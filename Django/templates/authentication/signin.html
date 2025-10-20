@@ -1,0 +1,185 @@
+{% extends '../layout/layout2.html' %} 
+
+
+{% block content %}
+<section class="auth bg-base d-flex flex-wrap">
+    <div class="auth-left d-lg-block d-none">
+        <div class="position-relative h-100 w-100">
+            <div id="particles-js"></div>
+            <div class="word-overlay">
+                <span class="big-word" id="big-word"></span>
+            </div>
+        </div>
+    </div>
+    <div class="auth-right py-32 px-24 d-flex flex-column justify-content-center">
+        <div class="max-w-464-px mx-auto w-100">
+            <div>
+                <a href="{% url 'index' %}" class="mb-40 max-w-290-px">
+                    <img src="/static/images/logo.png" alt="">
+                </a>
+                <h4 class="mb-12">Iniciar Sesión en tu Cuenta</h4>
+                <p class="mb-32 text-secondary-light text-lg">¡Bienvenido de vuelta! Por favor ingresa tus datos</p>
+            </div>
+            {% if form.errors %}
+                <div class="alert alert-danger">
+                    {{ form.errors }}
+                </div>
+            {% endif %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+            
+                        <form method="post">
+                {% csrf_token %}
+                                {% if request.GET.next %}
+                                    <input type="hidden" name="next" value="{{ request.GET.next }}" />
+                                {% endif %}
+                <div class="icon-field mb-16">
+                    <span class="icon top-50 translate-middle-y">
+                        <iconify-icon icon="mage:email"></iconify-icon>
+                    </span>
+                    <input type="text" name="username" class="form-control h-56-px bg-neutral-50 radius-12" placeholder="Usuario" required>
+                </div>
+                <div class="position-relative mb-20">
+                    <div class="icon-field">
+                        <span class="icon top-50 translate-middle-y">
+                            <iconify-icon icon="solar:lock-password-outline"></iconify-icon>
+                        </span>
+                        <input type="password" name="password" class="form-control h-56-px bg-neutral-50 radius-12" id="your-password" placeholder="Contraseña" required>
+                    </div>
+                    <span class="toggle-password ri-eye-line cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light" data-toggle="#your-password"></span>
+                </div>
+                <div class="">
+                    <div class="d-flex justify-content-between gap-2">
+                        <div class="form-check style-check d-flex align-items-center">
+                            <input class="form-check-input border border-neutral-300" type="checkbox" value="" id="remeber">
+                            <label class="form-check-label" for="remeber">Recordarme </label>
+                        </div>
+                        <a href="{% url 'forgotPassword' %}" class="text-primary-600 fw-medium">¿Olvidaste tu contraseña?</a>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary text-sm btn-sm px-12 py-16 w-100 radius-12 mt-32"> Iniciar Sesión</button>
+
+                <div class="mt-32 center-border-horizontal text-center">
+                    <span class="bg-base z-1 px-4">Or sign in with</span>
+                </div>
+                <div class="mt-32 d-flex align-items-center gap-3">
+                    <button type="button" class="fw-semibold text-primary-light py-16 px-24 w-50 border radius-12 text-md d-flex align-items-center justify-content-center gap-12 line-height-1 bg-hover-primary-50">
+                        <iconify-icon icon="ic:baseline-facebook" class="text-primary-600 text-xl line-height-1"></iconify-icon>
+                        Google
+                    </button>
+                    <button type="button" class="fw-semibold text-primary-light py-16 px-24 w-50 border radius-12 text-md d-flex align-items-center justify-content-center gap-12 line-height-1 bg-hover-primary-50">
+                        <iconify-icon icon="logos:google-icon" class="text-primary-600 text-xl line-height-1"></iconify-icon>
+                        Google
+                    </button>
+                </div>
+                <div class="mt-32 text-center text-sm">
+                    <p class="mb-0">Don’t have an account? <a href="{% url 'signup' %}" class="text-primary-600 fw-semibold">Sign Up</a></p>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</section>
+{% endblock content %}
+
+{% block script %}    
+<!-- Particles.js -->
+<script src="https://cdn.jsdelivr.net/particles.js/2.0.0/particles.min.js"></script>
+<style>
+    /* Fondo de partículas limitado a la columna izquierda del login */
+    .auth-left { position: relative; overflow: hidden; }
+    .auth-left #particles-js { position: absolute; inset: 0; width: 100%; height: 100%; background-color: #161718; background-repeat: no-repeat; background-size: cover; background-position: 50% 50%; }
+    /* Overlay de palabra grande abajo-izquierda */
+    .word-overlay{ position:absolute; inset:0; z-index:2; display:flex; align-items:flex-end; }
+    .word-overlay .big-word{ color:#fff; font-family:'Anton', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; font-size: clamp(42px, 9vw, 128px); letter-spacing: 1px; padding: 0 28px 28px; line-height: 1.02; text-shadow: 0 10px 24px rgba(0,0,0,.35); display:inline-block; white-space:nowrap; text-transform: uppercase; transform: translateX(-12%); opacity: 0; transition: transform 1.1s cubic-bezier(.22,.61,.36,1), opacity 1.1s cubic-bezier(.22,.61,.36,1); }
+    .word-overlay .big-word.show{ transform: translateX(0); opacity: 1; }
+    .word-overlay .big-word.leaving{ transform: translateX(10%); opacity: 0; transition-duration: .7s; }
+    /* Asegurar que el canvas ocupe el contenedor */
+    .auth-left canvas{ display:block; }
+    @media (max-width: 992px) { /* oculto por d-none ya, pero por si se muestra */ .auth-left #particles-js, .typewriter-overlay { display: none; } }
+    
+</style>
+<script>
+    // ================== Particles Background Init ==================
+    document.addEventListener('DOMContentLoaded', function() {
+        if (window.particlesJS) {
+            particlesJS("particles-js", {
+                particles:{
+                    number:{ value:80, density:{ enable:true, value_area:800 }},
+                    color:{ value:"#ffffff" },
+                    shape:{ type:"circle", stroke:{ width:0, color:"#000000" }, polygon:{ nb_sides:5 } },
+                    opacity:{ value:0.5, random:false, anim:{ enable:false, speed:1, opacity_min:0.1, sync:false } },
+                    size:{ value:3, random:true, anim:{ enable:false, speed:40, size_min:0.1, sync:false } },
+                    line_linked:{ enable:true, distance:150, color:"#ffffff", opacity:0.4, width:1 },
+                    move:{ enable:true, speed:6, direction:"none", random:false, straight:false, out_mode:"out", bounce:false, attract:{ enable:false, rotateX:600, rotateY:1200 } }
+                },
+                interactivity:{
+                    detect_on:"window",
+                    events:{ 
+                        onhover:{ enable:true, mode:["repulse","grab"] }, 
+                        onclick:{ enable:true, mode:["push","bubble"] }, 
+                        resize:true 
+                    },
+                    modes:{ 
+                        grab:{ distance:220, line_linked:{ opacity:0.6 } }, 
+                        bubble:{ distance:260, size:5, duration:1.6, opacity:0.9, speed:2 }, 
+                        repulse:{ distance:160, duration:0.45 }, 
+                        push:{ particles_nb:4 }, 
+                        remove:{ particles_nb:2 } 
+                    }
+                },
+                retina_detect:true
+            });
+        }
+
+        // Palabra grande alternando entre tokens de las frases
+        const words = [
+            'OPTIMIZA', 'CORTA', 'ARMA', 'CREA',
+            'DISEÑA', 'CALCULA', 'ENSAMBLA', 'SIN DESPERDICIO'
+        ];
+        const big = document.getElementById('big-word');
+        let wi = 0;
+        const hold = 2600; // duración en pantalla por palabra (ms)
+        const changeDelay = 300; // tiempo para transición de salida (ms)
+        function cycle() {
+            // Animar salida suave
+            big.classList.add('leaving');
+            setTimeout(() => {
+                // Cambiar palabra y animar entrada
+                big.textContent = words[wi % words.length];
+                big.classList.remove('leaving');
+                big.classList.add('show');
+                wi++;
+                setTimeout(cycle, hold);
+            }, changeDelay);
+        }
+        // Primera palabra con entrada suave
+        setTimeout(() => {
+            big.textContent = words[wi % words.length];
+            wi++;
+            big.classList.add('show');
+            setTimeout(cycle, hold);
+        }, 400);
+    });
+
+    // ================== Password Show Hide Js Start ==========
+    function initializePasswordToggle(toggleSelector) {
+        $(toggleSelector).on('click', function() {
+            $(this).toggleClass('ri-eye-off-line');
+            var input = $($(this).attr('data-toggle'));
+            if (input.attr('type') === 'password') {
+                input.attr('type', 'text');
+            } else {
+                input.attr('type', 'password');
+            }
+        });
+    }
+    // Call the function
+    initializePasswordToggle('.toggle-password');
+    // ========================= Password Show Hide Js End ===========================
+</script>
+{% endblock %}

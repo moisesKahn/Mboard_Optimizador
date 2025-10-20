@@ -1,0 +1,154 @@
+{% extends '../layout/layout.html' %} 
+
+{% block content %}
+
+<div class="card h-100 p-0 radius-12">
+    <div class="card-body p-24">
+        <div class="row justify-content-center">
+            <div class="col-xxl-6 col-xl-8 col-lg-10">
+                <div class="card border">
+                    <div class="card-header border-bottom border-primary-50 bg-primary-50 px-24 py-16">
+                        <h6 class="text-md text-primary-600 mb-0">Agregar Nuevo Tablero</h6>
+                    </div>
+                    <div class="card-body">
+                        <form action="#">
+                            <div class="mb-20">
+                                <label for="tableroId" class="form-label fw-semibold text-primary-light text-sm mb-8">ID Tablero <span class="text-danger-600">*</span></label>
+                                <input type="text" class="form-control radius-8" id="tableroId" placeholder="TB001" required>
+                                <small class="text-muted">Identificador único del tablero</small>
+                            </div>
+                            
+                            <div class="mb-20">
+                                <label for="nombreTablero" class="form-label fw-semibold text-primary-light text-sm mb-8">Nombre de Tablero <span class="text-danger-600">*</span></label>
+                                <input type="text" class="form-control radius-8" id="nombreTablero" placeholder="Tablero MDF 18mm" required>
+                                <small class="text-muted">Nombre descriptivo del tablero</small>
+                            </div>
+                            
+                            <div class="alert alert-info mb-20" style="border-left: 4px solid #0dcaf0; background-color: #d1ecf1; border-color: #bee5eb;">
+                                <div class="d-flex align-items-center">
+                                    <iconify-icon icon="solar:info-circle-outline" class="text-info fs-5 me-2"></iconify-icon>
+                                    <small>
+                                        <strong>Importante:</strong> El sistema ajustará automáticamente las medidas para que 
+                                        <strong>la medida más grande siempre sea el ancho (eje X)</strong>.
+                                        Ejemplo: Si ingresas 1220×2440, se guardará como 2440×1220.
+                                    </small>
+                                </div>
+                            </div>
+                            
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-20">
+                                        <label for="ancho" class="form-label fw-semibold text-primary-light text-sm mb-8">Ancho (Eje X) <span class="text-danger-600">*</span></label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control radius-8" id="ancho" placeholder="2440" required onblur="validarMedidasTablero()">
+                                            <span class="input-group-text">mm</span>
+                                        </div>
+                                        <small class="text-muted">Medida mayor del tablero</small>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-20">
+                                        <label for="alto" class="form-label fw-semibold text-primary-light text-sm mb-8">Largo (Eje Y) <span class="text-danger-600">*</span></label>
+                                        <div class="input-group">
+                                            <input type="number" class="form-control radius-8" id="alto" placeholder="1220" required onblur="validarMedidasTablero()">
+                                            <span class="input-group-text">mm</span>
+                                        </div>
+                                        <small class="text-muted">Medida menor del tablero</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-20">
+                                <label for="disponibilidad" class="form-label fw-semibold text-primary-light text-sm mb-8">Disponibilidad <span class="text-danger-600">*</span></label>
+                                <select class="form-control radius-8 form-select" id="disponibilidad" required>
+                                    <option value="">Seleccione disponibilidad</option>
+                                    <option value="disponible">Disponible</option>
+                                    <option value="agotado">Agotado</option>
+                                    <option value="en_reposicion">En Reposición</option>
+                                    <option value="descontinuado">Descontinuado</option>
+                                </select>
+                                <small class="text-muted">Estado actual del stock</small>
+                            </div>
+
+                            <div class="d-flex align-items-center justify-content-center gap-3">
+                                <button type="button" class="border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-56 py-11 radius-8" onclick="history.back()">
+                                    Cancelar
+                                </button>
+                                <button type="submit" class="btn btn-primary-600 text-md px-56 py-12 radius-8">
+                                    Guardar Tablero
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block script %}
+<script>
+function validarMedidasTablero() {
+    const anchoInput = document.getElementById('ancho');
+    const altoInput = document.getElementById('alto');
+    
+    if (!anchoInput || !altoInput) return;
+    
+    let ancho = parseFloat(anchoInput.value);
+    let alto = parseFloat(altoInput.value);
+    
+    // Solo validar si ambos campos tienen valores válidos
+    if (isNaN(ancho) || isNaN(alto) || ancho <= 0 || alto <= 0) {
+        return;
+    }
+    
+    // VALIDACIÓN: Asegurar que la medida más grande siempre sea el ancho (eje X)
+    if (alto > ancho) {
+        // Intercambiar valores automáticamente
+        const temp = ancho;
+        ancho = alto;
+        alto = temp;
+        
+        // Actualizar los inputs con los valores intercambiados
+        anchoInput.value = ancho;
+        altoInput.value = alto;
+        
+        // Mostrar notificación
+        mostrarNotificacion(`⚠️ Medidas ajustadas: ${ancho}×${alto}mm (la medida mayor debe ser el ancho)`, 'warning');
+    }
+}
+
+function mostrarNotificacion(mensaje, tipo = 'info') {
+    // Crear notificación simple
+    const alertDiv = document.createElement('div');
+    const colores = {
+        success: 'alert-success',
+        error: 'alert-danger', 
+        warning: 'alert-warning',
+        info: 'alert-info'
+    };
+    
+    alertDiv.className = `alert ${colores[tipo] || 'alert-info'} alert-dismissible fade show`;
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.style.minWidth = '350px';
+    alertDiv.innerHTML = `
+        ${mensaje}
+        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+    `;
+    
+    document.body.appendChild(alertDiv);
+    
+    // Auto-eliminar después de 5 segundos
+    setTimeout(() => {
+        if (alertDiv.parentElement) {
+            alertDiv.remove();
+        }
+    }, 5000);
+}
+</script>
+{% endblock %}

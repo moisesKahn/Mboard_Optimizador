@@ -1,0 +1,180 @@
+{% extends '../layout/layout.html' %} 
+
+{% block content %}
+{% csrf_token %}
+
+<div class="card h-100 p-0 radius-12">
+    <div class="card-header border-bottom bg-base py-16 px-24 d-flex align-items-center flex-wrap gap-3 justify-content-between">
+        <div class="d-flex align-items-center flex-wrap gap-3">
+            <form class="d-flex align-items-center gap-2" method="get">
+                <label class="mb-0 text-sm text-secondary-light">Mostrar</label>
+                <select name="page_size" class="form-select form-select-sm w-auto ps-12 py-6 radius-12 h-40-px" onchange="this.form.submit()">
+                    {% for n in page_sizes %}
+                    <option value="{{ n }}" {% if page_size == n %}selected{% endif %}>{{ n }}</option>
+                    {% endfor %}
+                </select>
+                <input type="hidden" name="page" value="1" />
+                <input type="text" class="bg-base h-40-px w-auto" name="search" placeholder="Buscar" value="{{ search }}">
+                <iconify-icon icon="ion:search-outline" class="icon"></iconify-icon>
+            </form>
+        </div>
+        <a href="{% url 'addUser' %}" class="btn btn-primary text-sm btn-sm px-12 py-12 radius-8 d-flex align-items-center gap-2">
+            <iconify-icon icon="ic:baseline-plus" class="icon text-xl line-height-1"></iconify-icon>
+            Agregar Nuevo Usuario
+        </a>
+    </div>
+    <div class="card-body p-24">
+        <div class="table-responsive scroll-sm">
+            <table class="table bordered-table sm-table mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">ID</th>
+                        <th scope="col">Nombre Completo</th>
+                        <th scope="col">Correo Electrónico</th>
+                        <th scope="col">Organización</th>
+                        <th scope="col">Rol del Sistema</th>
+                        <th scope="col" class="text-center">Estado</th>
+                        <th scope="col">Fecha de Creación</th>
+                        <th scope="col" class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for usuario in usuarios %}
+                    <tr>
+                        <td>{{ usuario.id|stringformat:"03d" }}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {% load ui_extras %}
+                                <div class="w-32-px h-32-px rounded-circle flex-shrink-0 me-8 d-flex align-items-center justify-content-center fw-bold text-white"
+                                     style="background-color:#6c5ce7;">
+                                    {{ usuario|user_initials }}
+                                </div>
+                                <span class="text-sm mb-0 fw-normal text-secondary-light">{{ usuario.get_full_name|default:usuario.username }}</span>
+                            </div>
+                        </td>
+                        <td><span class="text-sm mb-0 fw-normal text-secondary-light">{{ usuario.email|default:"-" }}</span></td>
+                        <td>
+                            {% if usuario.usuarioperfiloptimizador.organizacion %}
+                                <span class="bg-primary-50 text-primary-600 border border-primary-200 px-12 py-2 radius-4 fw-medium text-xs">{{ usuario.usuarioperfiloptimizador.organizacion.nombre }}</span>
+                            {% else %}
+                                <span class="bg-neutral-50 text-neutral-600 border border-neutral-200 px-12 py-2 radius-4 fw-medium text-xs">Sin Organización</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if usuario.usuarioperfiloptimizador.rol == 'super_admin' %}
+                                <span class="bg-warning-50 text-warning-600 border border-warning-200 px-12 py-2 radius-4 fw-medium text-xs">SUPER_ADMIN</span>
+                            {% elif usuario.usuarioperfiloptimizador.rol == 'org_admin' %}
+                                <span class="bg-success-50 text-success-600 border border-success-200 px-12 py-2 radius-4 fw-medium text-xs">ORG_ADMIN</span>
+                            {% elif usuario.usuarioperfiloptimizador.rol == 'agente' %}
+                                <span class="bg-info-50 text-info-600 border border-info-200 px-12 py-2 radius-4 fw-medium text-xs">AGENTE</span>
+                            {% else %}
+                                <span class="bg-secondary-50 text-secondary-600 border border-secondary-200 px-12 py-2 radius-4 fw-medium text-xs">SIN ROL</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if usuario.is_active %}
+                                <span class="bg-success-focus text-success-600 border border-success-main px-16 py-2 radius-4 fw-medium text-xs">Activo</span>
+                            {% else %}
+                                <span class="bg-neutral-200 text-neutral-600 border border-neutral-400 px-16 py-2 radius-4 fw-medium text-xs">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td><span class="text-xs text-secondary-light">{{ usuario.date_joined|date:"d M Y" }}</span></td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center gap-6 justify-content-center">
+                                <a href="{% url 'viewProfile' %}?user_id={{ usuario.id }}" class="bg-neutral-100 text-neutral-700 bg-hover-primary-50 text-hover-primary-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle text-decoration-none" title="Ver perfil">
+                                    <iconify-icon icon="mdi:eye-outline" class="text-sm"></iconify-icon>
+                                </a>
+                                <a href="{% url 'editUser' usuario.id %}" class="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle text-decoration-none">
+                                    <iconify-icon icon="lucide:edit" class="text-sm"></iconify-icon>
+                                </a>
+                                <button type="button" class="bg-danger-focus bg-hover-danger-200 text-danger-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle" onclick="confirmDelete('{{ usuario.id }}', '{{ usuario.get_full_name|default:usuario.username }}')">
+                                    <iconify-icon icon="fluent:delete-24-regular" class="text-sm"></iconify-icon>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center gap-3">
+                                <iconify-icon icon="heroicons:users" class="text-secondary-light" style="font-size: 48px;"></iconify-icon>
+                                <div>
+                                    <h6 class="text-secondary-light mb-1">No hay usuarios disponibles</h6>
+                                    <p class="text-xs text-secondary-light mb-0">Comienza agregando tu primer usuario</p>
+                                </div>
+                                <a href="{% url 'addUser' %}" class="btn btn-primary px-20 py-11">
+                                    <iconify-icon icon="ic:baseline-plus" class="text-xl me-1"></iconify-icon>
+                                    Agregar Usuario
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-24">
+            <span>{{ usuarios|length }} de {{ total }}</span>
+            <ul class="pagination d-flex flex-wrap align-items-center gap-2 justify-content-center">
+                {% with prev=page|add:-1 next=page|add:1 %}
+                <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+                    <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="?page={{ prev|default:1 }}&page_size={{ page_size }}&search={{ search }}&rol={{ rol_filter }}" aria-label="Anterior">
+                        <iconify-icon icon="ep:d-arrow-left"></iconify-icon>
+                    </a>
+                </li>
+                <li class="page-item active"><a class="page-link bg-primary-600 text-white border-0" href="#" aria-current="page">{{ page }}</a></li>
+                <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+                    <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="?page={{ next|default:total_pages }}&page_size={{ page_size }}&search={{ search }}&rol={{ rol_filter }}" aria-label="Siguiente">
+                        <iconify-icon icon="ep:d-arrow-right"></iconify-icon>
+                    </a>
+                </li>
+                {% endwith %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block script %}
+<script>
+    // Función para confirmar eliminación de usuario
+    function confirmDelete(userId, userName) {
+        if (confirm('¿Estás seguro de que quieres desactivar al usuario "' + userName + '"?\n\nEl usuario será desactivado y no podrá acceder al sistema.')) {
+            $.ajax({
+                url: '{% url "delete_user" 0 %}'.replace('0', userId),
+                type: 'POST',
+                headers: {
+                    'X-CSRFToken': $('[name=csrfmiddlewaretoken]').val()
+                },
+                success: function(result) {
+                    if (result.success) {
+                        $('button[onclick*="' + userId + '"]').closest('tr').fadeOut(300, function() {
+                            $(this).remove();
+                        });
+                        alert('Usuario desactivado exitosamente');
+                    } else {
+                        alert('Error: ' + result.message);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    alert('Error al desactivar usuario: ' + error);
+                }
+            });
+        }
+    }
+
+    // Select all functionality
+    document.addEventListener('DOMContentLoaded', function() {
+        const selectAllCheckbox = document.querySelector('input[name="selectAll"]');
+        if (selectAllCheckbox) {
+            selectAllCheckbox.addEventListener('change', function() {
+                const userCheckboxes = document.querySelectorAll('input[name="userIds"]');
+                userCheckboxes.forEach(checkbox => {
+                    checkbox.checked = this.checked;
+                });
+            });
+        }
+    });
+</script>
+{% endblock %}

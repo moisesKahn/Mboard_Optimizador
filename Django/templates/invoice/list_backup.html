@@ -1,0 +1,790 @@
+{% extends '../layout/layout.html' %} 
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <form method="GET" class="d-flex align-items-center gap-3">
+                <div class="icon-field">
+                    <input type="text" name="search" value="{{ search }}" class="form-control form-control-sm w-auto" placeholder="Buscar proyecto, cliente o RUT...">
+                    <span class="icon">
+                        <iconify-icon icon="ion:search-outline"></iconify-icon>
+                    </span>
+                </div>
+                <select name="estado" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value="">Todos los Estados</option>
+                    {% for value, label in estados %}
+                        <option value="{{ value }}" {% if estado_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <select name="cliente" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value="">Todos los Clientes</option>
+                    {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" {% if cliente_filter == cliente.id|stringformat:'s' %}selected{% endif %}>{{ cliente.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-secondary">Buscar</button>
+            </form>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <a href="{% url 'optimizador_home' %}" class="btn btn-sm btn-primary-600"><i class="ri-add-line"></i> Crear Proyecto</a>
+            <a href="{% url 'clientes_agregar' %}" class="btn btn-sm btn-success-600"><i class="ri-user-add-line"></i> Nuevo Cliente</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive" style="overflow-x: auto;">
+            <table class="table bordered-table mb-0" style="min-width: 1200px;">
+            <thead>
+                <tr>
+                    <th scope="col" style="width: 80px;">ID</th>
+                    <th scope="col" style="width: 280px;">Nombre del Proyecto</th>
+                    <th scope="col" style="width: 200px;">Cliente</th>
+                    <th scope="col" style="width: 120px;">RUT Cliente</th>
+                    <th scope="col" style="width: 200px;">Encargado</th>
+                    <th scope="col" style="width: 120px;">Fecha de Creación</th>
+                    <th scope="col" style="width: 120px;">Estado</th>
+                    <th scope="col" style="width: 140px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for proyecto in proyectos %}
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">{{ proyecto.codigo }}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-primary-50 text-primary-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:document-text-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">{{ proyecto.nombre }}</h6>
+                                <span class="text-sm text-secondary-light">#{{ proyecto.codigo }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">{{ proyecto.cliente.nombre }}</h6>
+                            <span class="text-xs text-secondary-light">{{ proyecto.cliente.rut }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">{{ proyecto.cliente.rut }}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-secondary-50 text-secondary-600 rounded-circle flex-shrink-0 me-12 d-flex align-items-center justify-content-center">
+                                <iconify-icon icon="solar:user-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">{{ proyecto.creado_por.get_full_name|default:proyecto.creado_por.username }}</h6>
+                                <span class="text-xs text-secondary-light">
+                                    {% if proyecto.creado_por.usuarioperfiloptimizador %}
+                                        {{ proyecto.creado_por.usuarioperfiloptimizador.empresa|default:"Sistema" }} / {{ proyecto.creado_por.usuarioperfiloptimizador.get_rol_display }}
+                                    {% else %}
+                                        Sistema / Admin
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">{{ proyecto.fecha_creacion|date:"d M Y" }}</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="{{ proyecto.id }}" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            {% for value, label in estados %}
+                                <option value="{{ value }}" {% if proyecto.estado == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('{{ proyecto.codigo }}')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="{% url 'optimizador_abrir' proyecto.id %}" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center" onclick="deleteProject('{{ proyecto.id }}')">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-4">
+                        <div class="d-flex flex-column align-items-center">
+                            <iconify-icon icon="solar:folder-open-outline" class="text-5xl text-secondary-light mb-3"></iconify-icon>
+                            <h6 class="text-lg text-secondary-light">No hay proyectos disponibles</h6>
+                            <p class="text-sm text-secondary-light mb-3">¿Por qué no crear el primer proyecto?</p>
+                            <a href="{% url 'optimizador_home' %}" class="btn btn-primary-600 btn-sm">
+                                <i class="ri-add-line"></i> Crear Primer Proyecto
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-success-50 text-success-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:code-square-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Plataforma E-commerce Muebles</h6>
+                                <span class="text-sm text-secondary-light">#PRY-002</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Rodrigo Jiménez Soto</h6>
+                            <span class="text-xs text-secondary-light">18.765.432-1</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">18.765.432-1</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list2.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">Ana García López</h6>
+                                <span class="text-xs text-secondary-light">Dimaplac / ORG_ADMIN</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">22 Ene 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="002" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado">Sin Estado</option>
+                            <option value="sin_iniciar">Sin Iniciar</option>
+                            <option value="en_curso" selected>En Curso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('002')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">003</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-warning-50 text-warning-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:palette-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">App Móvil Gestión Logística</h6>
+                                <span class="text-sm text-secondary-light">#PRY-003</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Carmen Morales Espinoza</h6>
+                            <span class="text-xs text-secondary-light">12.987.654-3</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">12.987.654-3</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list3.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">Roberto Fernández Cruz</h6>
+                                <span class="text-xs text-secondary-light">Imperial / AGENT</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">05 Feb 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="003" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado">Sin Estado</option>
+                            <option value="sin_iniciar" selected>Sin Iniciar</option>
+                            <option value="en_curso">En Curso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('003')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">004</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-info-50 text-info-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:chart-2-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Optimización Costos Producción</h6>
+                                <span class="text-sm text-secondary-light">#PRY-004</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Diego Vargas Mendoza</h6>
+                            <span class="text-xs text-secondary-light">16.543.210-9</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">16.543.210-9</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list4.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">María Teresa Gómez</h6>
+                                <span class="text-xs text-secondary-light">Falabella / USER</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">18 Feb 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="004" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado" selected>Sin Estado</option>
+                            <option value="sin_iniciar">Sin Iniciar</option>
+                            <option value="en_curso">En Curso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('004')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">005</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-danger-50 text-danger-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:graph-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Análisis Eficiencia Materiales</h6>
+                                <span class="text-sm text-secondary-light">#PRY-005</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Francisca Ramírez Castro</h6>
+                            <span class="text-xs text-secondary-light">13.456.789-0</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">13.456.789-0</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list5.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">Luis Alberto Díaz</h6>
+                                <span class="text-xs text-secondary-light">Paris / MODERATOR</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">28 Feb 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="005" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado">Sin Estado</option>
+                            <option value="sin_iniciar">Sin Iniciar</option>
+                            <option value="en_curso" selected>En Curso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('005')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">006</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-secondary-50 text-secondary-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:widget-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Monitor Rendimiento Recursos</h6>
+                                <span class="text-sm text-secondary-light">#PRY-006</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Alejandro Pérez Fuentes</h6>
+                            <span class="text-xs text-secondary-light">14.321.987-6</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">14.321.987-6</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list1.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">Carlos Martínez Silva</h6>
+                                <span class="text-xs text-secondary-light">Sodimac / SUPER_ADMIN</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">03 Mar 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="006" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado">Sin Estado</option>
+                            <option value="sin_iniciar">Sin Iniciar</option>
+                            <option value="en_curso">En Curso</option>
+                            <option value="terminado" selected>Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('006')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">007</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-purple-50 text-purple-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:box-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Plataforma Gestión Inventario</h6>
+                                <span class="text-sm text-secondary-light">#PRY-007</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Valentina Silva Rojas</h6>
+                            <span class="text-xs text-secondary-light">11.654.789-2</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">11.654.789-2</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list2.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">Ana García López</h6>
+                                <span class="text-xs text-secondary-light">Dimaplac / ORG_ADMIN</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">15 Mar 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="007" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado">Sin Estado</option>
+                            <option value="sin_iniciar" selected>Sin Iniciar</option>
+                            <option value="en_curso">En Curso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('007')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">008</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-success-50 text-success-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:transmission-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Automatización Cadena Suministro</h6>
+                                <span class="text-sm text-secondary-light">#PRY-008</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Ignacio Muñoz Bravo</h6>
+                            <span class="text-xs text-secondary-light">17.234.561-4</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">17.234.561-4</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list3.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">Roberto Fernández Cruz</h6>
+                                <span class="text-xs text-secondary-light">Imperial / AGENT</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">22 Mar 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="008" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado" selected>Sin Estado</option>
+                            <option value="sin_iniciar">Sin Iniciar</option>
+                            <option value="en_curso">En Curso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('008')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">009</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-warning-50 text-warning-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:calculator-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Calculadora Costos Materiales</h6>
+                                <span class="text-sm text-secondary-light">#PRY-009</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Sofía Herrera Núñez</h6>
+                            <span class="text-xs text-secondary-light">19.876.543-7</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">19.876.543-7</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list4.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">María Teresa Gómez</h6>
+                                <span class="text-xs text-secondary-light">Falabella / USER</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">28 Mar 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="009" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado">Sin Estado</option>
+                            <option value="sin_iniciar">Sin Iniciar</option>
+                            <option value="en_curso" selected>En Curso</option>
+                            <option value="terminado">Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('009')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">010</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-info-50 text-info-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:settings-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">Configurador Parámetros Avanzados</h6>
+                                <span class="text-sm text-secondary-light">#PRY-010</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">Benjamín Torres Vega</h6>
+                            <span class="text-xs text-secondary-light">20.123.456-5</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">20.123.456-5</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <img src="/static/images/user-list/user-list5.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-12">
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">Luis Alberto Díaz</h6>
+                                <span class="text-xs text-secondary-light">Paris / MODERATOR</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">05 Abr 2024</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="010" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            <option value="sin_estado">Sin Estado</option>
+                            <option value="sin_iniciar">Sin Iniciar</option>
+                            <option value="en_curso">En Curso</option>
+                            <option value="terminado" selected>Terminado</option>
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('010')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-24">
+            <span>Mostrando 1 a 10 de 10 proyectos</span>
+            <ul class="pagination d-flex flex-wrap align-items-center gap-2 justify-content-center">
+                <li class="page-item">
+                    <a class="page-link text-secondary-light fw-medium radius-4 border-0 px-10 py-10 d-flex align-items-center justify-content-center h-32-px w-32-px bg-base" href="javascript:void(0)">
+                        <iconify-icon icon="ep:d-arrow-left" class="text-xl"></iconify-icon>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link bg-primary-600 text-white fw-medium radius-4 border-0 px-10 py-10 d-flex align-items-center justify-content-center h-32-px w-32-px" href="javascript:void(0)">1</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link text-secondary-light fw-medium radius-4 border-0 px-10 py-10 d-flex align-items-center justify-content-center h-32-px w-32-px bg-base" href="javascript:void(0)">2</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link text-secondary-light fw-medium radius-4 border-0 px-10 py-10 d-flex align-items-center justify-content-center h-32-px w-32-px bg-base" href="javascript:void(0)">3</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link text-secondary-light fw-medium radius-4 border-0 px-10 py-10 d-flex align-items-center justify-content-center h-32-px w-32-px bg-base" href="javascript:void(0)">4</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link text-secondary-light fw-medium radius-4 border-0 px-10 py-10 d-flex align-items-center justify-content-center h-32-px w-32-px bg-base" href="javascript:void(0)">
+                        <iconify-icon icon="ep:d-arrow-right" class="text-xl"></iconify-icon>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% include 'invoice/project_preview_modal.html' %}
+
+<style>
+.status-select {
+    border: 1px solid #e0e6ed;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 0.875rem;
+    transition: all 0.3s ease;
+}
+
+.status-select:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 0.2rem rgba(59, 130, 246, 0.15);
+}
+
+.status-select option[value="sin_estado"] {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.status-select option[value="sin_iniciar"] {
+    background-color: #e3f2fd;
+    color: #1976d2;
+}
+
+.status-select option[value="en_curso"] {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+.status-select option[value="terminado"] {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.status-update-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #28a745;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    font-weight: 500;
+    z-index: 1050;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+}
+
+.status-update-notification.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+</style>
+
+<script>
+function updateProjectStatus(selectElement) {
+    const projectId = selectElement.getAttribute('data-project-id');
+    const newStatus = selectElement.value;
+    const statusNames = {
+        'sin_estado': 'Sin Estado',
+        'sin_iniciar': 'Sin Iniciar', 
+        'en_curso': 'En Curso',
+        'terminado': 'Terminado'
+    };
+    
+    // Agregar clase de carga visual
+    selectElement.style.opacity = '0.7';
+    selectElement.disabled = true;
+    
+    // Simular una llamada AJAX (en el futuro se puede conectar con el backend)
+    setTimeout(() => {
+        // Restaurar el elemento
+        selectElement.style.opacity = '1';
+        selectElement.disabled = false;
+        
+        // Mostrar notificación de éxito
+        showStatusUpdateNotification(projectId, statusNames[newStatus]);
+        
+        // Aquí se agregaría la lógica para enviar al servidor
+        console.log(`Proyecto ${projectId} actualizado a: ${statusNames[newStatus]}`);
+    }, 500);
+}
+
+function showStatusUpdateNotification(projectId, statusName) {
+    // Crear o obtener el elemento de notificación
+    let notification = document.querySelector('.status-update-notification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.className = 'status-update-notification';
+        document.body.appendChild(notification);
+    }
+    
+    // Configurar el mensaje
+    notification.innerHTML = `
+        <i class="ri-check-line me-2"></i>
+        Proyecto #${projectId} actualizado a: ${statusName}
+    `;
+    
+    // Mostrar la notificación
+    notification.classList.add('show');
+    
+    // Ocultar después de 3 segundos
+    setTimeout(() => {
+        notification.classList.remove('show');
+    }, 3000);
+}
+
+// Aplicar colores dinámicos basados en el estado seleccionado
+document.addEventListener('DOMContentLoaded', function() {
+    const statusSelects = document.querySelectorAll('.status-select');
+    
+    statusSelects.forEach(select => {
+        updateSelectStyle(select);
+        
+        select.addEventListener('change', function() {
+            updateSelectStyle(this);
+        });
+    });
+});
+
+function updateSelectStyle(select) {
+    const value = select.value;
+    
+    // Remover todas las clases de color
+    select.classList.remove('text-secondary', 'text-info', 'text-warning', 'text-success');
+    
+    // Aplicar color basado en el estado
+    switch(value) {
+        case 'sin_estado':
+            select.classList.add('text-secondary');
+            break;
+        case 'sin_iniciar':
+            select.classList.add('text-info');
+            break;
+        case 'en_curso':
+            select.classList.add('text-warning');
+            break;
+        case 'terminado':
+            select.classList.add('text-success');
+            break;
+    }
+}
+</script>
+
+{% endblock content %}

@@ -1,0 +1,220 @@
+{% extends '../layout/layout.html' %}
+
+{% block title %}{{ title }}{% endblock title %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">{{ title }}</h6>
+    <ul class="d-flex align-items-center gap-2">
+        <li class="fw-medium">
+            <a href="{% url 'index' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                <iconify-icon icon="solar:home-smile-angle-outline" class="icon text-lg"></iconify-icon>
+                Dashboard
+            </a>
+        </li>
+        <li>-</li>
+        <li class="fw-medium">{{ subTitle }}</li>
+    </ul>
+</div>
+
+<div class="card">
+    <div class="card-header border-bottom bg-base py-16 px-24">
+        <div class="d-flex align-items-center flex-wrap gap-3 justify-content-between">
+            <div class="d-flex align-items-center flex-wrap gap-3">
+                <span class="text-md fw-medium text-secondary-light mb-0">Lista de Organizaciones</span>
+            </div>
+            <div class="d-flex align-items-center flex-wrap gap-3">
+                <form method="get" class="d-flex align-items-center gap-2 navbar-search">
+                    <label class="mb-0 text-sm text-secondary-light">Mostrar</label>
+                    <select name="page_size" class="form-select form-select-sm w-auto ps-12 py-6 radius-8 h-40-px" onchange="this.form.submit()">
+                        {% for n in page_sizes %}
+                        <option value="{{ n }}" {% if page_size == n %}selected{% endif %}>{{ n }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="page" value="1" />
+                    <input type="text" class="bg-base h-40-px w-auto" name="search" 
+                           placeholder="Buscar organizaciones..." value="{{ search }}">
+                    <iconify-icon icon="ion:search-outline" class="icon"></iconify-icon>
+                </form>
+                <a href="{% url 'organizaciones_agregar' %}" class="btn btn-primary text-sm btn-sm px-12 py-12 radius-8 d-flex align-items-center gap-2">
+                    <iconify-icon icon="ic:baseline-plus" class="icon text-xl line-height-1"></iconify-icon>
+                    Agregar Organización
+                </a>
+            </div>
+        </div>
+    </div>
+    <div class="card-body p-24">
+        <div class="table-responsive scroll-sm">
+            <table class="table bordered-table sm-table mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col">Código</th>
+                        <th scope="col">Nombre</th>
+                        <th scope="col">Teléfono</th>
+                        <th scope="col">Email</th>
+                        <th scope="col" class="text-center">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for organizacion in organizaciones %}
+                    <tr>
+                        <td>
+                            <span class="text-md mb-0 fw-normal text-secondary-light">{{ organizacion.codigo }}</span>
+                        </td>
+                        <td>
+                            <span class="text-md mb-0 fw-normal text-secondary-light">{{ organizacion.nombre }}</span>
+                        </td>
+                        <td>
+                            <span class="text-md mb-0 fw-normal text-secondary-light">{{ organizacion.telefono|default:"-" }}</span>
+                        </td>
+                        <td>
+                            <span class="text-md mb-0 fw-normal text-secondary-light">{{ organizacion.email|default:"-" }}</span>
+                        </td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center gap-10 justify-content-center">
+                                <a href="{% url 'organizaciones_detalle' organizacion.id %}" class="bg-primary-focus text-primary-600 bg-hover-primary-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle" title="Ver perfil">
+                                    <iconify-icon icon="lucide:eye" class="menu-icon"></iconify-icon>
+                                </a>
+                                <a href="{% url 'organizaciones_editar' organizacion.id %}" 
+                                   class="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="lucide:edit" class="menu-icon"></iconify-icon>
+                                </a>
+                <button type="button" class="bg-danger-focus text-danger-600 bg-hover-danger-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle"
+                    data-id="{{ organizacion.id }}" data-nombre="{{ organizacion.nombre|escape }}"
+                    onclick="eliminarOrganizacion(this.dataset.id, this.dataset.nombre)">
+                                    <iconify-icon icon="lucide:trash-2" class="menu-icon"></iconify-icon>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center gap-3">
+                                <iconify-icon icon="heroicons:building-office-2" class="text-secondary-light" style="font-size: 48px;"></iconify-icon>
+                                <div>
+                                    <h6 class="text-secondary-light mb-1">No hay organizaciones disponibles</h6>
+                                    <p class="text-xs text-secondary-light mb-0">Comienza agregando tu primera organización</p>
+                                </div>
+                                <a href="{% url 'organizaciones_agregar' %}" class="btn btn-primary px-20 py-11">
+                                    <iconify-icon icon="ic:baseline-plus" class="text-xl me-1"></iconify-icon>
+                                    Agregar Organización
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-24">
+    <span>Mostrando {{ organizaciones|length }} de {{ total }} organizacion{{ total|pluralize:"es" }} • Página {{ page }} de {{ total_pages }}</span>
+    <ul class="pagination d-flex flex-wrap align-items-center gap-2 justify-content-center">
+    {% with prev=page|add:-1 next=page|add:1 near_last=total_pages|add:-1 %}
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="?page={{ prev|default:1 }}&page_size={{ page_size }}&search={{ search }}">
+                <iconify-icon icon="ep:d-arrow-left"></iconify-icon>
+            </a>
+        </li>
+        <li class="page-item"><a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px" href="?page=1&page_size={{ page_size }}&search={{ search }}">1</a></li>
+        {% if total_pages > 1 %}
+            {% if page > 2 %}<li class="page-item"><span class="page-link border-0">…</span></li>{% endif %}
+            <li class="page-item active"><a class="page-link bg-primary-600 text-white border-0" href="#">{{ page }}</a></li>
+                    {% if page < near_last %}<li class="page-item"><span class="page-link border-0">…</span></li>{% endif %}
+            <li class="page-item"><a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px" href="?page={{ total_pages }}&page_size={{ page_size }}&search={{ search }}">{{ total_pages }}</a></li>
+        {% endif %}
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+            <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="?page={{ next|default:total_pages }}&page_size={{ page_size }}&search={{ search }}">
+                <iconify-icon icon="ep:d-arrow-right"></iconify-icon>
+            </a>
+        </li>
+    {% endwith %}
+    </ul>
+</div>
+<!-- Modal de confirmación para eliminar -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirmar Eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Está seguro que desea eliminar la organización <strong id="organizacionNombre"></strong>?</p>
+                <p class="text-danger"><small>Esta acción no se puede deshacer.</small></p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmDelete">Eliminar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 1050">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% endblock %}
+
+{% block script %}
+<script>
+let organizacionIdToDelete = null;
+
+function eliminarOrganizacion(id, nombre) {
+    organizacionIdToDelete = id;
+    document.getElementById('organizacionNombre').textContent = nombre;
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+}
+
+document.getElementById('confirmDelete').addEventListener('click', function() {
+    if (organizacionIdToDelete) {
+        // Crear formulario para envío
+        const form = document.createElement('form');
+        form.method = 'post';
+        form.action = `/organizaciones/eliminar/${organizacionIdToDelete}/`;
+        
+        // Token CSRF
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]');
+        if (csrfToken) {
+            const csrfInput = document.createElement('input');
+            csrfInput.type = 'hidden';
+            csrfInput.name = 'csrfmiddlewaretoken';
+            csrfInput.value = csrfToken.value;
+            form.appendChild(csrfInput);
+        }
+        
+        document.body.appendChild(form);
+        form.submit();
+    }
+});
+
+// Select all functionality
+document.getElementById('selectAll').addEventListener('change', function() {
+    const checkboxes = document.querySelectorAll('input[name="organizacionIds"]');
+    checkboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+    });
+});
+
+// Auto-hide alerts after 5 seconds
+setTimeout(function() {
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(function(alert) {
+        const bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+    });
+}, 5000);
+</script>
+{% endblock %}

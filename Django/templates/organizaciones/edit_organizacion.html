@@ -1,0 +1,127 @@
+{% extends '../layout/layout.html' %}
+
+{% block title %}{{ title }}{% endblock title %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">{{ title }}</h6>
+    <ul class="d-flex align-items-center gap-2">
+        <li class="fw-medium">
+            <a href="{% url 'index' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                <iconify-icon icon="solar:home-smile-angle-outline" class="icon text-lg"></iconify-icon>
+                Dashboard
+            </a>
+        </li>
+        <li>-</li>
+        <li class="fw-medium">
+            <a href="{% url 'organizaciones_lista' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                Organizaciones
+            </a>
+        </li>
+        <li>-</li>
+        <li class="fw-medium">{{ subTitle }}</li>
+    </ul>
+</div>
+
+<div class="row gy-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">{{ title }}</h6>
+            </div>
+            <div class="card-body">
+                <form method="post" class="row gy-3">
+                    {% csrf_token %}
+                    <div class="col-12">
+                        <label for="codigo" class="form-label">Código <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="codigo" name="codigo" 
+                               value="{{ organizacion.codigo }}" required>
+                    </div>
+                    
+                    <div class="col-12">
+                        <label for="nombre" class="form-label">Nombre <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="nombre" name="nombre" 
+                               value="{{ organizacion.nombre }}" required>
+                    </div>
+                    
+                    <div class="col-12">
+                        <label for="direccion" class="form-label">Dirección</label>
+                        <textarea class="form-control" id="direccion" name="direccion" 
+                                  rows="3">{{ organizacion.direccion }}</textarea>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="telefono" class="form-label">Teléfono</label>
+                        <input type="text" class="form-control" id="telefono" name="telefono" 
+                               value="{{ organizacion.telefono }}">
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" 
+                               value="{{ organizacion.email }}">
+                    </div>
+                    
+                    <div class="col-12">
+                        <div class="d-flex align-items-center gap-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ri-save-line me-1"></i>
+                                Actualizar Organización
+                            </button>
+                            <a href="{% url 'organizaciones_lista' %}" class="btn btn-secondary">
+                                <i class="ri-arrow-left-line me-1"></i>
+                                Volver
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Información Adicional</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-column gap-3">
+                    <div>
+                        <label class="text-sm text-secondary-light">Creado:</label>
+                        <p class="text-sm">{{ organizacion.created_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                    <div>
+                        <label class="text-sm text-secondary-light">Última actualización:</label>
+                        <p class="text-sm">{{ organizacion.updated_at|date:"d/m/Y H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if messages %}
+    <div class="position-fixed top-0 end-0 p-3" style="z-index: 1050">
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    </div>
+{% endif %}
+
+{% endblock %}
+
+{% block script %}
+<script>
+    // Auto-hide alerts after 5 seconds
+    setTimeout(function() {
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
+        });
+    }, 5000);
+</script>
+{% endblock %}

@@ -1,0 +1,1 @@
+\d core_organizacion;

@@ -1,0 +1,21 @@
+INSTRUCCIONES PARA EL PDF DEL PROYECTO 002
+===============================================
+
+Para que funcione correctamente la vista PDF del Proyecto 002, necesitas:
+
+1. Copiar el archivo PDF original: "proyecto_optimizacion_profesional (35).pdf"
+2. Renombrarlo como: "proyecto_optimizacion_profesional_002.pdf" 
+3. Colocarlo en esta carpeta: /static/pdfs/
+
+El archivo debe estar en formato PDF y contener el reporte de optimización original.
+
+Una vez copiado el PDF, el Proyecto 002 mostrará el documento original incrustado 
+en el modal con opciones para:
+- Ver en nueva pestaña
+- Descargar el archivo
+- Visualizar directamente en el modal
+
+RUTA ACTUAL ESPERADA:
+/static/pdfs/proyecto_optimizacion_profesional_002.pdf
+
+NOTA: Este archivo de texto es temporal. Reemplázalo con el PDF real.

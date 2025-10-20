@@ -1,0 +1,67 @@
+<table class="table bordered-table mb-0" id="dataTable" data-page-length='10'>
+    <thead>
+        <tr>
+            <th scope="col">Código</th>
+            <th scope="col">Nombre</th>
+            <th scope="col">Tipo</th>
+            <th scope="col">Dimensiones</th>
+            <th scope="col">Espesor</th>
+            <th scope="col">Precio por tablero</th>
+            <th scope="col">Stock</th>
+            <th scope="col">Acción</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for material in materiales %}
+        <tr>
+            <td>{{ material.codigo }}</td>
+            <td>{{ material.nombre }}</td>
+            <td>{{ material.get_tipo_display }}</td>
+            <td>{{ material.ancho }} x {{ material.largo }} mm</td>
+            <td>{{ material.espesor }} mm</td>
+            <td>
+                <span class="precio-tablero"
+                      data-precio-m2="{{ material.precio_m2 }}"
+                      data-ancho="{{ material.ancho }}"
+                      data-largo="{{ material.largo }}">
+                    —
+                </span>
+            </td>
+            <td>
+                {% if material.stock > 0 %}
+                    <span class="bg-success-focus text-success-main px-24 py-4 rounded-pill fw-medium text-sm">{{ material.stock }} unid</span>
+                {% else %}
+                    <span class="bg-warning-focus text-warning-main px-24 py-4 rounded-pill fw-medium text-sm">Agotado</span>
+                {% endif %}
+            </td>
+            <td>
+                <div class="d-flex align-items-center gap-10">
+                    <button type="button" class="bg-info-focus text-info-main bg-hover-info-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle">
+                        <iconify-icon icon="solar:eye-outline" class="menu-icon"></iconify-icon>
+                    </button>
+                    <a href="{% url 'edit_tablero' material.id %}" class="bg-success-focus text-success-main bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle text-decoration-none">
+                        <iconify-icon icon="lucide:edit" class="menu-icon"></iconify-icon>
+                    </a>
+                    <button type="button" class="remove-item-btn bg-danger-focus bg-hover-danger-200 text-danger-main fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle" data-id="{{ material.id }}" data-nombre="{{ material.nombre }}" onclick="confirmDelete(this)">
+                        <iconify-icon icon="fluent:delete-24-regular" class="menu-icon"></iconify-icon>
+                    </button>
+                </div>
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="8" class="text-center py-4">
+                <div class="text-muted">
+                    <iconify-icon icon="solar:box-outline" class="text-4xl mb-2"></iconify-icon>
+                    <p>No hay tableros disponibles</p>
+                    {% if not search %}
+                        <a href="{% url 'add_tablero' %}" class="btn btn-sm btn-primary">Agregar Primer Tablero</a>
+                    {% else %}
+                        <p class="small">Intenta con otros términos de búsqueda</p>
+                    {% endif %}
+                </div>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>

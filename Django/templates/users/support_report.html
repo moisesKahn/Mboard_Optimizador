@@ -1,0 +1,83 @@
+{% extends 'index.html' %}
+{% block content %}
+<div class="container mt-4">
+  <div class="d-flex justify-content-between align-items-center">
+    <h3 class="mb-0">{{ title }}</h3>
+    <button id="bulkDeleteBtn" class="btn btn-sm btn-danger">Eliminar todos excepto yo</button>
+  </div>
+  <table class="table table-striped mt-3">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Usuario</th>
+        <th>Rol</th>
+        <th>Organización</th>
+        <th>Último acceso</th>
+        <th>Forzar cambio contraseña</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for u in usuarios %}
+      <tr>
+        <td>{{ u.id }}</td>
+        <td>{{ u.username }}</td>
+        <td>{{ u.rol|default:'-' }}</td>
+        <td>{{ u.organizacion|default:'-' }}</td>
+        <td>{% if u.ultimo_acceso %}{{ u.ultimo_acceso|date:'Y-m-d H:i' }}{% else %}-{% endif %}</td>
+        <td>
+          <button class="btn btn-sm btn-warning force-btn" data-user-id="{{ u.id }}">Forzar</button>
+          {% if u.must_change_password %}<span class="badge bg-info ms-2">Pendiente</span>{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+async function forcePwd(userId){
+  const res = await fetch(`/users/force-password-change/${userId}/`, {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}});
+  const data = await res.json().catch(()=>({}));
+  if(data && data.success){
+    location.reload();
+  } else {
+    alert(data.message || 'No se pudo marcar el cambio de contraseña');
+  }
+}
+document.addEventListener('DOMContentLoaded', ()=>{
+  document.querySelectorAll('.force-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const id = btn.getAttribute('data-user-id');
+      forcePwd(id);
+    });
+  });
+  const bulkBtn = document.getElementById('bulkDeleteBtn');
+  if(bulkBtn){
+    bulkBtn.addEventListener('click', async ()=>{
+      if(!confirm('¿Seguro que deseas desactivar a TODOS los usuarios excepto tu cuenta? Esta acción es reversible (se pueden reactivar), pero afectará el acceso de otros.')) return;
+      const res = await fetch('/users/bulk-delete-others/', {method:'POST', headers:{'X-CSRFToken': getCookie('csrftoken')}});
+      const data = await res.json().catch(()=>({}));
+      if(data && data.success){
+        alert(`Usuarios desactivados: ${data.deleted}`);
+        location.reload();
+      } else {
+        alert(data.message || 'No se pudo ejecutar la eliminación masiva');
+      }
+    });
+  }
+});
+function getCookie(name) {
+  let cookieValue = null;
+  if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim();
+          if (cookie.substring(0, name.length + 1) === (name + '=')) {
+              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+              break;
+          }
+      }
+  }
+  return cookieValue;
+}
+</script>
+{% endblock %}

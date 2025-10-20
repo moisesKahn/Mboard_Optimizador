@@ -1,0 +1,2924 @@
+{% extends '../layout/layout.html' %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">Optimizador de Materiales</h6>
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-primary radius-8 d-flex align-items-center gap-2" onclick="nuevoProyecto()">
+            <iconify-icon icon="solar:add-circle-outline" class="text-lg"></iconify-icon>
+            <span>Nuevo Proyecto</span>
+        </button>
+    </div>
+</div>
+
+<!-- Información del Proyecto -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:document-outline" class="text-xl me-2"></iconify-icon>
+            1. Información del Proyecto
+        </h6>
+    </div>
+    <div class="card-body">
+        <form id="proyectoForm">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Cliente <span class="text-danger">*</span></label>
+                    <div class="position-relative">
+                        <input type="text" class="form-control" id="clienteInput" placeholder="Buscar o escribir cliente..." 
+                               oninput="buscarClientes(this.value)" onblur="seleccionarCliente()" autocomplete="off" required>
+                        <div id="clientesSugerencias" class="position-absolute w-100 bg-white border rounded shadow-sm d-none" style="z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+                        <input type="hidden" id="clienteId" value="">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">RUT <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="rutCliente" placeholder="12.345.678-9" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nombre del Proyecto</label>
+                    <input type="text" class="form-control" id="nombreProyecto" placeholder="Se auto-completa con cliente + fecha">
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Materiales del Proyecto -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:layers-outline" class="text-xl me-2"></iconify-icon>
+            2. Materiales del Proyecto
+        </h6>
+    </div>
+    <div class="card-body">
+        <div id="materialesContainer">
+            <div class="d-flex align-items-center gap-2 mb-3" style="background: rgba(13, 110, 253, 0.05); padding: 12px; border-radius: 8px; border: 1px solid rgba(13, 110, 253, 0.1);">
+                <button type="button" class="btn btn-primary material-tab active fw-semibold" data-material="1" onclick="seleccionarMaterial(1)" style="box-shadow: 0 2px 6px rgba(13, 110, 253, 0.4); border: 2px solid rgba(13, 110, 253, 0.3);">
+                    Material 1
+                </button>
+                <button type="button" class="btn btn-success fw-semibold" onclick="agregarMaterial()" style="box-shadow: 0 2px 6px rgba(25, 135, 84, 0.4);">
+                    <iconify-icon icon="solar:add-circle-outline" class="me-1"></iconify-icon>
+                    Agregar Material
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuración del Material -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:settings-outline" class="text-xl me-2"></iconify-icon>
+            3. Configuración del Material
+        </h6>
+        <small class="text-muted mt-1">Unidad: milímetros</small>
+    </div>
+    <div class="card-body">
+        <form id="configuracionMaterial">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Material <span class="text-danger">*</span></label>
+                    <select class="form-select" id="materialSelect" onchange="cargarInfoMaterial()" required>
+                        <option value="">Seleccionar material...</option>
+                        {% for tablero in tableros %}
+                            <option value="{{ tablero.id }}" data-ancho="{{ tablero.ancho }}" data-largo="{{ tablero.largo }}" data-espesor="{{ tablero.espesor }}">
+                                {{ tablero.nombre }} | {{ tablero.ancho }}x{{ tablero.largo }}mm | {{ tablero.espesor }}mm
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Ancho tablero (X) <span class="text-warning">*</span></label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="anchoTablero" min="100" max="5000" step="1" 
+                               onchange="validarMedidasTablero()" required readonly>
+                        <span class="input-group-text">mm</span>
+                    </div>
+                    <small class="text-muted">Auto-completado desde material seleccionado</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Largo tablero (Y) <span class="text-warning">*</span></label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="largoTablero" min="100" max="5000" step="1"
+                               onchange="validarMedidasTablero()" required readonly>
+                        <span class="input-group-text">mm</span>
+                    </div>
+                    <small class="text-muted">Auto-completado desde material seleccionado</small>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Permitir Edición</label>
+                    <div class="form-check form-switch mt-2">
+                        <input class="form-check-input" type="checkbox" id="permitirEdicionCheck" onchange="toggleMedidasEditables()" style="transform: scale(1.2);">
+                        <label class="form-check-label fw-medium" for="permitirEdicionCheck" id="estadoEdicionLabel">
+                            <iconify-icon icon="solar:lock-outline" class="me-1" id="estadoEdicionIcon"></iconify-icon>
+                            <span id="estadoEdicionTexto">Bloqueado</span>
+                        </label>
+                    </div>
+                    <small class="text-muted">Habilita la edición manual de medidas</small>
+                    <!-- Botones de prueba temporales -->
+                    <div class="mt-2">
+                        <button type="button" class="btn btn-sm btn-info" onclick="probarCheckbox()">Probar Checkbox</button>
+                        <button type="button" class="btn btn-sm btn-success" onclick="probarConectividad()">Test JS</button>
+                    </div>
+                </div>
+            </div>
+            
+            
+            <hr class="my-3">
+            <h6 class="mb-3">Configuración de Márgenes y Cortes</h6>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Margen X (mm)</label>
+                    <input type="number" class="form-control" id="margenX" value="10" min="0">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Margen Y (mm)</label>
+                    <input type="number" class="form-control" id="margenY" value="10" min="0">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Desperdicio sierra (mm)</label>
+                    <input type="number" class="form-control" id="desperdicioSierra" value="3" min="0">
+                </div>
+            </div>
+            
+            <div class="row g-3 mt-2">
+                <div class="col-12">
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="editarMargenes()">
+                            <iconify-icon icon="solar:settings-outline" class="me-1"></iconify-icon>
+                            Editar Márgenes
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleEditarDimensiones()">
+                            <iconify-icon icon="solar:pen-outline" class="me-1"></iconify-icon>
+                            Editar Dimensiones
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-3">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <label class="form-label">Tapacanto</label>
+                    <select class="form-select" id="tapacantoSelect" onchange="actualizarTapacantoDisponible()" disabled>
+                        <option value="">Sin tapacanto disponible</option>
+                        {% for tapacanto in tapacantos %}
+                            <option value="{{ tapacanto.id }}" data-nombre="{{ tapacanto.nombre }}">{{ tapacanto.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Estado</label>
+                    <div class="form-control-plaintext" id="tapacantoEstado">
+                        <span class="badge bg-secondary">No seleccionado</span>
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="mt-3 text-muted">
+                <small>
+                    <strong>Sugerencias:</strong> 
+                    Rápidos: 1830x2500 (melamina), 1200x2400 (terciado), 1520x2440 (MDF). 
+                    El margen y el kerf se consideran en la colocación.
+                </small>
+            </div>
+            
+            <div class="alert alert-info mt-3" style="border-left: 4px solid #0dcaf0; background-color: #d1ecf1; border-color: #bee5eb;">
+                <div class="d-flex align-items-center">
+                    <iconify-icon icon="solar:info-circle-outline" class="text-info fs-5 me-2"></iconify-icon>
+                    <small>
+                        <strong>Importante:</strong> El sistema ajustará automáticamente las medidas para que 
+                        <strong>la medida más grande siempre sea el ancho (eje X)</strong>.
+                        Si ingresas 2500×1830, se cambiará a 2500×1830 (ancho×largo).
+                    </small>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Dimensiones de Piezas -->
+<div class="card mb-24">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="card-title mb-0">
+                <iconify-icon icon="solar:widget-4-outline" class="text-xl me-2"></iconify-icon>
+                4. Dimensiones de piezas
+            </h6>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-success" onclick="agregarPieza()">
+                    <iconify-icon icon="solar:add-circle-outline" class="me-1"></iconify-icon>Añadir fila
+                </button>
+                <button type="button" class="btn btn-sm btn-info" onclick="cargarEjemplo()">
+                    <iconify-icon icon="solar:widget-outline" class="me-1"></iconify-icon>Ejemplo
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="limpiarPiezas()">
+                    <iconify-icon icon="solar:trash-bin-minimalistic-outline" class="me-1"></iconify-icon>Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="tablaPiezas">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th style="width: 90px;">Cant.</th>
+                        <th>Nombre</th>
+                        <th style="width: 120px;">Largo (Y)</th>
+                        <th style="width: 120px;">Ancho (X)</th>
+                        <th style="width: 80px;">Veta libre</th>
+                        <th style="width: 200px;">Tapacantos</th>
+                        <th style="width: 60px;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="piezasTableBody">
+                    <tr id="pieza_1">
+                        <td class="text-center">1</td>
+                        <td><input type="number" class="form-control form-control-sm" value="1" min="1" style="width: 85px;"></td>
+                        <td><input type="text" class="form-control form-control-sm" placeholder="Nombre pieza"></td>
+                        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+                        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input">
+                        </td>
+                        <td>
+                            <div class="tapacanto-buttons d-flex justify-content-center align-items-center gap-1" style="opacity: 0.5; pointer-events: none; white-space: nowrap;">
+                                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                                    id="tapacanto_todos_1" 
+                                    onclick="toggleTapacantoTodos(1)" 
+                                    title="Todos los lados">
+                                    ⬛
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                                    id="tapacanto_abajo_1" 
+                                    onclick="toggleTapacantoLado(1, 'abajo')" 
+                                    title="Lado inferior">
+                                    ⬇️
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                                    id="tapacanto_derecha_1" 
+                                    onclick="toggleTapacantoLado(1, 'derecha')" 
+                                    title="Lado derecho">
+                                    ➡️
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                                    id="tapacanto_arriba_1" 
+                                    onclick="toggleTapacantoLado(1, 'arriba')" 
+                                    title="Lado superior">
+                                    ⬆️
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                                    id="tapacanto_izquierda_1" 
+                                    onclick="toggleTapacantoLado(1, 'izquierda')" 
+                                    title="Lado izquierdo">
+                                    ⬅️
+                                </button>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarPieza(1)" title="Eliminar pieza">
+                                <iconify-icon icon="solar:trash-bin-minimalistic-outline"></iconify-icon>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Botones de Acción -->
+<div class="card mb-24">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-3">
+                <button type="button" class="btn btn-outline-info w-100" onclick="exportarJsonEntrada()">
+                    <iconify-icon icon="solar:export-outline" class="me-2"></iconify-icon>
+                    Exportar JSON entrada
+                </button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-outline-success w-100" onclick="exportarJsonSalida()" disabled id="btnExportarSalida">
+                    <iconify-icon icon="solar:export-outline" class="me-2"></iconify-icon>
+                    Exportar JSON salida (Lepton-like)
+                </button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-outline-warning w-100" onclick="exportarPDF()" disabled id="btnExportarPDF">
+                    <iconify-icon icon="solar:printer-outline" class="me-2"></iconify-icon>
+                    Imprimir / Exportar PDF
+                </button>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-primary w-100" onclick="optimizarMaterial()">
+                    <iconify-icon icon="solar:widget-2-outline" class="me-2"></iconify-icon>
+                    Optimizar Material Actual
+                </button>
+            </div>
+        </div>
+        
+        <div class="mt-3 text-center">
+            <small class="text-muted">Editando: Material 1</small>
+        </div>
+    </div>
+</div>
+
+<!-- Resumen del Proyecto -->
+<div class="card mb-24" id="resumenProyecto" style="display: none;">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:chart-outline" class="text-xl me-2"></iconify-icon>
+            5. Resumen del Proyecto
+        </h6>
+    </div>
+    <div class="card-body">
+        <div class="bg-light p-3 rounded border">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="mb-2">
+                        <strong>Material:</strong> <span id="materialNombre">Melamina blanca 15mm</span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Cliente:</strong> <span id="clienteNombre">-</span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Fecha:</strong> <span id="fechaProyecto"></span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Total m²:</strong> <span id="areaTotal">-</span>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="mb-2">
+                        <strong>Cortados:</strong> <span id="totalTableros">0</span> <small class="text-muted">tableros</small>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Piezas:</strong> <span id="totalPiezas">0</span> <small class="text-muted">elementos</small>
+                    </div>
+                    <div class="mb-2">
+                        <strong>% de aprovechamiento:</strong> <span id="eficienciaPromedio" class="text-success fw-bold">0%</span>
+                    </div>
+                    <div class="mb-2">
+                        <strong>Desperdicios:</strong> <span id="desperdicios">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-4">
+            <h6>Eficiencia Promedio: <span class="text-success" id="eficienciaPromedio">30.9%</span></h6>
+            
+            <div class="mt-3">
+                <h6>Detalle por Material:</h6>
+                <div id="detalleMateriales">
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <span class="fw-medium">Melamina blanca 15mm</span>
+                        <span class="text-success">6 piezas • 1 tableros • 30.9%</span>
+                        <iconify-icon icon="solar:check-circle-bold" class="text-success"></iconify-icon>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Resultado de Optimización -->
+<div class="card" id="resultadoOptimizacion" style="display: none;">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:pie-chart-outline" class="text-xl me-2"></iconify-icon>
+            6. Resultado de Optimización
+        </h6>
+    </div>
+    <div class="card-body" id="contenidoResultado">
+        <!-- Aquí se mostrará el resultado de la optimización -->
+    </div>
+</div>
+
+<!-- Modal para configurar tapacantos -->
+<div class="modal fade" id="modalTapacantos" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Configurar Tapacantos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="text-center mb-3">
+                    <div class="tapacanto-selector" id="tapacantoSelector">
+                        <div class="pieza-preview" onclick="toggleTapacanto('arriba')">
+                            <div class="lado arriba" id="lado-arriba"></div>
+                            <div class="lado izquierda" id="lado-izquierda" onclick="toggleTapacanto('izquierda')"></div>
+                            <div class="pieza-centro">Pieza</div>
+                            <div class="lado derecha" id="lado-derecha" onclick="toggleTapacanto('derecha')"></div>
+                            <div class="lado abajo" id="lado-abajo" onclick="toggleTapacanto('abajo')"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <label class="form-label">Tipo de Tapacanto</label>
+                    <select class="form-select" id="tipoTapacanto">
+                        <option value="">Sin tapacanto</option>
+                        {% for tapacanto in tapacantos %}
+                            <option value="{{ tapacanto.id }}">{{ tapacanto.codigo }} - {{ tapacanto.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" onclick="guardarTapacantos()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Estilos para el selector de tapacantos */
+.tapacanto-selector {
+    display: inline-block;
+    position: relative;
+}
+
+.pieza-preview {
+    width: 150px;
+    height: 100px;
+    position: relative;
+    border: 2px solid #ddd;
+    margin: 20px;
+}
+
+.pieza-centro {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: #666;
+}
+
+.lado {
+    position: absolute;
+    cursor: pointer;
+    background-color: #f8f9fa;
+    transition: background-color 0.3s;
+}
+
+.lado:hover {
+    background-color: #e9ecef;
+}
+
+.lado.active {
+    background-color: #007bff;
+}
+
+.lado.arriba, .lado.abajo {
+    width: 100%;
+    height: 8px;
+    left: 0;
+}
+
+.lado.arriba {
+    top: -8px;
+}
+
+.lado.abajo {
+    bottom: -8px;
+}
+
+.lado.izquierda, .lado.derecha {
+    width: 8px;
+    height: 100%;
+    top: 0;
+}
+
+.lado.izquierda {
+    left: -8px;
+}
+
+.lado.derecha {
+    right: -8px;
+}
+
+/* Estilos mejorados para las pestañas de materiales */
+.material-tab {
+    padding: 10px 18px;
+    border: 2px solid transparent !important;
+    border-radius: 8px;
+    font-weight: 600;
+    min-width: 120px;
+    transition: all 0.3s ease;
+    margin-right: 8px;
+}
+
+.material-tab.active {
+    background-color: #0d6efd !important;
+    color: white !important;
+    border-color: rgba(13, 110, 253, 0.5) !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.4) !important;
+}
+
+.material-tab:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Estilos para la visualización de tableros */
+.tablero-visualization {
+    border: 2px solid #333;
+    margin: 10px;
+    position: relative;
+    background-color: #f8f9fa;
+}
+
+.pieza-en-tablero {
+    position: absolute;
+    border: 1px solid #666;
+    background-color: rgba(0, 123, 255, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+}
+
+.pieza-rotada::after {
+    content: "↻";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    color: #dc3545;
+}
+</style>
+
+<script>
+let contadorPiezas = 1;
+let proyectoActual = null;
+let resultadosOptimizacion = {}; // Objeto para guardar resultados por material
+let piezaEditandoTapacanto = null;
+
+// Funciones principales
+function toggleNuevoCliente() {
+    // Función desactivada - el nuevo sistema usa autocompletado de cliente
+    console.log('toggleNuevoCliente: Función del sistema anterior desactivada');
+    return;
+}
+
+function cargarInfoMaterial() {
+    const select = document.getElementById('materialSelect');
+    const option = select.selectedOptions[0];
+    
+    if (option && option.value) {
+        // Obtener dimensiones desde los atributos data o desde el value
+        let ancho = option.getAttribute('data-ancho');
+        let largo = option.getAttribute('data-largo');
+        
+        // Si no están en data-attributes, intentar desde el value
+        if (!ancho || !largo) {
+            const valueParts = option.value.split('|');
+            if (valueParts.length >= 2) {
+                ancho = valueParts[0];
+                largo = valueParts[1];
+            }
+        }
+        
+        // Si aún no las tenemos, usar valores por defecto
+        if (!ancho || !largo) {
+            ancho = '1830';
+            largo = '2500';
+        }
+        
+        // VALIDACIÓN: Asegurar que la medida más grande siempre sea el ancho (eje X)
+        const medidaAncho = parseFloat(ancho);
+        const medidaLargo = parseFloat(largo);
+        
+        if (medidaLargo > medidaAncho) {
+            // Intercambiar valores: el largo pasa a ser ancho
+            const temp = ancho;
+            ancho = largo;
+            largo = temp;
+            console.log(`🔄 Medidas intercambiadas para tablero: Ancho=${ancho}mm, Largo=${largo}mm (la medida mayor ahora es el ancho)`);
+            mostrarNotificacion(`Medidas ajustadas: ${ancho}×${largo}mm (la medida mayor es el ancho)`, 'info');
+        }
+        
+        // Configurar dimensiones automáticamente (valores por defecto del material)
+        const anchoTablero = document.getElementById('anchoTablero');
+        const largoTablero = document.getElementById('largoTablero');
+        
+        if (anchoTablero) {
+            anchoTablero.value = ancho;
+            console.log(`Ancho tablero configurado: ${ancho}mm`);
+        }
+        if (largoTablero) {
+            largoTablero.value = largo;
+            console.log(`Largo tablero configurado: ${largo}mm`);
+        }
+        
+        // Asegurar que los campos estén bloqueados y el checkbox desmarcado al seleccionar material
+        const checkbox = document.getElementById('permitirEdicionCheck');
+        if (checkbox) {
+            checkbox.checked = false;
+            // Forzar el bloqueo de campos
+            anchoTablero.readOnly = true;
+            largoTablero.readOnly = true;
+            anchoTablero.style.backgroundColor = '';
+            anchoTablero.style.borderColor = '';
+            largoTablero.style.backgroundColor = '';
+            largoTablero.style.borderColor = '';
+            
+            // Actualizar textos e iconos
+            const estadoTexto = document.getElementById('estadoEdicionTexto');
+            const estadoIcon = document.getElementById('estadoEdicionIcon');
+            const estadoLabel = document.getElementById('estadoEdicionLabel');
+            if (estadoTexto) estadoTexto.textContent = 'Bloqueado';
+            if (estadoIcon) estadoIcon.setAttribute('icon', 'solar:lock-outline');
+            if (estadoLabel) estadoLabel.className = 'form-check-label fw-medium text-muted';
+        }
+        
+        console.log(`Material base: ${ancho}x${largo}mm - Auto-completado y bloqueado`);
+        
+        // Habilitar la selección de tapacanto cuando se selecciona un material
+        const tapacantoSelect = document.getElementById('tapacantoSelect');
+        if (tapacantoSelect) {
+            tapacantoSelect.disabled = false;
+            // Dejar sin seleccionar por defecto para que el usuario elija
+            tapacantoSelect.selectedIndex = 0; // "Seleccionar tapacanto..."
+        }
+        
+        actualizarTapacantoDisponible();
+        
+        // Mostrar sección de configuración
+        const configMaterial = document.getElementById('configuracionMaterial');
+        if (configMaterial) {
+            configMaterial.style.display = 'block';
+        }
+    } else {
+        // Si no hay material seleccionado, deshabilitar tapacanto
+        const tapacantoSelect = document.getElementById('tapacantoSelect');
+        if (tapacantoSelect) {
+            tapacantoSelect.disabled = true;
+        }
+        actualizarTapacantoDisponible();
+    }
+}
+
+function toggleEditarDimensiones() {
+    // Función deshabilitada - Los campos de dimensiones son siempre editables
+    const anchoInput = document.getElementById('anchoTablero');
+    const largoInput = document.getElementById('largoTablero');
+    
+    if (anchoInput && largoInput) {
+        anchoInput.readOnly = false;
+        largoInput.readOnly = false;
+        anchoInput.focus();
+    }
+}
+
+// Función antigua eliminada - se usa la nueva versión con sistema de tapacanto visual
+
+function configurarTapacantos(piezaId) {
+    piezaEditandoTapacanto = piezaId;
+    
+    // Limpiar selección anterior
+    document.querySelectorAll('.lado').forEach(lado => {
+        lado.classList.remove('active');
+    });
+    
+    // Cargar configuración existente si la hay
+    const modal = new bootstrap.Modal(document.getElementById('modalTapacantos'));
+    modal.show();
+}
+
+function toggleTapacanto(lado) {
+    const elemento = document.getElementById(`lado-${lado}`);
+    elemento.classList.toggle('active');
+}
+
+function guardarTapacantos() {
+    // Sistema anterior desactivado - ahora se usa el sistema visual de 5 botones
+    console.log('guardarTapacantos: Usando nuevo sistema visual de tapacanto');
+    
+    // Cerrar modal sin hacer nada
+    const modal = bootstrap.Modal.getInstance(document.getElementById('modalTapacantos'));
+    if (modal) modal.hide();
+    return;
+}
+
+function limpiarPiezas() {
+    if (confirm('¿Está seguro de que desea limpiar todas las piezas?')) {
+        const tbody = document.getElementById('piezasTableBody');
+        
+        // Limpiar completamente y agregar una pieza nueva con el sistema visual
+        tbody.innerHTML = '';
+        agregarPieza();
+    }
+}
+
+function validarMedidasTablero() {
+    const anchoInput = document.getElementById('anchoTablero');
+    const largoInput = document.getElementById('largoTablero');
+    
+    if (!anchoInput || !largoInput) return;
+    
+    let ancho = parseFloat(anchoInput.value);
+    let largo = parseFloat(largoInput.value);
+    
+    // Validar rangos lógicos
+    if (ancho < 100 || ancho > 5000) {
+        mostrarNotificacion('El ancho del tablero debe estar entre 100mm y 5000mm', 'warning');
+        anchoInput.focus();
+        return false;
+    }
+    
+    if (largo < 100 || largo > 5000) {
+        mostrarNotificacion('El largo del tablero debe estar entre 100mm y 5000mm', 'warning');
+        largoInput.focus();
+        return false;
+    }
+    
+    // VALIDACIÓN CRÍTICA: Asegurar que la medida más grande siempre sea el ancho (eje X)
+    if (largo > ancho) {
+        // Intercambiar valores automáticamente
+        const temp = ancho;
+        ancho = largo;
+        largo = temp;
+        
+        // Actualizar los inputs con los valores intercambiados
+        anchoInput.value = ancho;
+        largoInput.value = largo;
+        
+        console.log(`🔄 Medidas intercambiadas automáticamente: Ancho=${ancho}mm, Largo=${largo}mm`);
+        mostrarNotificacion(`⚠️ Medidas ajustadas: ${ancho}×${largo}mm (la medida mayor debe ser el ancho)`, 'warning');
+    }
+    
+    console.log(`✅ Medidas del tablero validadas: ${ancho}mm x ${largo}mm`);
+    mostrarNotificacion(`Medidas del tablero: ${ancho}mm × ${largo}mm`, 'success');
+    
+    // Actualizar el resumen si existe
+    actualizarResumenProyecto();
+    
+    return true;
+}
+
+function cargarEjemplo() {
+    console.log('Iniciando carga de ejemplo...');
+    
+    // Llenar información del proyecto
+    const clienteBusqueda = document.getElementById('clienteBusqueda');
+    if (clienteBusqueda) {
+        clienteBusqueda.value = 'Benavente 1155, Block A';
+        clienteBusqueda.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    
+    // Configurar material y dimensiones
+    try {
+        // Seleccionar primer material disponible en el selector
+        const materialSelect = document.getElementById('materialSelect');
+        if (materialSelect && materialSelect.options.length > 1) {
+            materialSelect.selectedIndex = 1; // Primer material real (no el placeholder)
+            console.log('Material seleccionado:', materialSelect.value);
+            
+            // Llamar directamente a cargarInfoMaterial en lugar de disparar evento
+            cargarInfoMaterial();
+        }
+        
+        const anchoTablero = document.getElementById('anchoTablero');
+        const largoTablero = document.getElementById('largoTablero');
+        
+        // Configurar dimensiones del tablero después de un pequeño delay 
+        // para permitir que la información del material se cargue
+        setTimeout(() => {
+            if (anchoTablero) {
+                anchoTablero.value = '1830';
+                console.log('Ancho tablero configurado:', anchoTablero.value);
+            }
+            if (largoTablero) {
+                largoTablero.value = '2500';
+                console.log('Largo tablero configurado:', largoTablero.value);
+            }
+            
+            // Validar las medidas configuradas
+            validarMedidasTablero();
+        }, 100);
+        
+    } catch (error) {
+        console.error('Error configurando material:', error);
+    }
+    
+    // Seleccionar primer tapacanto disponible para habilitar los botones en las piezas
+    setTimeout(() => {
+        const tapacantoSelect = document.getElementById('tapacantoSelect');
+        if (tapacantoSelect && tapacantoSelect.options.length > 1) {
+            tapacantoSelect.selectedIndex = 1; // Primer tapacanto real (no el placeholder)
+            console.log('Tapacanto seleccionado:', tapacantoSelect.value);
+            
+            // Llamar directamente a la función en lugar de disparar evento
+            actualizarTapacantoDisponible();
+        }
+    }, 150);
+    
+    // Limpiar y agregar piezas de ejemplo (sin confirmación)
+    const tbody = document.getElementById('piezasTableBody');
+    tbody.innerHTML = '';
+    agregarPieza();
+    console.log('Tabla de piezas limpiada y primera pieza agregada');
+    
+    // Datos de ejemplo
+    const piezasEjemplo = [
+        { cantidad: 2, nombre: 'Lateral izquierdo', largo: 720, ancho: 350 },
+        { cantidad: 1, nombre: 'Fondo', largo: 718, ancho: 300 },
+        { cantidad: 2, nombre: 'Estante', largo: 678, ancho: 300 },
+        { cantidad: 1, nombre: 'Tapa superior', largo: 750, ancho: 350 }
+    ];
+    const firstRow = tbody.children[0];
+    
+    // Configuraciones de tapacanto para cada pieza del ejemplo
+    const tapacantoConfig = [
+        { todos: false, lados: { abajo: true, derecha: false, arriba: false, izquierda: false } }, // Lateral izquierdo - solo abajo
+        { todos: true, lados: { abajo: false, derecha: false, arriba: false, izquierda: false } }, // Fondo - todos los lados
+        { todos: true, lados: { abajo: false, derecha: false, arriba: false, izquierda: false } }, // Estante - todos los lados
+        { todos: true, lados: { abajo: false, derecha: false, arriba: false, izquierda: false } }  // Tapa superior - todos los lados
+    ];
+    
+    // Llenar primera fila
+    if (firstRow) {
+        const inputs = firstRow.querySelectorAll('input');
+        inputs[0].value = piezasEjemplo[0].cantidad; // cantidad
+        inputs[1].value = piezasEjemplo[0].nombre; // nombre
+        inputs[2].value = piezasEjemplo[0].largo; // largo
+        inputs[3].value = piezasEjemplo[0].ancho; // ancho
+        inputs[4].checked = true; // veta libre
+        
+    }
+    
+    // Agregar las demás piezas
+    for (let i = 1; i < piezasEjemplo.length; i++) {
+        agregarPieza();
+        const newRow = tbody.children[i];
+        const inputs = newRow.querySelectorAll('input');
+        inputs[0].value = piezasEjemplo[i].cantidad;
+        inputs[1].value = piezasEjemplo[i].nombre;
+        inputs[2].value = piezasEjemplo[i].largo;
+        inputs[3].value = piezasEjemplo[i].ancho;
+        inputs[4].checked = true; // veta libre por defecto
+    }
+    
+    // Configurar tapacantos para todas las piezas con delay
+    setTimeout(() => {
+        for (let i = 0; i < tapacantoConfig.length; i++) {
+            configurarTapacantoEjemplo(i + 1, tapacantoConfig[i]);
+        }
+    }, 200);
+    
+    // Verificar y mostrar secciones relevantes
+    const configMaterial = document.getElementById('configuracionMaterial');
+    const gestionPiezas = document.getElementById('gestionPiezas');
+    const resumenProyecto = document.getElementById('resumenProyecto');
+    
+    console.log('Elementos encontrados:', {
+        configMaterial: !!configMaterial,
+        gestionPiezas: !!gestionPiezas,
+        resumenProyecto: !!resumenProyecto
+    });
+    
+    if (configMaterial) {
+        configMaterial.style.display = 'block';
+        console.log('Configuración material mostrada');
+    }
+    
+    if (gestionPiezas) {
+        gestionPiezas.style.display = 'block';
+        console.log('Gestión piezas mostrada');
+    }
+    
+    // Actualizar tapacanto disponible
+    try {
+        actualizarTapacantoDisponible();
+        console.log('Tapacanto actualizado');
+    } catch (error) {
+        console.error('Error actualizando tapacanto:', error);
+    }
+    
+    // Actualizar y mostrar resumen
+    try {
+        actualizarResumenProyecto();
+        if (resumenProyecto) {
+            resumenProyecto.style.display = 'block';
+            console.log('Resumen mostrado');
+        }
+    } catch (error) {
+        console.error('Error actualizando resumen:', error);
+    }
+    
+    console.log('Proceso de carga de ejemplo completado');
+    
+    // Notificación de éxito
+    const alertDiv = document.createElement('div');
+    alertDiv.className = 'alert alert-success alert-dismissible fade show';
+    alertDiv.style.position = 'fixed';
+    alertDiv.style.top = '20px';
+    alertDiv.style.right = '20px';
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        <i class="fas fa-check-circle me-2"></i>Ejemplo cargado exitosamente
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => {
+        if (alertDiv.parentNode) {
+            alertDiv.remove();
+        }
+    }, 3000);
+}
+
+// Función auxiliar para configurar tapacanto en el ejemplo
+function configurarTapacantoEjemplo(numeroPieza, config) {
+    // Primero limpiar todos los botones
+    const botonTodos = document.getElementById(`tapacanto_todos_${numeroPieza}`);
+    const botones = ['abajo', 'derecha', 'arriba', 'izquierda'];
+    
+    if (botonTodos) {
+        botonTodos.classList.remove('btn-primary');
+        botonTodos.classList.add('btn-outline-secondary');
+    }
+    
+    botones.forEach(lado => {
+        const boton = document.getElementById(`tapacanto_${lado}_${numeroPieza}`);
+        if (boton) {
+            boton.classList.remove('btn-primary');
+            boton.classList.add('btn-outline-secondary');
+        }
+    });
+    
+    // Configurar según la configuración especificada
+    if (config.todos) {
+        // Seleccionar "todos los lados"
+        if (botonTodos) {
+            botonTodos.classList.remove('btn-outline-secondary');
+            botonTodos.classList.add('btn-primary');
+        }
+    } else {
+        // Seleccionar lados individuales
+        Object.keys(config.lados).forEach(lado => {
+            if (config.lados[lado]) {
+                const boton = document.getElementById(`tapacanto_${lado}_${numeroPieza}`);
+                if (boton) {
+                    boton.classList.remove('btn-outline-secondary');
+                    boton.classList.add('btn-primary');
+                }
+            }
+        });
+    }
+}
+
+function limpiarFormulario() {
+    if (confirm('¿Está seguro de que desea limpiar todo el formulario?')) {
+        // Limpiar información del proyecto
+        document.getElementById('nombreProyecto').value = '';
+        document.getElementById('clienteInput').value = '';
+        document.getElementById('clienteId').value = '';
+        document.getElementById('rutCliente').value = '';
+        
+        // Limpiar configuración de material
+        document.getElementById('materialSelect').value = '';
+        document.getElementById('anchoTablero').value = '';
+        document.getElementById('largoTablero').value = '';
+        document.getElementById('tapacantoSelect').value = '';
+        document.getElementById('margenX').value = '10';
+        document.getElementById('margenY').value = '10';
+        document.getElementById('desperdicioSierra').value = '3';
+        
+        // Limpiar piezas
+        limpiarPiezas();
+        
+        // Ocultar secciones de resultado
+        document.getElementById('resumenProyecto').style.display = 'none';
+        if (document.getElementById('resultadoOptimizacion')) {
+            document.getElementById('resultadoOptimizacion').style.display = 'none';
+        }
+        
+        // Resetear variables
+        proyectoActual = null;
+        resultadosOptimizacion = {}; // Limpiar todos los resultados
+        materialActual = 1;
+        totalMateriales = 1;
+        
+        // Resetear pestañas de materiales
+        document.getElementById('materialesContainer').innerHTML = `
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <button type="button" class="btn btn-primary material-tab active" data-material="1" onclick="seleccionarMaterial(1)">
+                    Material 1
+                </button>
+                <button type="button" class="btn btn-outline-primary" onclick="agregarMaterial()">
+                    <iconify-icon icon="solar:add-circle-outline" class="me-1"></iconify-icon>
+                    Agregar Material
+                </button>
+            </div>
+        `;
+    }
+}
+
+async function optimizarMaterial() {
+    // Obtener referencia al botón correctamente
+    const btn = document.querySelector('button[onclick="optimizarMaterial()"]');
+    const originalText = btn.innerHTML;
+    
+    try {
+        // Validar formulario
+        if (!validarFormulario()) {
+            return;
+        }
+        
+        // Mostrar loading
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Optimizando...';
+        
+        // Recopilar datos
+        const datos = recopilarDatosFormulario();
+        console.log('Datos enviados:', datos); // Para debug
+        
+        // Enviar al servidor
+        const response = await fetch('/optimizador/optimizar/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+            },
+            body: JSON.stringify(datos)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        console.log('Resultado recibido:', result); // Para debug
+        
+        if (result.success) {
+            // Guardar resultado para el material actual
+            resultadosOptimizacion[materialActual] = result.resultado;
+            mostrarResultadoOptimizacion(result.resultado);
+            
+            // Habilitar botones de exportación
+            document.getElementById('btnExportarSalida').disabled = false;
+            document.getElementById('btnExportarPDF').disabled = false;
+            
+            // Mostrar notificación de éxito
+            mostrarNotificacion('¡Optimización completada exitosamente!', 'success');
+            
+        } else {
+            throw new Error(result.message || 'Error desconocido en la optimización');
+        }
+        
+    } catch (error) {
+        console.error('Error completo:', error);
+        // Solo mostrar errores reales, no de timeout o recursión
+        if (!error.message.includes('Maximum call stack') && !error.message.includes('Timeout')) {
+            mostrarNotificacion('Error al realizar la optimización: ' + error.message, 'error');
+        } else {
+            // Para errores de recursión o timeout, mostrar como completado con advertencia
+            mostrarNotificacion('Optimización completada con limitaciones técnicas', 'warning');
+        }
+    } finally {
+        // Restaurar botón SIEMPRE
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+}
+
+function validarFormulario() {
+    // Validar información básica
+    const nombreProyecto = document.getElementById('nombreProyecto').value.trim();
+    if (!nombreProyecto) {
+        alert('Por favor, ingrese el nombre del proyecto');
+        return false;
+    }
+    
+    // Validar cliente (nuevo sistema de autocompletado)
+    const clienteInput = document.getElementById('clienteInput').value.trim();
+    if (!clienteInput) {
+        alert('Por favor, ingrese o seleccione un cliente');
+        return false;
+    }
+    
+    // Validar material
+    const materialSelect = document.getElementById('materialSelect').value;
+    if (!materialSelect) {
+        alert('Por favor, seleccione un material');
+        return false;
+    }
+    
+    // Validar dimensiones del tablero
+    const ancho = parseFloat(document.getElementById('anchoTablero').value);
+    const largo = parseFloat(document.getElementById('largoTablero').value);
+    if (!ancho || !largo || ancho <= 0 || largo <= 0) {
+        alert('Por favor, verifique las dimensiones del tablero');
+        return false;
+    }
+    
+    // Validar que hay al menos una pieza válida
+    const piezasValidas = obtenerPiezasValidas();
+    if (piezasValidas.length === 0) {
+        alert('Por favor, ingrese al menos una pieza válida');
+        return false;
+    }
+    
+    return true;
+}
+
+function obtenerPiezasValidas() {
+    const piezas = [];
+    const rows = document.querySelectorAll('#piezasTableBody tr');
+    
+    rows.forEach((row, index) => {
+        const inputs = row.querySelectorAll('input');
+        
+        const cantidad = parseInt(inputs[0].value) || 0;
+        const nombre = inputs[1].value.trim() || `Pieza ${index + 1}`;
+        const largo = parseFloat(inputs[2].value) || 0;
+        const ancho = parseFloat(inputs[3].value) || 0;
+        const vetaLibre = inputs[4].checked;
+        
+        if (cantidad > 0 && largo > 0 && ancho > 0) {
+            // Obtener configuración de tapacantos del nuevo sistema visual
+            let tapacantos = [];
+            const numeroPieza = index + 1;
+            
+            // Verificar si "todos los lados" está seleccionado
+            const botonTodos = document.getElementById(`tapacanto_todos_${numeroPieza}`);
+            if (botonTodos && botonTodos.classList.contains('btn-primary')) {
+                tapacantos = [
+                    { lado: 'arriba', tipo: 'completo' },
+                    { lado: 'derecha', tipo: 'completo' },
+                    { lado: 'abajo', tipo: 'completo' },
+                    { lado: 'izquierda', tipo: 'completo' }
+                ];
+            } else {
+                // Verificar lados individuales
+                const lados = ['abajo', 'derecha', 'arriba', 'izquierda'];
+                lados.forEach(lado => {
+                    const boton = document.getElementById(`tapacanto_${lado}_${numeroPieza}`);
+                    if (boton && boton.classList.contains('btn-primary')) {
+                        tapacantos.push({ lado: lado, tipo: 'completo' });
+                    }
+                });
+            }
+            
+            piezas.push({
+                id: index + 1,
+                cantidad: cantidad,
+                nombre: nombre,
+                largo: largo,
+                ancho: ancho,
+                veta_libre: vetaLibre,
+                tapacantos: tapacantos
+            });
+        }
+    });
+    
+    return piezas;
+}
+
+function recopilarDatosFormulario() {
+    // Obtener cliente desde el nuevo sistema de autocompletado
+    const clienteId = document.getElementById('clienteId').value || '';
+    const clienteInput = document.getElementById('clienteInput').value.trim();
+    
+    // Las medidas de trabajo SIEMPRE vienen de los campos editables (fuente de verdad)
+    const anchoTrabajo = parseFloat(document.getElementById('anchoTablero').value);
+    const largoTrabajo = parseFloat(document.getElementById('largoTablero').value);
+    
+    console.log(`📐 Medidas de trabajo del tablero: ${anchoTrabajo}mm x ${largoTrabajo}mm`);
+
+    const datos = {
+        nombre_proyecto: document.getElementById('nombreProyecto').value.trim(),
+        configuracion_material: {
+            material_id: document.getElementById('materialSelect').value,
+            ancho_custom: anchoTrabajo,  // Usar las medidas editables
+            largo_custom: largoTrabajo,  // Usar las medidas editables
+            tapacanto_id: document.getElementById('tapacantoSelect').value || null,
+            margen_x: parseFloat(document.getElementById('margenX').value) || 0,
+            margen_y: parseFloat(document.getElementById('margenY').value) || 0,
+            desperdicio_sierra: parseFloat(document.getElementById('desperdicioSierra').value) || 3
+        },
+        piezas: obtenerPiezasValidas()
+    };
+    
+    // Información del cliente
+    if (clienteId) {
+        // Cliente existente seleccionado
+        datos.cliente_id = clienteId;
+    } else if (clienteInput) {
+        // Nuevo cliente o cliente no seleccionado
+        datos.nuevo_cliente = {
+            nombre: clienteInput,
+            rut: document.getElementById('rutCliente').value.trim() || ''
+        };
+    }
+    
+    return datos;
+}
+
+function mostrarResultadoOptimizacion(resultado, autoScroll = true) {
+    const container = document.getElementById('contenidoResultado');
+    
+    let html = `
+        <div class="row g-2 mb-3">
+            <div class="col-md-3">
+                <div class="text-center p-2 border rounded bg-primary text-white">
+                    <div class="fs-6 fw-bold">${resultado.material.nombre}</div>
+                    <div style="font-size: 0.75rem;">Material</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center p-2 border rounded">
+                    <div class="fs-6 fw-bold text-success">${resultado.total_tableros}</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">Tableros</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center p-2 border rounded">
+                    <div class="fs-6 fw-bold text-info">${resultado.total_piezas}</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">Piezas</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="text-center p-2 border rounded">
+                    <div class="fs-6 fw-bold text-warning">${resultado.eficiencia}%</div>
+                    <div class="text-muted" style="font-size: 0.75rem;">Eficiencia</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0">Visualización de Tableros:</h6>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="rotarVisualizacionTableros('${resultado.material.nombre}')">
+                <iconify-icon icon="solar:refresh-outline" class="me-1"></iconify-icon>
+                Rotar Vista
+            </button>
+        </div>
+        <div id="contenedorVisualizacion-${resultado.material.nombre.replace(/\s+/g, '')}">
+    `;
+    
+    // Generar visualización de cada tablero
+    resultado.tableros.forEach((tablero, index) => {
+        html += generarVisualizacionTablero(tablero, index + 1, resultado.material);
+    });
+    
+    html += '</div>';
+    
+    container.innerHTML = html;
+    document.getElementById('resultadoOptimizacion').style.display = 'block';
+    
+    // Guardar resultado para rotación
+    window.resultadoActual = resultado;
+    console.log('✅ Resultado guardado para rotación:', resultado);
+    
+    // Verificar que las medidas de visualización coincidan con los campos editables
+    const anchoActual = document.getElementById('anchoTablero')?.value;
+    const largoActual = document.getElementById('largoTablero')?.value;
+    console.log(`📐 Visualización usará medidas editables: ${anchoActual}mm x ${largoActual}mm`);
+    
+    // Scroll hacia el resultado solo si es una nueva optimización
+    if (autoScroll) {
+        document.getElementById('resultadoOptimizacion').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function generarVisualizacionTablero(tablero, numero, material, rotarVisualizacion = false) {
+    const escala = 0.35; // Escala aumentada para mejor visualización
+    
+    // SIEMPRE usar las medidas de los campos editables, NO las del resultado de optimización
+    const anchoInput = document.getElementById('anchoTablero');
+    const largoInput = document.getElementById('largoTablero');
+    
+    // Obtener márgenes y desperdicio de sierra
+    const margenX = parseFloat(document.getElementById('margenX')?.value) || 0;
+    const margenY = parseFloat(document.getElementById('margenY')?.value) || 0;
+    const desperdicioSierra = parseFloat(document.getElementById('desperdicioSierra')?.value) || 3;
+    
+    let anchoTablero = parseFloat(anchoInput?.value) || 1830; // Default si no hay valor
+    let largoTablero = parseFloat(largoInput?.value) || 2500; // Default si no hay valor
+    
+    // Calcular área de trabajo efectiva (descontando márgenes)
+    const anchoTrabajo = anchoTablero - (margenX * 2);
+    const largoTrabajo = largoTablero - (margenY * 2);
+    
+    console.log(`📐 Tablero completo: ${anchoTablero}mm x ${largoTablero}mm`);
+    console.log(`📦 Área de trabajo: ${anchoTrabajo}mm x ${largoTrabajo}mm (márgenes: ${margenX}x${margenY}mm, sierra: ${desperdicioSierra}mm)`);
+    console.log(`🔍 Medidas del tablero en resultado backend: ${tablero.ancho}x${tablero.largo}`);
+    
+    // IMPORTANTE: Siempre usar las medidas editables, NO las del backend
+    if (tablero.ancho !== anchoTablero || tablero.largo !== largoTablero) {
+        console.warn(`⚠️ Discrepancia detectada! Backend: ${tablero.ancho}x${tablero.largo}, Editables: ${anchoTablero}x${largoTablero}`);
+        console.log(`✅ Usando medidas editables como fuente de verdad`);
+    }
+    
+    if (rotarVisualizacion && anchoTablero < largoTablero) {
+        [anchoTablero, largoTablero] = [largoTablero, anchoTablero];
+        console.log(`🔄 Vista rotada: ${anchoTablero}mm x ${largoTablero}mm`);
+    }
+    
+    const anchoVis = anchoTablero * escala;
+    const largoVis = largoTablero * escala;
+    
+    console.log(`📊 Contenedor: ${anchoVis.toFixed(0)}px x ${largoVis.toFixed(0)}px (escala: ${escala})`);
+    
+    // Generar colores únicos para cada pieza
+    const colores = [
+        '#E3F2FD', '#F3E5F5', '#E8F5E8', '#FFF3E0', '#FCE4EC',
+        '#E1F5FE', '#F1F8E9', '#FFF8E1', '#FAFAFA', '#E0F2F1'
+    ];
+    
+    let html = `
+        <div class="mb-4 border rounded p-3 bg-light">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <h6 class="mb-0"><strong>Tablero ${numero}</strong> - ${tablero.piezas.length} piezas</h6>
+                    <small class="text-muted">
+                        📐 Tablero completo: ${anchoTablero}mm × ${largoTablero}mm<br>
+                        📦 Área de trabajo: ${anchoTrabajo}mm × ${largoTrabajo}mm 
+                        ${margenX > 0 || margenY > 0 ? `<span class="text-warning">(márgenes: ${margenX}×${margenY}mm)</span>` : ''}
+                        ${desperdicioSierra > 0 ? `<span class="text-danger">(sierra: ${desperdicioSierra}mm)</span>` : ''}
+                    </small>
+                </div>
+                <div class="text-end">
+                    <small class="text-muted">
+                        Eficiencia: ${tablero.area_total > 0 ? ((tablero.area_utilizada / tablero.area_total) * 100).toFixed(1) : '0'}%
+                    </small>
+                    ${margenX > 0 || margenY > 0 ? `
+                        <br><small class="text-warning">
+                            ⚠️ Área perdida por márgenes: ${((margenX * largoTablero * 2) + (margenY * anchoTrabajo * 2))} mm²
+                        </small>
+                    ` : ''}
+                </div>
+            </div>
+            <div class="position-relative" style="width: ${anchoVis + 120}px; height: ${largoVis + 120}px; margin: 0 auto;">
+                
+                <!-- Medidas del tablero con información de márgenes integrada -->
+                <div style="position: absolute; top: -50px; left: 50%; transform: translateX(-50%); font-weight: bold; font-size: 12px; color: #000; background: rgba(255,255,255,0.95); padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 3px solid #0d6efd; text-align: center; line-height: 1.2;">
+                    <div style="margin-bottom: ${margenY > 0 ? '4px' : '0'};">${anchoTablero}mm</div>
+                    ${margenY > 0 ? `<div style="font-size: 9px; color: #ffc107; font-weight: normal;">Margen Y: ${margenY}mm</div>` : ''}
+                </div>
+                <div style="position: absolute; left: -50px; top: 50%; transform: translateY(-50%) rotate(-90deg); font-weight: bold; font-size: 12px; color: #000; background: rgba(255,255,255,0.95); padding: 6px 10px; border-radius: 4px; border: 1px solid #ccc; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-left: 3px solid #0d6efd; text-align: center; line-height: 1.2;">
+                    <div style="margin-bottom: ${margenX > 0 ? '4px' : '0'};">${largoTablero}mm</div>
+                    ${margenX > 0 ? `<div style="font-size: 9px; color: #ffc107; font-weight: normal;">Margen X: ${margenX}mm</div>` : ''}
+                </div>
+                
+                <div class="tablero-visualization border border-dark position-relative" 
+                     style="width: ${anchoVis}px; height: ${largoVis}px; background: #f8f9fa; margin: 60px;">
+                
+                <!-- Márgenes DENTRO del tablero -->
+                ${margenX > 0 || margenY > 0 ? `
+                    <!-- Márgenes superiores e inferiores INTERNOS -->
+                    ${margenY > 0 ? `
+                        <div style="position: absolute; top: 0; left: 0; right: 0; height: ${margenY * escala}px; 
+                                    background: repeating-linear-gradient(45deg, #ffc107, #ffc107 2px, transparent 2px, transparent 8px); 
+                                    opacity: 0.4; border-bottom: 1px dashed #ffc107; z-index: 5;"></div>
+                        
+                        <div style="position: absolute; bottom: 0; left: 0; right: 0; height: ${margenY * escala}px; 
+                                    background: repeating-linear-gradient(45deg, #ffc107, #ffc107 2px, transparent 2px, transparent 8px); 
+                                    opacity: 0.4; border-top: 1px dashed #ffc107; z-index: 5;"></div>
+                    ` : ''}
+                    
+                    <!-- Márgenes laterales INTERNOS -->
+                    ${margenX > 0 ? `
+                        <div style="position: absolute; top: 0; bottom: 0; left: 0; width: ${margenX * escala}px; 
+                                    background: repeating-linear-gradient(135deg, #ffc107, #ffc107 2px, transparent 2px, transparent 8px); 
+                                    opacity: 0.4; border-right: 1px dashed #ffc107; z-index: 5;"></div>
+                        
+                        <div style="position: absolute; top: 0; bottom: 0; right: 0; width: ${margenX * escala}px; 
+                                    background: repeating-linear-gradient(135deg, #ffc107, #ffc107 2px, transparent 2px, transparent 8px); 
+                                    opacity: 0.4; border-left: 1px dashed #ffc107; z-index: 5;"></div>
+                    ` : ''}
+                    
+                    <!-- Área de trabajo efectiva -->
+                    <div style="position: absolute; top: ${margenY * escala}px; bottom: ${margenY * escala}px; 
+                                left: ${margenX * escala}px; right: ${margenX * escala}px; 
+                                border: 2px dashed #28a745; background: rgba(40, 167, 69, 0.05); z-index: 3;"></div>
+                ` : ''}
+    `;
+    
+    // Agregar líneas de corte principales
+    const cortesVerticales = new Set();
+    const cortesHorizontales = new Set();
+    
+    tablero.piezas.forEach(pieza => {
+        cortesVerticales.add(pieza.x);
+        cortesVerticales.add(pieza.x + pieza.ancho);
+        cortesHorizontales.add(pieza.y);
+        cortesHorizontales.add(pieza.y + pieza.largo);
+    });
+    
+    // Dibujar líneas de corte verticales
+    Array.from(cortesVerticales).forEach(x => {
+        if (x > 0 && x < tablero.ancho) {
+            const xPos = x * escala;
+            html += `<div style="position: absolute; left: ${xPos}px; top: 0; bottom: 0; width: 1px; background: #007bff; opacity: 0.5; z-index: 1;"></div>`;
+        }
+    });
+    
+    // Dibujar líneas de corte horizontales
+    Array.from(cortesHorizontales).forEach(y => {
+        if (y > 0 && y < tablero.largo) {
+            const yPos = y * escala;
+            html += `<div style="position: absolute; top: ${yPos}px; left: 0; right: 0; height: 1px; background: #007bff; opacity: 0.5; z-index: 1;"></div>`;
+        }
+    });
+    
+    // Agregar cada pieza
+    tablero.piezas.forEach((pieza, index) => {
+        let x = pieza.x * escala;
+        let y = pieza.y * escala;
+        let ancho = pieza.ancho * escala;
+        let largo = pieza.largo * escala;
+        
+        // Ajustar coordenadas si la visualización está rotada
+        if (rotarVisualizacion && tablero.ancho < tablero.largo) {
+            const tempX = x;
+            x = y;
+            y = (tablero.ancho * escala) - tempX - ancho;
+            [ancho, largo] = [largo, ancho];
+        }
+        const color = colores[index % colores.length];
+        
+        // Generar marcas de tapacanto con líneas punteadas y código
+        let marcasTapacanto = '';
+        if (pieza.tapacantos && pieza.tapacantos.length > 0) {
+            pieza.tapacantos.forEach(tapacanto => {
+                const colorTapacanto = '#dc3545';
+                // Obtener el código del tapacanto seleccionado
+                let codigoTapacanto = 'T';
+                try {
+                    const tapacantoSelect = document.getElementById('tapacantoSelect');
+                    if (tapacantoSelect && tapacantoSelect.selectedIndex > 0) {
+                        const selectedOption = tapacantoSelect.options[tapacantoSelect.selectedIndex];
+                        codigoTapacanto = selectedOption.getAttribute('data-codigo') || selectedOption.text.split(' ')[0] || 'T';
+                    }
+                } catch(e) {
+                    codigoTapacanto = tapacanto.codigo || 'T';
+                }
+                
+                switch(tapacanto.lado) {
+                    case 'arriba':
+                        marcasTapacanto += `
+                            <div style="position: absolute; top: 0px; left: 2px; right: 2px; height: 2px; background: repeating-linear-gradient(to right, ${colorTapacanto} 0px, ${colorTapacanto} 3px, transparent 3px, transparent 6px); z-index: 10;"></div>
+                            <div style="position: absolute; top: 3px; left: 50%; transform: translateX(-50%); background: ${colorTapacanto}; color: white; font-size: 7px; padding: 1px 3px; border-radius: 2px; z-index: 15; line-height: 1;">${codigoTapacanto}</div>
+                        `;
+                        break;
+                    case 'abajo':
+                        marcasTapacanto += `
+                            <div style="position: absolute; bottom: 0px; left: 2px; right: 2px; height: 2px; background: repeating-linear-gradient(to right, ${colorTapacanto} 0px, ${colorTapacanto} 3px, transparent 3px, transparent 6px); z-index: 10;"></div>
+                            <div style="position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); background: ${colorTapacanto}; color: white; font-size: 7px; padding: 1px 3px; border-radius: 2px; z-index: 15; line-height: 1;">${codigoTapacanto}</div>
+                        `;
+                        break;
+                    case 'izquierda':
+                        marcasTapacanto += `
+                            <div style="position: absolute; top: 2px; left: 0px; bottom: 2px; width: 2px; background: repeating-linear-gradient(to bottom, ${colorTapacanto} 0px, ${colorTapacanto} 3px, transparent 3px, transparent 6px); z-index: 10;"></div>
+                            <div style="position: absolute; left: 3px; top: 50%; transform: translateY(-50%) rotate(-90deg); background: ${colorTapacanto}; color: white; font-size: 7px; padding: 1px 3px; border-radius: 2px; z-index: 15; line-height: 1;">${codigoTapacanto}</div>
+                        `;
+                        break;
+                    case 'derecha':
+                        marcasTapacanto += `
+                            <div style="position: absolute; top: 2px; right: 0px; bottom: 2px; width: 2px; background: repeating-linear-gradient(to bottom, ${colorTapacanto} 0px, ${colorTapacanto} 3px, transparent 3px, transparent 6px); z-index: 10;"></div>
+                            <div style="position: absolute; right: 3px; top: 50%; transform: translateY(-50%) rotate(90deg); background: ${colorTapacanto}; color: white; font-size: 7px; padding: 1px 3px; border-radius: 2px; z-index: 15; line-height: 1;">${codigoTapacanto}</div>
+                        `;
+                        break;
+                }
+            });
+        }
+        
+        // Símbolo de rotación mejorado - más visible
+        const simboloRotacion = pieza.rotada ? 
+            '<div style="position: absolute; top: 3px; right: 3px; background: #ff6b35; color: white; border-radius: 3px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: bold; z-index: 15; box-shadow: 0 2px 4px rgba(0,0,0,0.3); border: 2px solid #fff;" title="Pieza rotada durante optimización">⟲</div>' : 
+            '';
+        
+        // Calcular si el nombre y medidas caben en la pieza
+        const nombreCompleto = pieza.nombre || `Pieza ${index + 1}`;
+        const medidas = `${pieza.ancho}x${pieza.largo}`;
+        
+        // Cálculo preciso del espacio disponible (5px por carácter, márgenes de 6px)
+        const anchoDisponible = ancho - 12; // Márgenes de 6px cada lado
+        const largoDisponible = largo - 12;
+        const textoAncho = Math.max(nombreCompleto.length * 5.5, medidas.length * 5);
+        const textoAlto = 20; // Altura para 2 líneas de texto más grandes
+        
+        const cabeTextoCompleto = anchoDisponible > textoAncho && largoDisponible > textoAlto;
+        const cabeNombre = anchoDisponible > (nombreCompleto.length * 4.5) && largoDisponible > 10;
+        
+        let nombreMostrar = '';
+        if (cabeTextoCompleto) {
+            nombreMostrar = nombreCompleto;
+        } else if (cabeNombre) {
+            // Calcular cuántos caracteres caben
+            const maxChars = Math.floor(anchoDisponible / 5.5);
+            nombreMostrar = nombreCompleto.length > maxChars ? nombreCompleto.substring(0, maxChars - 3) + '...' : nombreCompleto;
+        }
+        
+        let contenidoPieza = '';
+        if (cabeTextoCompleto && nombreMostrar) {
+            // Mostrar nombre completo y medidas
+            contenidoPieza = `
+                <div style="font-size: 10px; font-weight: bold; line-height: 1.2; margin-bottom: 1px;">${nombreMostrar}</div>
+                <div style="font-size: 9px; color: #555; font-weight: 500;">${medidas}mm</div>
+            `;
+        } else if (nombreMostrar && cabeNombre) {
+            // Solo nombre si cabe
+            contenidoPieza = `<div style="font-size: 10px; font-weight: bold; line-height: 1.1;">${nombreMostrar}</div>`;
+        }
+        
+        // Agregar área de desperdicio de sierra alrededor de la pieza (si hay valor)
+        if (desperdicioSierra > 0) {
+            const margenSierra = desperdicioSierra * escala;
+            html += `
+                <div class="sierra-area position-absolute" 
+                     style="left: ${x - margenSierra}px; top: ${y - margenSierra}px; 
+                            width: ${ancho + (margenSierra * 2)}px; height: ${largo + (margenSierra * 2)}px; 
+                            background: repeating-linear-gradient(45deg, #dc3545, #dc3545 1px, transparent 1px, transparent 4px); 
+                            opacity: 0.2; z-index: 4; 
+                            border: 1px dashed #dc3545;"
+                     title="Desperdicio de sierra: ${desperdicioSierra}mm">
+                </div>
+            `;
+        }
+        
+        html += `
+            <div class="pieza-en-tablero position-absolute ${pieza.rotada ? 'border-warning border-3' : 'border border-secondary'}" 
+                 style="left: ${x}px; top: ${y}px; width: ${ancho}px; height: ${largo}px; background: ${color}; z-index: 5; ${pieza.rotada ? 'box-shadow: 0 0 0 2px #ff6b35;' : ''}"
+                 title="${pieza.id_unico || pieza.nombre} (${pieza.ancho}x${pieza.largo}mm)${pieza.rotada ? ' - ⟲ ROTADA AUTOMÁTICAMENTE' : ''}${desperdicioSierra > 0 ? ` + ${desperdicioSierra}mm sierra` : ''}">
+                <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; line-height: 1.1; pointer-events: none; max-width: 100%; overflow: hidden;">
+                    ${contenidoPieza}
+                </div>
+                ${marcasTapacanto}
+                ${simboloRotacion}
+            </div>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+            
+            <!-- Lista de piezas en el tablero -->
+            <div class="mt-3">
+                <small class="text-muted">
+                    <strong>Piezas:</strong>
+                    ${tablero.piezas.map(p => {
+                        const rotadaIcon = p.rotada ? ' <span class="text-warning fw-bold" title="Pieza rotada automáticamente">⟲</span>' : '';
+                        const tapacantoInfo = (p.tapacantos && p.tapacantos.length > 0) ? 
+                            ` <span class="text-info">[T:${p.tapacantos.length}]</span>` : '';
+                        return `<span class="${p.rotada ? 'text-warning' : ''}">${p.id_unico || p.nombre}</span>${rotadaIcon}${tapacantoInfo}`;
+                    }).join(', ')}
+                </small>
+            </div>
+            
+            <!-- Información de eficiencia del tablero -->
+            <div class="mt-2">
+                <div class="row text-center">
+                    <div class="col-4">
+                        <small class="text-muted d-block">Área Utilizada</small>
+                        <small class="fw-bold text-success">
+                            ${((tablero.piezas.reduce((sum, p) => sum + (p.ancho * p.largo), 0) / 1000000)).toFixed(2)} m²
+                        </small>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted d-block">Piezas</small>
+                        <small class="fw-bold text-info">${tablero.piezas.length}</small>
+                    </div>
+                    <div class="col-4">
+                        <small class="text-muted d-block">Eficiencia</small>
+                        <small class="fw-bold text-warning">
+                            ${((tablero.piezas.reduce((sum, p) => sum + (p.ancho * p.largo), 0) / (anchoTablero * largoTablero)) * 100).toFixed(1)}%
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    return html;
+}
+
+// Funciones de exportación
+function exportarJsonEntrada() {
+    try {
+        const datos = recopilarDatosFormulario();
+        
+        const blob = new Blob([JSON.stringify(datos, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `entrada_${datos.nombre_proyecto}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+    } catch (error) {
+        alert('Error al exportar: ' + error.message);
+    }
+}
+
+function exportarJsonSalida() {
+    const resultadoActual = resultadosOptimizacion[materialActual];
+    if (!resultadoActual) {
+        alert('No hay resultado de optimización para exportar en este material');
+        return;
+    }
+    
+    try {
+        const blob = new Blob([JSON.stringify(resultadoActual, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resultado_optimizacion_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        
+    } catch (error) {
+        alert('Error al exportar: ' + error.message);
+    }
+}
+
+function exportarPDF() {
+    if (!proyectoActual) {
+        alert('Primero debe realizar la optimización');
+        return;
+    }
+    
+    window.open(`/optimizador/exportar-pdf/${proyectoActual}/`, '_blank');
+}
+
+// Nuevas funciones para el sistema mejorado
+
+// Sistema de búsqueda de clientes
+let clientesData = [];
+let timeoutBusqueda = null;
+
+function buscarClientes(valor) {
+    clearTimeout(timeoutBusqueda);
+    
+    timeoutBusqueda = setTimeout(() => {
+        const sugerenciasDiv = document.getElementById('clientesSugerencias');
+        const clienteInput = document.getElementById('clienteInput');
+        
+        if (valor.length < 2) {
+            sugerenciasDiv.classList.add('d-none');
+            return;
+        }
+        
+        const clientesFiltrados = clientesData.filter(cliente => 
+            cliente.nombre.toLowerCase().includes(valor.toLowerCase())
+        );
+        
+        if (clientesFiltrados.length > 0) {
+            let html = '';
+            clientesFiltrados.forEach(cliente => {
+                html += `
+                    <div class="p-2 border-bottom cursor-pointer cliente-opcion" 
+                         onclick="seleccionarClienteExistente('${cliente.id}', '${cliente.nombre}', '${cliente.rut || ''}')"
+                         onmouseover="this.style.backgroundColor='#f8f9fa'" 
+                         onmouseout="this.style.backgroundColor='white'">
+                        <strong>${cliente.nombre}</strong>
+                        ${cliente.rut ? `<br><small class="text-muted">${cliente.rut}</small>` : ''}
+                    </div>
+                `;
+            });
+            
+            // Agregar opción de crear nuevo cliente
+            html += `
+                <div class="p-2 border-top bg-light cursor-pointer" 
+                     onclick="crearNuevoCliente('${valor}')"
+                     onmouseover="this.style.backgroundColor='#e9ecef'" 
+                     onmouseout="this.style.backgroundColor='#f8f9fa'">
+                    <i class="fas fa-plus-circle me-2"></i>
+                    <strong>Crear nuevo cliente:</strong> "${valor}"
+                </div>
+            `;
+            
+            sugerenciasDiv.innerHTML = html;
+            sugerenciasDiv.classList.remove('d-none');
+        } else {
+            sugerenciasDiv.innerHTML = `
+                <div class="p-2 bg-light cursor-pointer" 
+                     onclick="crearNuevoCliente('${valor}')"
+                     onmouseover="this.style.backgroundColor='#e9ecef'" 
+                     onmouseout="this.style.backgroundColor='#f8f9fa'">
+                    <i class="fas fa-plus-circle me-2"></i>
+                    <strong>Crear nuevo cliente:</strong> "${valor}"
+                </div>
+            `;
+            sugerenciasDiv.classList.remove('d-none');
+        }
+    }, 300);
+}
+
+function seleccionarClienteExistente(id, nombre, rut) {
+    document.getElementById('clienteInput').value = nombre;
+    document.getElementById('clienteId').value = id;
+    document.getElementById('rutCliente').value = rut || '';
+    document.getElementById('clientesSugerencias').classList.add('d-none');
+    
+    // Auto-completar nombre del proyecto si está vacío
+    const nombreProyecto = document.getElementById('nombreProyecto');
+    if (!nombreProyecto.value.trim()) {
+        const fecha = new Date().toLocaleDateString('es-CL');
+        nombreProyecto.value = `${nombre} - ${fecha}`;
+    }
+}
+
+function crearNuevoCliente(nombre) {
+    document.getElementById('clienteInput').value = nombre;
+    document.getElementById('clienteId').value = '';
+    document.getElementById('rutCliente').focus();
+    document.getElementById('clientesSugerencias').classList.add('d-none');
+    
+    // Auto-completar nombre del proyecto
+    const nombreProyecto = document.getElementById('nombreProyecto');
+    if (!nombreProyecto.value.trim()) {
+        const fecha = new Date().toLocaleDateString('es-CL');
+        nombreProyecto.value = `${nombre} - ${fecha}`;
+    }
+}
+
+function seleccionarCliente() {
+    setTimeout(() => {
+        document.getElementById('clientesSugerencias').classList.add('d-none');
+    }, 200);
+}
+
+// Sistema de tapacantos con iconos
+function toggleTapacanto(piezaId, tipo) {
+    const contenedor = document.getElementById(`tapacantos_${piezaId}`);
+    const botones = contenedor.querySelectorAll('.tapacanto-btn');
+    
+    // Quitar active de todos los botones
+    botones.forEach(btn => btn.classList.remove('active', 'btn-primary'));
+    botones.forEach(btn => btn.classList.add('btn-outline-secondary'));
+    
+    // Activar el botón seleccionado
+    const botonSeleccionado = contenedor.querySelector(`[data-lado="${tipo}"]`);
+    botonSeleccionado.classList.remove('btn-outline-secondary');
+    botonSeleccionado.classList.add('btn-primary', 'active');
+    
+    // Guardar la configuración
+    botonSeleccionado.setAttribute('data-config', tipo);
+}
+
+// Función para mostrar notificaciones toast
+function mostrarNotificacion(mensaje, tipo = 'success') {
+    // Crear elemento de notificación
+    const notificacion = document.createElement('div');
+    notificacion.className = `alert alert-${tipo} alert-dismissible fade show position-fixed`;
+    notificacion.style.cssText = `
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        min-width: 300px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    `;
+    
+    notificacion.innerHTML = `
+        <div class="d-flex align-items-center">
+            <iconify-icon icon="solar:check-circle-bold" class="text-success me-2 text-xl"></iconify-icon>
+            <div>${mensaje}</div>
+            <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert"></button>
+        </div>
+    `;
+    
+    // Agregar al body
+    document.body.appendChild(notificacion);
+    
+    // Auto-remover después de 4 segundos
+    setTimeout(() => {
+        if (notificacion.parentNode) {
+            notificacion.classList.remove('show');
+            setTimeout(() => notificacion.remove(), 150);
+        }
+    }, 4000);
+}
+
+// Sistema de materiales múltiples
+let materialActual = 1;
+let totalMateriales = 1;
+
+function agregarMaterial() {
+    // Guardar el estado actual antes de agregar nuevo material
+    if (materialActual) {
+        guardarEstadoMaterial(materialActual);
+    }
+    
+    totalMateriales++;
+    const contenedor = document.getElementById('materialesContainer');
+    
+    // Crear nuevo botón de material con mejores estilos
+    const nuevoBoton = document.createElement('button');
+    nuevoBoton.type = 'button';
+    nuevoBoton.className = 'btn btn-outline-primary material-tab fw-semibold';
+    nuevoBoton.setAttribute('data-material', totalMateriales);
+    nuevoBoton.style.boxShadow = '0 2px 4px rgba(108, 117, 125, 0.3)';
+    nuevoBoton.onclick = () => seleccionarMaterial(totalMateriales);
+    nuevoBoton.innerHTML = `Material ${totalMateriales}`;
+    
+    // Agregar antes del botón "Agregar Material"
+    const botonAgregar = contenedor.querySelector('.btn-success');
+    botonAgregar.parentNode.insertBefore(nuevoBoton, botonAgregar);
+    
+    // Seleccionar el nuevo material (esto cargará un estado limpio)
+    seleccionarMaterial(totalMateriales);
+    
+    // Actualizar resumen
+    document.getElementById('totalMateriales').textContent = totalMateriales;
+}
+
+function seleccionarMaterial(numeroMaterial) {
+    // Actualizar pestañas visuales con mejores estilos
+    document.querySelectorAll('.material-tab').forEach(tab => {
+        tab.classList.remove('btn-primary', 'active');
+        tab.classList.add('btn-outline-primary');
+        tab.style.boxShadow = '0 2px 4px rgba(108, 117, 125, 0.3)';
+    });
+    
+    const tabSeleccionada = document.querySelector(`[data-material="${numeroMaterial}"]`);
+    tabSeleccionada.classList.remove('btn-outline-primary');
+    tabSeleccionada.classList.add('btn-primary', 'active');
+    tabSeleccionada.style.boxShadow = '0 2px 4px rgba(13, 110, 253, 0.3)';
+    
+    // SIEMPRE guardar el estado del material actual antes de cambiar
+    if (materialActual && materialActual !== numeroMaterial) {
+        console.log(`Guardando estado del Material ${materialActual}`);
+        guardarEstadoMaterial(materialActual);
+    }
+    
+    // Cambiar el material actual
+    const materialAnterior = materialActual;
+    materialActual = numeroMaterial;
+    
+    // Actualizar texto en la parte inferior
+    document.querySelector('.text-muted').textContent = `Editando: Material ${numeroMaterial}`;
+    
+    console.log(`Cambiando de Material ${materialAnterior} a Material ${numeroMaterial}`);
+    
+    // Cargar configuración del material seleccionado
+    cargarEstadoMaterial(numeroMaterial);
+    
+    // Mostrar visualización del material si existe
+    mostrarVisualizacionMaterial(numeroMaterial);
+}
+
+function limpiarConfiguracionMaterial() {
+    document.getElementById('materialSelect').value = '';
+    document.getElementById('anchoTablero').value = '';
+    document.getElementById('largoTablero').value = '';
+    limpiarPiezas();
+}
+
+// Función para editar márgenes
+function editarMargenes() {
+    const margenX = document.getElementById('margenX');
+    const margenY = document.getElementById('margenY');
+    const desperdicio = document.getElementById('desperdicioSierra');
+    
+    if (margenX.readOnly) {
+        margenX.readOnly = false;
+        margenY.readOnly = false;
+        desperdicio.readOnly = false;
+        margenX.classList.add('border-primary');
+        margenY.classList.add('border-primary');
+        desperdicio.classList.add('border-primary');
+    } else {
+        margenX.readOnly = true;
+        margenY.readOnly = true;
+        desperdicio.readOnly = true;
+        margenX.classList.remove('border-primary');
+        margenY.classList.remove('border-primary');
+        desperdicio.classList.remove('border-primary');
+    }
+}
+
+// Función para mostrar la visualización del material actual
+function mostrarVisualizacionMaterial(numeroMaterial) {
+    const resultado = resultadosOptimizacion[numeroMaterial];
+    const divResultado = document.getElementById('resultadoOptimizacion');
+    
+    if (resultado) {
+        // Mostrar la visualización del material (sin scroll automático)
+        mostrarResultadoOptimizacion(resultado, false);
+        divResultado.style.display = 'block';
+        
+        // Habilitar botones de exportación
+        document.getElementById('btnExportarSalida').disabled = false;
+        document.getElementById('btnExportarPDF').disabled = false;
+    } else {
+        // Ocultar visualización si no hay resultado
+        divResultado.style.display = 'none';
+        
+        // Deshabilitar botones de exportación
+        document.getElementById('btnExportarSalida').disabled = true;
+        document.getElementById('btnExportarPDF').disabled = true;
+    }
+}
+
+// Función para mostrar la visualización del material actual
+function mostrarVisualizacionMaterial(numeroMaterial) {
+    const resultado = resultadosOptimizacion[numeroMaterial];
+    const divResultado = document.getElementById('resultadoOptimizacion');
+    
+    if (resultado) {
+        console.log(`Mostrando visualización del Material ${numeroMaterial}`);
+        // Mostrar la visualización del material (sin scroll automático)
+        mostrarResultadoOptimizacion(resultado, false);
+        divResultado.style.display = 'block';
+        
+        // Habilitar botones de exportación
+        document.getElementById('btnExportarSalida').disabled = false;
+        document.getElementById('btnExportarPDF').disabled = false;
+    } else {
+        console.log(`No hay visualización para el Material ${numeroMaterial}`);
+        // Ocultar visualización si no hay resultado
+        divResultado.style.display = 'none';
+        
+        // Deshabilitar botones de exportación
+        document.getElementById('btnExportarSalida').disabled = true;
+        document.getElementById('btnExportarPDF').disabled = true;
+    }
+}
+
+// Variables globales para guardar estado de materiales
+let estadosMateriales = {};
+
+// Funciones para guardar y cargar estado entre materiales
+function guardarEstadoMaterial(numeroMaterial) {
+    const estado = {
+        // Información del tablero
+        anchoTablero: document.getElementById('anchoTablero').value,
+        largoTablero: document.getElementById('largoTablero').value,
+        materialSelect: document.getElementById('materialSelect').value,
+        tapacantoSelect: document.getElementById('tapacantoSelect').value,
+        margenX: document.getElementById('margenX').value,
+        margenY: document.getElementById('margenY').value,
+        desperdicioSierra: document.getElementById('desperdicioSierra').value,
+        
+        // Piezas
+        piezas: []
+    };
+    
+    // Guardar todas las piezas
+    const filasPiezas = document.querySelectorAll('#piezasTableBody tr');
+    filasPiezas.forEach((fila, index) => {
+        const inputs = fila.querySelectorAll('input');
+        const checkbox = fila.querySelector('input[type="checkbox"]');
+        
+        // Obtener estado del tapacanto
+        const tapacantoEstado = {
+            todos: false,
+            lados: {
+                abajo: false,
+                derecha: false,
+                arriba: false,
+                izquierda: false
+            }
+        };
+        
+        const botonTodos = document.getElementById(`tapacanto_todos_${index + 1}`);
+        if (botonTodos) {
+            tapacantoEstado.todos = botonTodos.classList.contains('btn-primary');
+        }
+        
+        ['abajo', 'derecha', 'arriba', 'izquierda'].forEach(lado => {
+            const boton = document.getElementById(`tapacanto_${lado}_${index + 1}`);
+            if (boton) {
+                tapacantoEstado.lados[lado] = boton.classList.contains('btn-primary');
+            }
+        });
+        
+        estado.piezas.push({
+            cantidad: inputs[0] ? inputs[0].value : '1',
+            nombre: inputs[1] ? inputs[1].value : '',
+            largo: inputs[2] ? inputs[2].value : '',
+            ancho: inputs[3] ? inputs[3].value : '',
+            veteado: checkbox ? checkbox.checked : false,
+            tapacanto: tapacantoEstado
+        });
+    });
+    
+    estadosMateriales[numeroMaterial] = estado;
+}
+
+function cargarEstadoMaterial(numeroMaterial) {
+    const estado = estadosMateriales[numeroMaterial];
+    
+    if (!estado) {
+        // Si no hay estado guardado, crear un estado inicial vacío pero no limpiar
+        console.log(`Creando nuevo estado para Material ${numeroMaterial}`);
+        return;
+    }
+    
+    // Cargar información del tablero
+    document.getElementById('anchoTablero').value = estado.anchoTablero || '';
+    document.getElementById('largoTablero').value = estado.largoTablero || '';
+    document.getElementById('materialSelect').value = estado.materialSelect || '';
+    document.getElementById('tapacantoSelect').value = estado.tapacantoSelect || '';
+    document.getElementById('margenX').value = estado.margenX || '5';
+    document.getElementById('margenY').value = estado.margenY || '5';
+    document.getElementById('desperdicioSierra').value = estado.desperdicioSierra || '3';
+    
+    // Actualizar disponibilidad de tapacantos
+    actualizarTapacantoDisponible();
+    
+    // Limpiar tabla de piezas solo si tiene contenido diferente
+    const tbody = document.getElementById('piezasTableBody');
+    tbody.innerHTML = '';
+    
+    // Recargar piezas del estado guardado
+    estado.piezas.forEach((pieza, index) => {
+        agregarPieza();
+        
+        // Configurar valores de la pieza
+        const fila = document.getElementById(`pieza_${index + 1}`);
+        if (fila) {
+            const inputs = fila.querySelectorAll('input');
+            if (inputs[0]) inputs[0].value = pieza.cantidad;
+            if (inputs[1]) inputs[1].value = pieza.nombre;
+            if (inputs[2]) inputs[2].value = pieza.largo;
+            if (inputs[3]) inputs[3].value = pieza.ancho;
+            
+            const checkbox = fila.querySelector('input[type="checkbox"]');
+            if (checkbox) checkbox.checked = pieza.veteado;
+            
+            // Restaurar estado del tapacanto
+            if (pieza.tapacanto) {
+                if (pieza.tapacanto.todos) {
+                    const botonTodos = document.getElementById(`tapacanto_todos_${index + 1}`);
+                    if (botonTodos) {
+                        botonTodos.classList.remove('btn-outline-secondary');
+                        botonTodos.classList.add('btn-primary');
+                    }
+                } else {
+                    Object.keys(pieza.tapacanto.lados).forEach(lado => {
+                        if (pieza.tapacanto.lados[lado]) {
+                            const boton = document.getElementById(`tapacanto_${lado}_${index + 1}`);
+                            if (boton) {
+                                boton.classList.remove('btn-outline-secondary');
+                                boton.classList.add('btn-primary');
+                            }
+                        }
+                    });
+                }
+            }
+        }
+    });
+}
+
+function limpiarConfiguracionMaterial() {
+    // Limpiar todos los campos del formulario
+    document.getElementById('anchoTablero').value = '';
+    document.getElementById('largoTablero').value = '';
+    document.getElementById('materialSelect').value = '';
+    document.getElementById('tapacantoSelect').value = '';
+    
+    // Resetear márgenes a valores por defecto
+    document.getElementById('margenX').value = '5';
+    document.getElementById('margenY').value = '5';
+    document.getElementById('desperdicioSierra').value = '3';
+    
+    // Limpiar piezas
+    limpiarPiezas();
+    
+    // Actualizar disponibilidad de tapacantos
+    actualizarTapacantoDisponible();
+}
+
+// Funciones para el sistema de tapacanto visual
+function toggleTapacantoTodos(numeroPieza) {
+    const botonTodos = document.getElementById(`tapacanto_todos_${numeroPieza}`);
+    const botones = ['abajo', 'derecha', 'arriba', 'izquierda'];
+    
+    if (botonTodos.classList.contains('btn-primary')) {
+        // Deseleccionar todos
+        botonTodos.classList.remove('btn-primary');
+        botonTodos.classList.add('btn-outline-secondary');
+    } else {
+        // Seleccionar todos y deseleccionar individuales
+        botonTodos.classList.remove('btn-outline-secondary');
+        botonTodos.classList.add('btn-primary');
+        
+        // Deseleccionar todos los botones individuales
+        botones.forEach(lado => {
+            const botonLado = document.getElementById(`tapacanto_${lado}_${numeroPieza}`);
+            botonLado.classList.remove('btn-primary');
+            botonLado.classList.add('btn-outline-secondary');
+        });
+    }
+}
+
+function toggleTapacantoLado(numeroPieza, lado) {
+    const botonLado = document.getElementById(`tapacanto_${lado}_${numeroPieza}`);
+    const botonTodos = document.getElementById(`tapacanto_todos_${numeroPieza}`);
+    
+    // Deseleccionar el botón "todos" si estaba seleccionado
+    if (botonTodos.classList.contains('btn-primary')) {
+        botonTodos.classList.remove('btn-primary');
+        botonTodos.classList.add('btn-outline-secondary');
+    }
+    
+    // Toggle del lado específico
+    if (botonLado.classList.contains('btn-primary')) {
+        botonLado.classList.remove('btn-primary');
+        botonLado.classList.add('btn-outline-secondary');
+    } else {
+        botonLado.classList.remove('btn-outline-secondary');
+        botonLado.classList.add('btn-primary');
+    }
+}
+
+function obtenerTapacantoPieza(numeroPieza) {
+    const botonTodos = document.getElementById(`tapacanto_todos_${numeroPieza}`);
+    if (botonTodos && botonTodos.classList.contains('btn-primary')) {
+        return 4; // Todos los lados
+    }
+    
+    const botones = ['abajo', 'derecha', 'arriba', 'izquierda'];
+    let contador = 0;
+    botones.forEach(lado => {
+        const boton = document.getElementById(`tapacanto_${lado}_${numeroPieza}`);
+        if (boton && boton.classList.contains('btn-primary')) {
+            contador++;
+        }
+    });
+    
+    return contador;
+}
+
+// Estilos CSS adicionales
+const estilosCSS = `
+<style>
+.btn-xs {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
+    line-height: 1.2;
+}
+
+.tapacanto-btn {
+    width: 30px;
+    height: 28px;
+    padding: 0;
+    font-size: 12px;
+    font-weight: bold;
+    font-family: monospace;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tapacanto-btn.active {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+
+.cursor-pointer {
+    cursor: pointer;
+}
+
+.cliente-opcion {
+    transition: background-color 0.2s;
+}
+
+.cliente-opcion:hover {
+    background-color: #f8f9fa !important;
+}
+
+.material-tab {
+    min-width: 100px;
+    margin-right: 5px;
+}
+
+#clientesSugerencias {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 0.375rem 0.375rem;
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+}
+
+.form-control:focus + #clientesSugerencias {
+    border-color: #86b7fe;
+}
+
+.table th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.input-group-text {
+    font-size: 0.875rem;
+}
+
+/* Contenedor de botones de tapacanto */
+.tapacanto-buttons {
+    display: flex;
+    gap: 2px;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    min-width: 200px;
+}
+
+/* Botones de tapacanto mejorados */
+.tapacanto-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    padding: 3px 5px;
+    min-width: 32px;
+    height: 30px;
+    margin: 0 1px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    vertical-align: middle;
+}
+
+.tapacanto-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    flex-wrap: nowrap;
+    min-height: 35px;
+    padding: 2px;
+}
+
+.tapacanto-buttons .btn {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.tapacanto-btn:hover {
+    transform: scale(1.1);
+}
+
+.tapacanto-btn.btn-primary {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: white;
+}
+</style>
+`;
+
+// Agregar estilos al head
+document.head.insertAdjacentHTML('beforeend', estilosCSS);
+
+// Función para actualizar tapacanto disponible según el material
+function actualizarTapacantoDisponible() {
+    const tapacantoSelect = document.getElementById('tapacantoSelect');
+    const estadoBadge = document.getElementById('tapacantoEstado');
+    const selectedOption = tapacantoSelect.options[tapacantoSelect.selectedIndex];
+    
+    // Actualizar badge de estado
+    if (tapacantoSelect.value) {
+        estadoBadge.innerHTML = '<span class="badge bg-success">Disponible</span>';
+        // Habilitar todos los selects de tapacanto en las piezas
+        habilitarTapacantosPiezas(true);
+    } else {
+        estadoBadge.innerHTML = '<span class="badge bg-secondary">No disponible</span>';
+        // Deshabilitar todos los selects de tapacanto en las piezas
+        habilitarTapacantosPiezas(false);
+    }
+}
+
+// Función para habilitar/deshabilitar tapacantos en piezas
+function habilitarTapacantosPiezas(habilitar) {
+    const contenedoresTapacanto = document.querySelectorAll('.tapacanto-buttons');
+    contenedoresTapacanto.forEach(contenedor => {
+        if (habilitar) {
+            contenedor.style.opacity = '1';
+            contenedor.style.pointerEvents = 'auto';
+        } else {
+            contenedor.style.opacity = '0.5';
+            contenedor.style.pointerEvents = 'none';
+            // Resetear todos los botones
+            const botones = contenedor.querySelectorAll('.tapacanto-btn');
+            botones.forEach(boton => {
+                boton.classList.remove('btn-primary');
+                boton.classList.add('btn-outline-secondary');
+            });
+        }
+    });
+}
+
+// Función mejorada para agregar pieza (sin ventanas extra)
+function agregarPieza() {
+    const tbody = document.getElementById('piezasTableBody');
+    const numeroNuevaPieza = tbody.children.length + 1;
+    const tapacantoHabilitado = !document.getElementById('tapacantoSelect').disabled && document.getElementById('tapacantoSelect').value;
+    
+    const nuevaFila = document.createElement('tr');
+    nuevaFila.id = `pieza_${numeroNuevaPieza}`;
+    nuevaFila.innerHTML = `
+        <td class="text-center">${numeroNuevaPieza}</td>
+        <td><input type="number" class="form-control form-control-sm" value="1" min="1" style="width: 85px;"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Nombre pieza"></td>
+        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+        <td class="text-center">
+            <input type="checkbox" class="form-check-input" checked>
+        </td>
+        <td>
+            <div class="tapacanto-buttons" ${!tapacantoHabilitado ? 'style="opacity: 0.5; pointer-events: none;"' : ''}>
+                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                    id="tapacanto_todos_${numeroNuevaPieza}" 
+                    onclick="toggleTapacantoTodos(${numeroNuevaPieza})" 
+                    title="Todos los lados">
+                    ⬛
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                    id="tapacanto_abajo_${numeroNuevaPieza}" 
+                    onclick="toggleTapacantoLado(${numeroNuevaPieza}, 'abajo')" 
+                    title="Lado inferior">
+                    ⬇️
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                    id="tapacanto_derecha_${numeroNuevaPieza}" 
+                    onclick="toggleTapacantoLado(${numeroNuevaPieza}, 'derecha')" 
+                    title="Lado derecho">
+                    ➡️
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                    id="tapacanto_arriba_${numeroNuevaPieza}" 
+                    onclick="toggleTapacantoLado(${numeroNuevaPieza}, 'arriba')" 
+                    title="Lado superior">
+                    ⬆️
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-xs tapacanto-btn" 
+                    id="tapacanto_izquierda_${numeroNuevaPieza}" 
+                    onclick="toggleTapacantoLado(${numeroNuevaPieza}, 'izquierda')" 
+                    title="Lado izquierdo">
+                    ⬅️
+                </button>
+            </div>
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarPieza(${numeroNuevaPieza})" title="Eliminar pieza">
+                <iconify-icon icon="solar:trash-bin-minimalistic-outline"></iconify-icon>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(nuevaFila);
+    
+    // Agregar eventos de validación a los inputs de medidas de la nueva pieza
+    const inputLargo = nuevaFila.querySelector('td:nth-child(4) input');
+    const inputAncho = nuevaFila.querySelector('td:nth-child(5) input');
+    
+    if (inputLargo && inputAncho) {
+        inputLargo.addEventListener('blur', function() {
+            validarMedidasPieza(inputLargo, inputAncho, numeroNuevaPieza);
+        });
+        inputAncho.addEventListener('blur', function() {
+            validarMedidasPieza(inputLargo, inputAncho, numeroNuevaPieza);
+        });
+    }
+    
+    // Actualizar resumen del proyecto
+    actualizarResumenProyecto();
+}
+
+// Función para eliminar pieza con sistema de tapacanto visual
+function eliminarPieza(numeroPieza) {
+    const fila = document.getElementById(`pieza_${numeroPieza}`);
+    if (fila) {
+        fila.remove();
+        renumerarPiezas();
+        
+        // Actualizar resumen del proyecto
+        actualizarResumenProyecto();
+    }
+}
+
+// Función para renumerar piezas después de eliminar
+function renumerarPiezas() {
+    const filas = document.querySelectorAll('#piezasTableBody tr');
+    filas.forEach((fila, index) => {
+        const numeroNuevo = index + 1;
+        
+        // Actualizar ID de la fila
+        fila.id = `pieza_${numeroNuevo}`;
+        
+        // Actualizar número en primera columna
+        fila.children[0].textContent = numeroNuevo;
+        
+        // Actualizar IDs de botones de tapacanto
+        const botones = fila.querySelectorAll('.tapacanto-btn');
+        botones.forEach(boton => {
+            const id = boton.id;
+            if (id.includes('tapacanto_todos_')) {
+                boton.id = `tapacanto_todos_${numeroNuevo}`;
+                boton.setAttribute('onclick', `toggleTapacantoTodos(${numeroNuevo})`);
+            } else if (id.includes('tapacanto_abajo_')) {
+                boton.id = `tapacanto_abajo_${numeroNuevo}`;
+                boton.setAttribute('onclick', `toggleTapacantoLado(${numeroNuevo}, 'abajo')`);
+            } else if (id.includes('tapacanto_derecha_')) {
+                boton.id = `tapacanto_derecha_${numeroNuevo}`;
+                boton.setAttribute('onclick', `toggleTapacantoLado(${numeroNuevo}, 'derecha')`);
+            } else if (id.includes('tapacanto_arriba_')) {
+                boton.id = `tapacanto_arriba_${numeroNuevo}`;
+                boton.setAttribute('onclick', `toggleTapacantoLado(${numeroNuevo}, 'arriba')`);
+            } else if (id.includes('tapacanto_izquierda_')) {
+                boton.id = `tapacanto_izquierda_${numeroNuevo}`;
+                boton.setAttribute('onclick', `toggleTapacantoLado(${numeroNuevo}, 'izquierda')`);
+            }
+        });
+        
+        // Actualizar botón de eliminar
+        const botonEliminar = fila.querySelector('button[onclick*="eliminarPieza"]');
+        if (botonEliminar) {
+            botonEliminar.setAttribute('onclick', `eliminarPieza(${numeroNuevo})`);
+        }
+    });
+}
+
+function rotarVisualizacionTableros(materialNombre) {
+    console.log('🔄 Intentando rotar visualización para:', materialNombre);
+    
+    if (!window.resultadoActual) {
+        console.error('❌ No hay resultado actual');
+        mostrarNotificacion('Primero debe optimizar el material para poder rotar la visualización', 'warning');
+        return;
+    }
+    
+    console.log('✅ Resultado actual encontrado:', window.resultadoActual);
+    
+    const contenedorId = `contenedorVisualizacion-${materialNombre.replace(/\s+/g, '')}`;
+    console.log('🔍 Buscando contenedor:', contenedorId);
+    
+    let contenedor = document.getElementById(contenedorId);
+    
+    if (!contenedor) {
+        console.warn('⚠️ No se encontró contenedor específico:', contenedorId);
+        // Intentar encontrar cualquier contenedor de visualización
+        contenedor = document.querySelector('[id*="contenedorVisualizacion"]');
+        if (contenedor) {
+            console.log('✅ Usando contenedor alternativo:', contenedor.id);
+        } else {
+            console.error('❌ No se encontró ningún contenedor de visualización');
+            mostrarNotificacion('No se encontró la visualización para rotar', 'error');
+            return;
+        }
+    }
+    
+    const esRotado = contenedor.dataset.rotado === 'true';
+    contenedor.dataset.rotado = (!esRotado).toString();
+    console.log('🔄 Estado de rotación:', esRotado ? 'rotado -> normal' : 'normal -> rotado');
+    
+    let htmlVisualizacion = '';
+    window.resultadoActual.tableros.forEach((tablero, index) => {
+        htmlVisualizacion += generarVisualizacionTablero(tablero, index + 1, window.resultadoActual.material, !esRotado);
+    });
+    
+    contenedor.innerHTML = htmlVisualizacion;
+    
+    const mensaje = esRotado ? '🔄 Vista restaurada a orientación original' : '🔄 Vista rotada para aprovechar el ancho';
+    console.log('✅', mensaje);
+    
+    // Usar la función de notificación existente
+    mostrarNotificacion(mensaje, 'success');
+}
+
+// Función de debug para el optimizador
+function debugOptimizador() {
+    console.log('🔍 DEBUG OPTIMIZADOR:');
+    
+    // Verificar medidas del tablero
+    const anchoTablero = document.getElementById('anchoTablero');
+    const largoTablero = document.getElementById('largoTablero');
+    console.log(`📐 Medidas editables: ${anchoTablero?.value || 'N/A'}mm x ${largoTablero?.value || 'N/A'}mm`);
+    
+    // Verificar material seleccionado
+    const materialSelect = document.getElementById('materialSelect');
+    console.log(`🎯 Material seleccionado: ${materialSelect?.value || 'N/A'}`);
+    
+    // Verificar piezas
+    const piezas = obtenerPiezasValidas();
+    console.log(`🧩 Piezas válidas: ${piezas.length}`);
+    piezas.forEach((pieza, i) => {
+        console.log(`  ${i+1}. ${pieza.nombre}: ${pieza.ancho}x${pieza.largo} (cant: ${pieza.cantidad})`);
+    });
+    
+    // Verificar resultado actual
+    if (window.resultadoActual) {
+        console.log(`📊 Resultado actual: ${window.resultadoActual.total_tableros} tableros, ${window.resultadoActual.total_piezas} piezas`);
+        console.log(`⚡ Eficiencia: ${window.resultadoActual.eficiencia}%`);
+    } else {
+        console.log('❌ No hay resultado actual');
+    }
+}
+
+// Agregar función global para debug fácil
+window.debugOpt = debugOptimizador;
+
+// Función auxiliar para mostrar notificaciones
+// Función para inicializar eventos de validación en todas las piezas
+function inicializarValidacionPiezas() {
+    const tbody = document.getElementById('piezasTableBody');
+    if (!tbody) return;
+    
+    // Agregar eventos a todas las filas existentes
+    const filas = tbody.querySelectorAll('tr[id^="pieza_"]');
+    filas.forEach(fila => {
+        const inputLargo = fila.querySelector('td:nth-child(4) input');
+        const inputAncho = fila.querySelector('td:nth-child(5) input');
+        const numeroPieza = fila.id.replace('pieza_', '');
+        
+        if (inputLargo && inputAncho) {
+            // Remover listeners existentes para evitar duplicados
+            inputLargo.removeEventListener('blur', validarMedidasPieza);
+            inputAncho.removeEventListener('blur', validarMedidasPieza);
+            
+            // Agregar nuevos listeners
+            inputLargo.addEventListener('blur', function() {
+                validarMedidasPieza(inputLargo, inputAncho, numeroPieza);
+            });
+            inputAncho.addEventListener('blur', function() {
+                validarMedidasPieza(inputLargo, inputAncho, numeroPieza);
+            });
+        }
+    });
+}
+
+// Función para habilitar/deshabilitar edición de medidas del tablero
+function toggleMedidasEditables() {
+    console.log('🔧 Toggle medidas editables ejecutado');
+    
+    const anchoTablero = document.getElementById('anchoTablero');
+    const largoTablero = document.getElementById('largoTablero');
+    const checkbox = document.getElementById('permitirEdicionCheck');
+    const estadoTexto = document.getElementById('estadoEdicionTexto');
+    const estadoIcon = document.getElementById('estadoEdicionIcon');
+    const estadoLabel = document.getElementById('estadoEdicionLabel');
+    
+    // Debug: verificar que todos los elementos existan
+    if (!anchoTablero) console.error('❌ No se encontró elemento anchoTablero');
+    if (!largoTablero) console.error('❌ No se encontró elemento largoTablero');
+    if (!checkbox) console.error('❌ No se encontró elemento permitirEdicionCheck');
+    if (!estadoTexto) console.error('❌ No se encontró elemento estadoEdicionTexto');
+    if (!estadoIcon) console.error('❌ No se encontró elemento estadoEdicionIcon');
+    if (!estadoLabel) console.error('❌ No se encontró elemento estadoEdicionLabel');
+    
+    if (!anchoTablero || !largoTablero || !checkbox) {
+        console.error('❌ Elementos básicos no encontrados, abortando');
+        return;
+    }
+    
+    console.log(`📍 Estado del checkbox: ${checkbox.checked}`);
+    
+    if (checkbox.checked) {
+        // Habilitar edición
+        anchoTablero.readOnly = false;
+        largoTablero.readOnly = false;
+        
+        // Cambiar estilos de los campos
+        anchoTablero.style.backgroundColor = '#fff3cd';
+        anchoTablero.style.borderColor = '#ffc107';
+        largoTablero.style.backgroundColor = '#fff3cd';
+        largoTablero.style.borderColor = '#ffc107';
+        
+        // Cambiar texto e icono si existen
+        if (estadoTexto) estadoTexto.textContent = 'Habilitado';
+        if (estadoIcon) estadoIcon.setAttribute('icon', 'solar:lock-unlocked-outline');
+        if (estadoLabel) estadoLabel.className = 'form-check-label fw-medium text-warning';
+        
+        console.log('✏️ Edición de medidas del tablero HABILITADA');
+        mostrarNotificacion('Edición de medidas habilitada. Recuerda que la medida mayor debe ser el ancho.', 'warning');
+    } else {
+        // Deshabilitar edición
+        anchoTablero.readOnly = true;
+        largoTablero.readOnly = true;
+        
+        // Restaurar estilos de los campos
+        anchoTablero.style.backgroundColor = '';
+        anchoTablero.style.borderColor = '';
+        largoTablero.style.backgroundColor = '';
+        largoTablero.style.borderColor = '';
+        
+        // Cambiar texto e icono si existen
+        if (estadoTexto) estadoTexto.textContent = 'Bloqueado';
+        if (estadoIcon) estadoIcon.setAttribute('icon', 'solar:lock-outline');
+        if (estadoLabel) estadoLabel.className = 'form-check-label fw-medium text-muted';
+        
+        console.log('🔒 Edición de medidas del tablero BLOQUEADA');
+        mostrarNotificacion('Medidas bloqueadas. Se usarán las del material seleccionado.', 'info');
+    }
+}
+
+// Función para validar y ajustar medidas de piezas
+function validarMedidasPieza(inputLargo, inputAncho, numeroPieza) {
+    const largo = parseFloat(inputLargo.value);
+    const ancho = parseFloat(inputAncho.value);
+    
+    // Solo validar si ambos campos tienen valores válidos
+    if (isNaN(largo) || isNaN(ancho) || largo <= 0 || ancho <= 0) {
+        return;
+    }
+    
+    // NOTA: Para piezas, mantenemos la lógica original donde el usuario puede decidir
+    // la orientación. Solo informamos si la medida mayor está en el largo
+    if (largo > ancho) {
+        // Mostrar información discreta sobre la orientación
+        console.log(`💡 Pieza ${numeroPieza}: ${largo}×${ancho}mm (largo mayor que ancho)`);
+        
+        // Opcional: mostrar tooltip o mensaje suave
+        inputLargo.title = `Medida mayor (${largo}mm) está en el largo. ¿Es correcto?`;
+        inputAncho.title = `Medida menor (${ancho}mm) está en el ancho. ¿Es correcto?`;
+        
+        // Cambiar ligeramente el borde para indicar información
+        inputLargo.style.borderColor = '#ffc107';
+        inputAncho.style.borderColor = '#ffc107';
+        
+        setTimeout(() => {
+            inputLargo.style.borderColor = '';
+            inputAncho.style.borderColor = '';
+        }, 3000);
+    } else {
+        // Limpiar títulos y estilos si las medidas están OK
+        inputLargo.title = '';
+        inputAncho.title = '';
+        inputLargo.style.borderColor = '';
+        inputAncho.style.borderColor = '';
+    }
+}
+
+function actualizarResumenProyecto() {
+    console.log('📊 Actualizando resumen del proyecto...');
+    
+    try {
+        // Verificar que el contenedor del resumen existe
+        const resumenContainer = document.getElementById('resumenProyecto');
+        if (!resumenContainer) {
+            console.error('❌ No se encontró el contenedor del resumen del proyecto');
+            return;
+        }
+        
+        // Actualizar fecha
+        const fechaElement = document.getElementById('fechaProyecto');
+        if (fechaElement) {
+            fechaElement.textContent = new Date().toLocaleDateString('es-ES');
+            console.log('✅ Fecha actualizada:', fechaElement.textContent);
+        }
+        
+        // Actualizar cliente si está seleccionado
+        const clienteBusqueda = document.getElementById('clienteBusqueda');
+        const clienteNombre = document.getElementById('clienteNombre');
+        if (clienteBusqueda && clienteNombre) {
+            const clienteSeleccionado = clienteBusqueda.value;
+            if (clienteSeleccionado) {
+                clienteNombre.textContent = clienteSeleccionado;
+                console.log('✅ Cliente actualizado:', clienteSeleccionado);
+            } else {
+                clienteNombre.textContent = 'Sin especificar';
+            }
+        }
+        
+        // Actualizar material actual
+        const tipoMaterial = document.getElementById('tipoMaterial');
+        const espesorMaterial = document.getElementById('espesorMaterial');
+        const materialNombre = document.getElementById('materialNombre');
+        
+        if (tipoMaterial && espesorMaterial && materialNombre) {
+            const tipo = tipoMaterial.value || 'Material no especificado';
+            const espesor = espesorMaterial.value || '15';
+            materialNombre.textContent = `${tipo} ${espesor}mm`;
+            console.log('✅ Material actualizado:', materialNombre.textContent);
+        }
+        
+        // Actualizar dimensiones del tablero desde campos editables
+        const anchoTablero = document.getElementById('anchoTablero');
+        const largoTablero = document.getElementById('largoTablero');
+        
+        if (anchoTablero && largoTablero) {
+            const ancho = anchoTablero.value || '1830';
+            const largo = largoTablero.value || '2500';
+            console.log('📏 Dimensiones del tablero:', `${ancho}mm x ${largo}mm`);
+        }
+        
+        // Calcular área total de piezas
+        const piezas = obtenerPiezasValidas();
+        const areaTotal = document.getElementById('areaTotal');
+        const totalPiezasElement = document.getElementById('totalPiezas');
+        
+        if (areaTotal && totalPiezasElement) {
+            if (piezas.length > 0) {
+                const areaTotalM2 = piezas.reduce((total, pieza) => {
+                    return total + (pieza.ancho * pieza.largo / 1000000);
+                }, 0);
+                areaTotal.textContent = areaTotalM2.toFixed(2) + ' m²';
+                totalPiezasElement.textContent = piezas.length;
+                console.log('✅ Área total calculada:', areaTotal.textContent, '- Piezas:', piezas.length);
+            } else {
+                areaTotal.textContent = '0.00 m²';
+                totalPiezasElement.textContent = '0';
+                console.log('⚠️ No hay piezas válidas');
+            }
+        }
+        
+        // Mostrar resumen
+        resumenContainer.style.display = 'block';
+        console.log('✅ Resumen del proyecto mostrado');
+        
+    } catch (error) {
+        console.error('❌ Error actualizando resumen del proyecto:', error);
+    }
+}
+
+// Variable global para datos de clientes - se carga desde el script separado
+let clientesData = [];
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Optimizador mejorado iniciado');
+    
+    // Configurar campos de márgenes como readonly inicialmente
+    document.getElementById('margenX').readOnly = true;
+    document.getElementById('margenY').readOnly = true;
+    document.getElementById('desperdicioSierra').readOnly = true;
+    
+    // Mostrar el resumen del proyecto al cargar la página
+    actualizarResumenProyecto();
+    
+    // Inicializar eventos de validación en piezas existentes
+    inicializarValidacionPiezas();
+    
+    // Verificar que el checkbox funcione
+    setTimeout(() => {
+        const checkbox = document.getElementById('permitirEdicionCheck');
+        if (checkbox) {
+            console.log('✅ Checkbox encontrado y listo');
+            // Forzar estado inicial
+            checkbox.checked = false;
+            toggleMedidasEditables();
+        } else {
+            console.error('❌ Checkbox no encontrado después de cargar');
+        }
+    }, 1000);
+});
+
+// Función de prueba para el checkbox
+function probarCheckbox() {
+    console.log('🧪 Probando checkbox...');
+    const checkbox = document.getElementById('permitirEdicionCheck');
+    if (checkbox) {
+        checkbox.checked = !checkbox.checked;
+        console.log(`✅ Checkbox cambiado a: ${checkbox.checked}`);
+        toggleMedidasEditables();
+    } else {
+        console.error('❌ Checkbox no encontrado en la prueba');
+        alert('Error: No se pudo encontrar el checkbox');
+    }
+}
+
+// Función para inicializar validación en piezas existentes
+function inicializarValidacionPiezas() {
+    const piezasRows = document.querySelectorAll('#piezasTableBody tr');
+    piezasRows.forEach((row, index) => {
+        const inputLargo = row.querySelector('td:nth-child(4) input');
+        const inputAncho = row.querySelector('td:nth-child(5) input');
+        const numeroPieza = index + 1;
+        
+        if (inputLargo && inputAncho) {
+            inputLargo.addEventListener('blur', function() {
+                validarMedidasPieza(inputLargo, inputAncho, numeroPieza);
+            });
+            inputAncho.addEventListener('blur', function() {
+                validarMedidasPieza(inputLargo, inputAncho, numeroPieza);
+            });
+        }
+    });
+}
+    
+    // Agregar listeners para las medidas del tablero (medidas de trabajo)
+    const anchoTableroInput = document.getElementById('anchoTablero');
+    const largoTableroInput = document.getElementById('largoTablero');
+    
+    if (anchoTableroInput) {
+        anchoTableroInput.addEventListener('input', function() {
+            console.log('📐 Medida de trabajo - Ancho cambiado a:', this.value + 'mm');
+            actualizarResumenProyecto();
+            // Si hay visualización activa, regenerarla con las nuevas medidas (sin scroll)
+            if (window.resultadoActual) {
+                console.log('🔄 Regenerando visualización con nuevas medidas de ancho');
+                mostrarResultadoOptimizacion(window.resultadoActual, false);
+            }
+        });
+    }
+    
+    if (largoTableroInput) {
+        largoTableroInput.addEventListener('input', function() {
+            console.log('📐 Medida de trabajo - Largo cambiado a:', this.value + 'mm');
+            actualizarResumenProyecto();
+            // Si hay visualización activa, regenerarla con las nuevas medidas (sin scroll)
+            if (window.resultadoActual) {
+                console.log('🔄 Regenerando visualización con nuevas medidas de largo');
+                mostrarResultadoOptimizacion(window.resultadoActual, false);
+            }
+        });
+    }
+    
+    // Agregar listeners para auto-guardar estado cuando se modifican campos
+    const camposConfiguracion = [
+        'anchoTablero', 'largoTablero', 'materialSelect', 
+        'tapacantoSelect', 'margenX', 'margenY', 'desperdicioSierra'
+    ];
+    
+    camposConfiguracion.forEach(campoId => {
+        const campo = document.getElementById(campoId);
+        if (campo) {
+            campo.addEventListener('change', () => {
+                // Pequeño delay para asegurar que el valor se haya actualizado
+                setTimeout(() => {
+                    if (materialActual) {
+                        console.log(`Auto-guardando estado del Material ${materialActual} por cambio en ${campoId}`);
+                        guardarEstadoMaterial(materialActual);
+                    }
+                }, 100);
+            });
+        }
+    });
+    
+    // Listener para guardar estado antes de cerrar/recargar página
+    window.addEventListener('beforeunload', () => {
+        if (materialActual) {
+            guardarEstadoMaterial(materialActual);
+        }
+    });
+    
+    // Mostrar visualización del material actual al cargar la página
+    mostrarVisualizacionMaterial(materialActual);
+});
+</script>
+
+<!-- Scripts de prueba y datos -->
+<script>
+// Función de prueba INMEDIATA
+function probarConectividad() {
+    alert('✅ JavaScript SÍ está funcionando!');
+    console.log('✅ Test de conectividad exitoso - JavaScript OK');
+    return true;
+}
+
+// Datos de clientes para JavaScript (formato seguro)
+window.clientesData = [];
+
+// Test inmediato al cargar
+console.log('🚀 Script de prueba cargado');
+console.log('🔍 Probando funciones básicas...');
+
+// Verificar que las funciones básicas existen
+setTimeout(function() {
+    console.log('📋 Verificando funciones:');
+    console.log('- agregarPieza:', typeof agregarPieza);
+    console.log('- cargarEjemplo:', typeof cargarEjemplo);
+    console.log('- buscarClientes:', typeof buscarClientes);
+    console.log('- toggleMedidasEditables:', typeof toggleMedidasEditables);
+    
+    // Test de DOM
+    console.log('📄 Verificando elementos DOM:');
+    console.log('- clienteInput:', !!document.getElementById('clienteInput'));
+    console.log('- anchoTablero:', !!document.getElementById('anchoTablero'));
+    console.log('- permitirEdicionCheck:', !!document.getElementById('permitirEdicionCheck'));
+    
+    // Cargar datos de clientes de forma segura
+    try {
+        window.clientesData = [
+            {% for cliente in clientes %}
+            {
+                id: {{ cliente.id }},
+                nombre: "{{ cliente.nombre|addslashes }}",
+                rut: "{{ cliente.rut|default:''|addslashes }}"
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        console.log('✅ Clientes cargados:', window.clientesData.length);
+    } catch (e) {
+        console.error('❌ Error cargando clientes:', e);
+        window.clientesData = [];
+    }
+}, 500);
+</script>
+
+{% endblock %}

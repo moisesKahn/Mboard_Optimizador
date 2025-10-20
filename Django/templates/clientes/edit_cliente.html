@@ -1,0 +1,243 @@
+{% extends 'layout/layout.html' %}
+{% load static %}
+
+{% block meta_title %}{{ title }}{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-main-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+        <h6 class="fw-semibold mb-0">{{ title }}</h6>
+        <ul class="d-flex align-items-center gap-2">
+            <li class="fw-medium">
+                <a href="{% url 'index' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                    <iconify-icon icon="solar:home-smile-angle-outline" class="icon text-lg"></iconify-icon>
+                    Inicio
+                </a>
+            </li>
+            <li>-</li>
+            <li class="fw-medium">
+                <a href="{% url 'clientes_lista' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                    Clientes
+                </a>
+            </li>
+            <li>-</li>
+            <li class="fw-medium">{{ subTitle }}</li>
+        </ul>
+    </div>
+
+    <div class="row gy-4">
+        <div class="col-md-8 col-xl-9">
+            <div class="card h-100 p-0 radius-12">
+                <div class="card-header border-bottom bg-base py-16 px-24">
+                    <div class="d-flex align-items-center flex-wrap gap-3 justify-content-between">
+                        <div class="d-flex align-items-center gap-3">
+                            <iconify-icon icon="lucide:edit" class="text-primary-light text-xl"></iconify-icon>
+                            <span class="text-md fw-medium text-secondary-light mb-0">Editar Cliente: {{ cliente.nombre }}</span>
+                        </div>
+                        <a href="{% url 'clientes_lista' %}" class="btn btn-outline-primary text-sm btn-sm px-12 py-6 radius-8">
+                            <iconify-icon icon="solar:arrow-left-linear" class="icon text-xl line-height-1"></iconify-icon>
+                            Volver a Lista
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-body p-24">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    <form method="POST" class="row gy-20">
+                        {% csrf_token %}
+                        
+                        <!-- RUT -->
+                        <div class="col-sm-6">
+                            <label for="{{ form.rut.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                RUT <span class="text-danger-600">*</span>
+                            </label>
+                            {{ form.rut }}
+                            {% if form.rut.errors %}
+                                <div class="text-danger-600 text-sm mt-4">
+                                    {% for error in form.rut.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Nombre -->
+                        <div class="col-sm-6">
+                            <label for="{{ form.nombre.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Nombre Completo <span class="text-danger-600">*</span>
+                            </label>
+                            {{ form.nombre }}
+                            {% if form.nombre.errors %}
+                                <div class="text-danger-600 text-sm mt-4">
+                                    {% for error in form.nombre.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Organización -->
+                        <div class="col-sm-6">
+                            <label for="{{ form.organizacion.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Organización
+                            </label>
+                            {{ form.organizacion }}
+                            {% if form.organizacion.errors %}
+                                <div class="text-danger-600 text-sm mt-4">
+                                    {% for error in form.organizacion.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Teléfono -->
+                        <div class="col-sm-6">
+                            <label for="{{ form.telefono.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Teléfono
+                            </label>
+                            {{ form.telefono }}
+                            {% if form.telefono.errors %}
+                                <div class="text-danger-600 text-sm mt-4">
+                                    {% for error in form.telefono.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Email -->
+                        <div class="col-12">
+                            <label for="{{ form.email.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Email
+                            </label>
+                            {{ form.email }}
+                            {% if form.email.errors %}
+                                <div class="text-danger-600 text-sm mt-4">
+                                    {% for error in form.email.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Dirección -->
+                        <div class="col-12">
+                            <label for="{{ form.direccion.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Dirección
+                            </label>
+                            {{ form.direccion }}
+                            {% if form.direccion.errors %}
+                                <div class="text-danger-600 text-sm mt-4">
+                                    {% for error in form.direccion.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Estado Activo -->
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.activo }}
+                                <label for="{{ form.activo.id_for_label }}" class="form-check-label fw-semibold text-primary-light text-sm">
+                                    Cliente Activo
+                                </label>
+                            </div>
+                            {% if form.activo.errors %}
+                                <div class="text-danger-600 text-sm mt-4">
+                                    {% for error in form.activo.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="col-12">
+                            <div class="d-flex align-items-center gap-3">
+                                <button type="submit" class="btn btn-primary text-sm btn-sm px-20 py-11 radius-8">
+                                    <iconify-icon icon="material-symbols:save" class="icon text-xl line-height-1"></iconify-icon>
+                                    Actualizar Cliente
+                                </button>
+                                <a href="{% url 'clientes_lista' %}" class="btn btn-outline-secondary text-sm btn-sm px-20 py-11 radius-8">
+                                    Cancelar
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Panel lateral con información del cliente -->
+        <div class="col-md-4 col-xl-3">
+            <div class="card h-100 p-0 radius-12">
+                <div class="card-header border-bottom bg-base py-16 px-24">
+                    <span class="text-md fw-medium text-secondary-light mb-0">Información del Cliente</span>
+                </div>
+                <div class="card-body p-24">
+                    <div class="d-flex flex-column gap-16">
+                        <div class="d-flex align-items-center gap-10">
+                            <div class="w-44-px h-44-px bg-info-50 rounded-circle d-flex align-items-center justify-content-center">
+                                <iconify-icon icon="solar:calendar-outline" class="text-info-600 text-xl"></iconify-icon>
+                            </div>
+                            <div>
+                                <span class="text-md fw-medium text-secondary-light mb-0">Fecha de Registro</span>
+                                <p class="text-sm text-secondary-light mb-0">{{ cliente.fecha_creacion|date:"d/m/Y H:i" }}</p>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex align-items-center gap-10">
+                            <div class="w-44-px h-44-px bg-warning-50 rounded-circle d-flex align-items-center justify-content-center">
+                                <iconify-icon icon="solar:document-text-outline" class="text-warning-600 text-xl"></iconify-icon>
+                            </div>
+                            <div>
+                                <span class="text-md fw-medium text-secondary-light mb-0">ID del Cliente</span>
+                                <p class="text-sm text-secondary-light mb-0">#{{ cliente.id }}</p>
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-10">
+                            <div class="w-44-px h-44-px bg-{% if cliente.activo %}success{% else %}danger{% endif %}-50 rounded-circle d-flex align-items-center justify-content-center">
+                                <iconify-icon icon="{% if cliente.activo %}solar:shield-check-outline{% else %}solar:shield-cross-outline{% endif %}" class="text-{% if cliente.activo %}success{% else %}danger{% endif %}-600 text-xl"></iconify-icon>
+                            </div>
+                            <div>
+                                <span class="text-md fw-medium text-secondary-light mb-0">Estado Actual</span>
+                                <p class="text-sm text-{% if cliente.activo %}success{% else %}danger{% endif %}-600 mb-0 fw-medium">
+                                    {% if cliente.activo %}Activo{% else %}Inactivo{% endif %}
+                                </p>
+                            </div>
+                        </div>
+
+                        {% if cliente.organizacion %}
+                        <div class="d-flex align-items-center gap-10">
+                            <div class="w-44-px h-44-px bg-primary-50 rounded-circle d-flex align-items-center justify-content-center">
+                                <iconify-icon icon="solar:buildings-outline" class="text-primary-600 text-xl"></iconify-icon>
+                            </div>
+                            <div>
+                                <span class="text-md fw-medium text-secondary-light mb-0">Organización</span>
+                                <p class="text-sm text-secondary-light mb-0">{{ cliente.organizacion.nombre }}</p>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Formatear RUT automáticamente
+document.getElementById('{{ form.rut.id_for_label }}').addEventListener('input', function(e) {
+    let valor = e.target.value.replace(/[^0-9kK]/g, '');
+    valor = valor.replace(/k/g, 'K');
+    
+    if (valor.length >= 2) {
+        const cuerpo = valor.slice(0, -1);
+        const dv = valor.slice(-1);
+        const cuerpoFormateado = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+        valor = cuerpoFormateado + '-' + dv;
+    }
+    
+    e.target.value = valor;
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,253 @@
+{% extends '../layout/layout.html' %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">Optimizador de Materiales - LIMPIO</h6>
+</div>
+
+<!-- TEST JAVASCRIPT -->
+<div class="alert alert-info">
+    <h6>🧪 Test JavaScript:</h6>
+    <div class="d-flex gap-2">
+        <button class="btn btn-success btn-sm" onclick="alert('✅ JS Funciona!')">Test Alert</button>
+        <button class="btn btn-info btn-sm" onclick="testConsola()">Test Consola</button>
+        <button class="btn btn-warning btn-sm" onclick="testDOM()">Test DOM</button>
+    </div>
+    <div id="testResult" class="mt-2"></div>
+</div>
+
+<!-- Cliente -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">1. Cliente</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <label class="form-label">Cliente</label>
+                <input type="text" class="form-control" id="clienteInput" placeholder="Nombre del cliente">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">RUT</label>
+                <input type="text" class="form-control" id="rutCliente" placeholder="12.345.678-9">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuración -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">2. Configuración del Material</h6>
+    </div>
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Ancho tablero (mm)</label>
+                <input type="number" class="form-control" id="anchoTablero" value="2440">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Largo tablero (mm)</label>
+                <input type="number" class="form-control" id="largoTablero" value="1830">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Margen (mm)</label>
+                <input type="number" class="form-control" id="margen" value="5">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Piezas -->
+<div class="card mb-24">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="card-title mb-0">3. Piezas</h6>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-success" onclick="agregarPieza()">Añadir</button>
+                <button type="button" class="btn btn-sm btn-info" onclick="cargarEjemplo()">Ejemplo</button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Cantidad</th>
+                    <th>Nombre</th>
+                    <th>Largo</th>
+                    <th>Ancho</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="piezasTableBody">
+                <tr id="pieza_1">
+                    <td>1</td>
+                    <td><input type="number" class="form-control form-control-sm" value="1"></td>
+                    <td><input type="text" class="form-control form-control-sm" placeholder="Nombre"></td>
+                    <td><input type="number" class="form-control form-control-sm" placeholder="0"></td>
+                    <td><input type="number" class="form-control form-control-sm" placeholder="0"></td>
+                    <td>
+                        <button class="btn btn-sm btn-danger" onclick="eliminarPieza(1)">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Optimizar -->
+<div class="card">
+    <div class="card-body text-center">
+        <button type="button" class="btn btn-primary btn-lg" onclick="optimizar()">
+            Optimizar
+        </button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+console.log('🚀 Script iniciando...');
+
+// ===== VARIABLES GLOBALES =====
+var piezaCounter = 1;
+
+// ===== FUNCIONES DE PRUEBA =====
+window.testConsola = function() {
+    console.log('✅ Console.log funciona correctamente');
+    document.getElementById('testResult').innerHTML = '✅ Consola OK - Revisa F12';
+    alert('✅ Test Consola ejecutado');
+};
+
+window.testDOM = function() {
+    console.log('Ejecutando testDOM...');
+    var cliente = document.getElementById('clienteInput');
+    if (cliente) {
+        cliente.value = 'Test Cliente - ' + new Date().toLocaleTimeString();
+        document.getElementById('testResult').innerHTML = '✅ DOM manipulation funciona';
+        alert('✅ DOM funciona');
+    } else {
+        document.getElementById('testResult').innerHTML = '❌ No se encontró elemento';
+        alert('❌ Elemento no encontrado');
+    }
+};
+
+// ===== FUNCIONES PRINCIPALES =====
+window.agregarPieza = function() {
+    console.log('Agregando pieza...');
+    alert('✅ Función agregarPieza llamada');
+    
+    var tbody = document.getElementById('piezasTableBody');
+    if (!tbody) {
+        alert('❌ No se encontró la tabla');
+        return;
+    }
+    
+    piezaCounter++;
+    
+    var nuevaFila = document.createElement('tr');
+    nuevaFila.id = 'pieza_' + piezaCounter;
+    nuevaFila.innerHTML = '<td>' + piezaCounter + '</td>' +
+        '<td><input type="number" class="form-control form-control-sm" value="1"></td>' +
+        '<td><input type="text" class="form-control form-control-sm" placeholder="Nombre"></td>' +
+        '<td><input type="number" class="form-control form-control-sm" placeholder="0"></td>' +
+        '<td><input type="number" class="form-control form-control-sm" placeholder="0"></td>' +
+        '<td><button class="btn btn-sm btn-danger" onclick="eliminarPieza(' + piezaCounter + ')"><i class="fas fa-trash"></i></button></td>';
+    
+    tbody.appendChild(nuevaFila);
+    console.log('✅ Pieza agregada:', piezaCounter);
+    alert('✅ Pieza agregada: ' + piezaCounter);
+};
+
+window.eliminarPieza = function(numero) {
+    console.log('Eliminando pieza:', numero);
+    alert('✅ Función eliminarPieza llamada: ' + numero);
+    
+    var fila = document.getElementById('pieza_' + numero);
+    if (fila) {
+        fila.remove();
+        console.log('✅ Pieza eliminada');
+        alert('✅ Pieza eliminada');
+    } else {
+        alert('❌ No se encontró la pieza');
+    }
+};
+
+window.cargarEjemplo = function() {
+    console.log('Cargando ejemplo...');
+    
+    // Cargar datos del cliente
+    const clienteInput = document.getElementById('clienteInput');
+    const rutInput = document.getElementById('rutCliente');
+    
+    if (clienteInput) clienteInput.value = 'Cliente Ejemplo';
+    if (rutInput) rutInput.value = '12.345.678-9';
+    
+    // Limpiar tabla
+    const tbody = document.getElementById('piezasTableBody');
+    if (tbody) {
+        tbody.innerHTML = '';
+        piezaCounter = 0;
+        
+        // Agregar 3 piezas ejemplo
+        for (let i = 1; i <= 3; i++) {
+            agregarPieza();
+        }
+        
+        // Llenar datos después de agregar
+        setTimeout(() => {
+            const filas = tbody.querySelectorAll('tr');
+            
+            if (filas[0]) {
+                filas[0].querySelector('td:nth-child(2) input').value = '2';
+                filas[0].querySelector('td:nth-child(3) input').value = 'Puerta';
+                filas[0].querySelector('td:nth-child(4) input').value = '2000';
+                filas[0].querySelector('td:nth-child(5) input').value = '800';
+            }
+            
+            if (filas[1]) {
+                filas[1].querySelector('td:nth-child(2) input').value = '4';
+                filas[1].querySelector('td:nth-child(3) input').value = 'Estante';
+                filas[1].querySelector('td:nth-child(4) input').value = '600';
+                filas[1].querySelector('td:nth-child(5) input').value = '300';
+            }
+            
+            if (filas[2]) {
+                filas[2].querySelector('td:nth-child(2) input').value = '1';
+                filas[2].querySelector('td:nth-child(3) input').value = 'Fondo';
+                filas[2].querySelector('td:nth-child(4) input').value = '1200';
+                filas[2].querySelector('td:nth-child(5) input').value = '800';
+            }
+            
+            console.log('✅ Ejemplo cargado completamente');
+            alert('✅ Ejemplo cargado');
+            
+        }, 500);
+    }
+}
+
+window.optimizar = function() {
+    console.log('Iniciando optimización...');
+    alert('✅ Función optimizar ejecutada');
+};
+
+// ===== INICIALIZACIÓN =====
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Página cargada - Optimizador limpio inicializado');
+    
+    // Test automático
+    setTimeout(() => {
+        console.log('📋 Test automático de elementos:');
+        console.log('- Cliente input:', !!document.getElementById('clienteInput'));
+        console.log('- Ancho tablero:', !!document.getElementById('anchoTablero'));
+        console.log('- Tabla piezas:', !!document.getElementById('piezasTableBody'));
+        console.log('✅ Test automático completado');
+    }, 1000);
+});
+</script>
+{% endblock %}

@@ -1,0 +1,251 @@
+{% extends '../layout/layout.html' %} 
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <form method="GET" class="d-flex align-items-center gap-3">
+                <div class="icon-field">
+                    <input type="text" name="search" value="{{ search }}" class="form-control form-control-sm w-auto" placeholder="Buscar proyecto, cliente o RUT...">
+                    <span class="icon">
+                        <iconify-icon icon="ion:search-outline"></iconify-icon>
+                    </span>
+                </div>
+                <select name="estado" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value="">Todos los Estados</option>
+                    {% for value, label in estados %}
+                        <option value="{{ value }}" {% if estado_filter == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <select name="cliente" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+                    <option value="">Todos los Clientes</option>
+                    {% for cliente in clientes %}
+                        <option value="{{ cliente.id }}" {% if cliente_filter == cliente.id|stringformat:'s' %}selected{% endif %}>{{ cliente.nombre }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" class="btn btn-sm btn-secondary">Buscar</button>
+            </form>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-3">
+            <a href="{% url 'optimizador_home' %}" class="btn btn-sm btn-primary-600"><i class="ri-add-line"></i> Crear Proyecto</a>
+            <a href="{% url 'clientes_agregar' %}" class="btn btn-sm btn-success-600"><i class="ri-user-add-line"></i> Nuevo Cliente</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive" style="overflow-x: auto;">
+            <table class="table bordered-table mb-0" style="min-width: 1200px;">
+            <thead>
+                <tr>
+                    <th scope="col" style="width: 80px;">ID</th>
+                    <th scope="col" style="width: 280px;">Nombre del Proyecto</th>
+                    <th scope="col" style="width: 200px;">Cliente</th>
+                    <th scope="col" style="width: 120px;">RUT Cliente</th>
+                    <th scope="col" style="width: 200px;">Encargado</th>
+                    <th scope="col" style="width: 120px;">Fecha de Creación</th>
+                    <th scope="col" style="width: 120px;">Estado</th>
+                    <th scope="col" style="width: 140px;">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for proyecto in proyectos %}
+                <tr>
+                    <td>
+                        <span class="text-sm fw-medium">{{ proyecto.codigo }}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-primary-50 text-primary-600 rounded-circle d-flex align-items-center justify-content-center me-12">
+                                <iconify-icon icon="solar:document-text-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-md mb-0 fw-medium">{{ proyecto.nombre }}</h6>
+                                <span class="text-sm text-secondary-light">#{{ proyecto.codigo }}</span>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <div>
+                            <h6 class="text-sm mb-0 fw-medium">{{ proyecto.cliente.nombre }}</h6>
+                            <span class="text-xs text-secondary-light">{{ proyecto.cliente.rut }}</span>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="text-sm fw-medium">{{ proyecto.cliente.rut }}</span>
+                    </td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <div class="w-32-px h-32-px bg-secondary-50 text-secondary-600 rounded-circle flex-shrink-0 me-12 d-flex align-items-center justify-content-center">
+                                <iconify-icon icon="solar:user-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="text-sm mb-0 fw-medium">{{ proyecto.creado_por.get_full_name|default:proyecto.creado_por.username }}</h6>
+                                <span class="text-xs text-secondary-light">
+                                    {% if proyecto.creado_por.usuarioperfiloptimizador %}
+                                        {{ proyecto.creado_por.usuarioperfiloptimizador.empresa|default:"Sistema" }} / {{ proyecto.creado_por.usuarioperfiloptimizador.get_rol_display }}
+                                    {% else %}
+                                        Sistema / Admin
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </td>
+                    <td><span class="text-sm text-secondary-light">{{ proyecto.fecha_creacion|date:"d M Y" }}</span></td>
+                    <td>
+                        <select class="form-select form-select-sm status-select" data-project-id="{{ proyecto.id }}" onchange="updateProjectStatus(this)" style="max-width: 120px;">
+                            {% for value, label in estados %}
+                                <option value="{{ value }}" {% if proyecto.estado == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </td>
+                    <td>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" onclick="openProjectPreview('{{ proyecto.codigo }}')">
+                            <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
+                        </a>
+                        <a href="{% url 'optimizador_abrir' proyecto.id %}" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">
+                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                        </a>
+                        <a href="javascript:void(0)" class="w-32-px h-32-px bg-danger-focus text-danger-main rounded-circle d-inline-flex align-items-center justify-content-center" onclick="deleteProject('{{ proyecto.id }}')">
+                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-4">
+                        <div class="d-flex flex-column align-items-center">
+                            <iconify-icon icon="solar:folder-open-outline" class="text-5xl text-secondary-light mb-3"></iconify-icon>
+                            <h6 class="text-lg text-secondary-light">No hay proyectos disponibles</h6>
+                            <p class="text-sm text-secondary-light mb-3">¿Por qué no crear el primer proyecto?</p>
+                            <a href="{% url 'optimizador_home' %}" class="btn btn-primary-600 btn-sm">
+                                <i class="ri-add-line"></i> Crear Primer Proyecto
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-24">
+            <span>Mostrando {{ proyectos|length }} proyecto{% if proyectos|length != 1 %}s{% endif %}</span>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'clientes_lista' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="ri-user-line"></i> Gestionar Clientes
+                </a>
+                <a href="{% url 'tableros' %}" class="btn btn-outline-primary btn-sm">
+                    <i class="ri-box-3-line"></i> Gestionar Materiales
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript para funcionalidades AJAX -->
+<script>
+// Función para actualizar el estado del proyecto
+function updateProjectStatus(selectElement) {
+    const projectId = selectElement.getAttribute('data-project-id');
+    const newStatus = selectElement.value;
+    
+    // Crear FormData
+    const formData = new FormData();
+    formData.append('proyecto_id', projectId);
+    formData.append('estado', newStatus);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    
+    // Enviar AJAX
+    fetch('{% url "update_project_status" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Mostrar mensaje de éxito
+            showNotification('success', data.message);
+        } else {
+            // Mostrar error y revertir el cambio
+            showNotification('error', data.message);
+            location.reload(); // Recargar para revertir el cambio
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al actualizar el estado del proyecto');
+        location.reload();
+    });
+}
+
+// Función para eliminar proyecto
+function deleteProject(projectId) {
+    if (confirm('¿Estás seguro de que deseas eliminar este proyecto? Esta acción no se puede deshacer.')) {
+        const formData = new FormData();
+        formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+        
+        fetch(`/proyectos/eliminar/${projectId}/`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('success', data.message);
+                // Remover la fila de la tabla
+                const row = document.querySelector(`[data-project-id="${projectId}"]`).closest('tr');
+                row.remove();
+            } else {
+                showNotification('error', data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('error', 'Error al eliminar el proyecto');
+        });
+    }
+}
+
+// Función para mostrar notificaciones
+function showNotification(type, message) {
+    // Crear elemento de notificación
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type === 'success' ? 'success' : 'danger'} alert-dismissible fade show position-fixed`;
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Agregar al body
+    document.body.appendChild(notification);
+    
+    // Auto-remover después de 5 segundos
+    setTimeout(() => {
+        if (notification.parentNode) {
+            notification.remove();
+        }
+    }, 5000);
+}
+
+// Token CSRF para formularios AJAX
+document.addEventListener('DOMContentLoaded', function() {
+    // Agregar token CSRF si no existe
+    if (!document.querySelector('[name=csrfmiddlewaretoken]')) {
+        const csrfToken = document.createElement('input');
+        csrfToken.type = 'hidden';
+        csrfToken.name = 'csrfmiddlewaretoken';
+        csrfToken.value = '{{ csrf_token }}';
+        document.body.appendChild(csrfToken);
+    }
+});
+</script>
+
+{% endblock %}
+
+{% include 'invoice/project_preview_modal.html' %}

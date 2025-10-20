@@ -1,0 +1,122 @@
+{% extends '../layout/layout.html' %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <h2>🧪 PRUEBA DE CONECTIVIDAD JAVASCRIPT</h2>
+    
+    <!-- Botones de prueba -->
+    <div class="card">
+        <div class="card-body">
+            <h5>Pruebas Básicas:</h5>
+            <div class="row g-2">
+                <div class="col-auto">
+                    <button type="button" class="btn btn-success" onclick="alert('✅ JavaScript funciona!')">
+                        Test Alert
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-info" onclick="console.log('✅ Console log funciona')">
+                        Test Console
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-warning" onclick="testInput()">
+                        Test Input
+                    </button>
+                </div>
+                <div class="col-auto">
+                    <button type="button" class="btn btn-danger" onclick="testTable()">
+                        Test Table
+                    </button>
+                </div>
+            </div>
+            
+            <hr>
+            
+            <!-- Campo de prueba -->
+            <div class="mb-3">
+                <label class="form-label">Campo de Prueba:</label>
+                <input type="text" class="form-control" id="campoTest" placeholder="Escribe algo...">
+            </div>
+            
+            <!-- Tabla de prueba -->
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Nombre</th>
+                        <th>Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="tablaTest">
+                    <tr>
+                        <td>1</td>
+                        <td>Fila inicial</td>
+                        <td>
+                            <button class="btn btn-sm btn-danger" onclick="eliminarFila(this)">
+                                Eliminar
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <button type="button" class="btn btn-primary" onclick="agregarFila()">
+                Agregar Fila
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Funciones de prueba
+let contador = 1;
+
+function testInput() {
+    const campo = document.getElementById('campoTest');
+    campo.value = 'JavaScript funciona! ' + new Date().toLocaleTimeString();
+    alert('✅ Manipulación de input exitosa');
+}
+
+function testTable() {
+    const tbody = document.getElementById('tablaTest');
+    alert('✅ Tabla encontrada. Filas: ' + tbody.children.length);
+}
+
+function agregarFila() {
+    contador++;
+    const tbody = document.getElementById('tablaTest');
+    
+    const nuevaFila = document.createElement('tr');
+    nuevaFila.innerHTML = `
+        <td>${contador}</td>
+        <td>Fila ${contador}</td>
+        <td>
+            <button class="btn btn-sm btn-danger" onclick="eliminarFila(this)">
+                Eliminar
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(nuevaFila);
+    console.log('✅ Fila agregada:', contador);
+}
+
+function eliminarFila(boton) {
+    const fila = boton.closest('tr');
+    fila.remove();
+    console.log('✅ Fila eliminada');
+}
+
+// Test de carga
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Página de prueba cargada');
+    
+    setTimeout(() => {
+        console.log('🔍 Test de elementos:');
+        console.log('- Campo test:', !!document.getElementById('campoTest'));
+        console.log('- Tabla test:', !!document.getElementById('tablaTest'));
+    }, 1000);
+});
+</script>
+{% endblock %}

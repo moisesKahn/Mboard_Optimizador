@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Organizaciones</title>
+</head>
+<body>
+    <h1>Lista de Organizaciones - Test</h1>
+    <ul>
+    {% for organizacion in organizaciones %}
+        <li>{{ organizacion.nombre }} - {{ organizacion.codigo }}</li>
+    {% endfor %}
+    </ul>
+</body>
+</html>

@@ -1,0 +1,214 @@
+{% extends "layout/layout.html" %}
+{% block title %}Editar Usuario{% endblock %}
+
+{% block content %}
+<div class="dashboard-main-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+        <h6 class="fw-semibold mb-0">Editar Usuario</h6>
+        <ul class="d-flex align-items-center gap-2">
+            <li class="fw-medium">
+                <a href="{% url 'index' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                    <iconify-icon icon="solar:home-smile-angle-outline" class="icon text-lg"></iconify-icon>
+                    Panel de Control
+                </a>
+            </li>
+            <li>-</li>
+            <li class="fw-medium">
+                <a href="{% url 'usersList' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                    Usuarios
+                </a>
+            </li>
+            <li>-</li>
+            <li class="fw-medium">Editar Usuario</li>
+        </ul>
+    </div>
+
+    <div class="card h-100 p-0 radius-12">
+        <div class="card-body p-24">
+            <div class="row justify-content-center">
+                <div class="col-xxl-6 col-xl-8 col-lg-10">
+                    <div class="card border">
+                        <div class="card-body">
+                            <h6 class="text-md text-primary-light mb-16">Editar Información del Usuario</h6>
+                            
+                            <!-- Mensajes de error o éxito -->
+                            {% if messages %}
+                                {% for message in messages %}
+                                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                            
+                            <!-- Form starts here -->
+                            <form method="post">
+                                {% csrf_token %}
+                                
+                                <div class="row gy-3">
+                                    <!-- Información básica del usuario -->
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Nombre de Usuario <span class="text-danger">*</span></label>
+                                        {{ user_form.username }}
+                                        {% if user_form.username.errors %}
+                                            <div class="text-danger mt-1">{{ user_form.username.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Correo Electrónico <span class="text-danger">*</span></label>
+                                        {{ user_form.email }}
+                                        {% if user_form.email.errors %}
+                                            <div class="text-danger mt-1">{{ user_form.email.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                                        {{ user_form.first_name }}
+                                        {% if user_form.first_name.errors %}
+                                            <div class="text-danger mt-1">{{ user_form.first_name.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Apellido <span class="text-danger">*</span></label>
+                                        {{ user_form.last_name }}
+                                        {% if user_form.last_name.errors %}
+                                            <div class="text-danger mt-1">{{ user_form.last_name.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Perfil del usuario -->
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Rol del Sistema <span class="text-danger">*</span></label>
+                                        {{ perfil_form.rol }}
+                                        {% if perfil_form.rol.errors %}
+                                            <div class="text-danger mt-1">{{ perfil_form.rol.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Teléfono</label>
+                                        {{ perfil_form.telefono }}
+                                        {% if perfil_form.telefono.errors %}
+                                            <div class="text-danger mt-1">{{ perfil_form.telefono.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Organización</label>
+                                        {{ perfil_form.organizacion }}
+                                        {% if perfil_form.organizacion.errors %}
+                                            <div class="text-danger mt-1">{{ perfil_form.organizacion.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Estados -->
+                                    <div class="col-sm-6">
+                                        <div class="form-check">
+                                            {{ user_form.is_active }}
+                                            <label class="form-check-label" for="{{ user_form.is_active.id_for_label }}">
+                                                Usuario Activo
+                                            </label>
+                                        </div>
+                                        <div class="form-check mt-2">
+                                            {{ perfil_form.activo }}
+                                            <label class="form-check-label" for="{{ perfil_form.activo.id_for_label }}">
+                                                Perfil Activo
+                                            </label>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- Contraseña -->
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Nueva Contraseña (opcional)</label>
+                                        <div class="position-relative">
+                                            {{ user_form.password }}
+                                            <span class="toggle-password cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light" data-toggle="#{{ user_form.password.id_for_label }}">
+                                                <iconify-icon icon="solar:eye-outline" class="icon"></iconify-icon>
+                                            </span>
+                                        </div>
+                                        {% if user_form.password.errors %}
+                                            <div class="text-danger mt-1">{{ user_form.password.errors.0 }}</div>
+                                        {% endif %}
+                                        <div class="mt-2">
+                                            <small class="text-secondary-light">Deja en blanco si no quieres cambiar la contraseña</small>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-sm-6">
+                                        <label class="form-label">Confirmar Nueva Contraseña</label>
+                                        <div class="position-relative">
+                                            {{ user_form.confirm_password }}
+                                            <span class="toggle-password cursor-pointer position-absolute end-0 top-50 translate-middle-y me-16 text-secondary-light" data-toggle="#{{ user_form.confirm_password.id_for_label }}">
+                                                <iconify-icon icon="solar:eye-outline" class="icon"></iconify-icon>
+                                            </span>
+                                        </div>
+                                        {% if user_form.confirm_password.errors %}
+                                            <div class="text-danger mt-1">{{ user_form.confirm_password.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- Errores generales del formulario -->
+                                    {% if user_form.non_field_errors %}
+                                        <div class="col-12">
+                                            <div class="text-danger">{{ user_form.non_field_errors.0 }}</div>
+                                        </div>
+                                    {% endif %}
+                                    
+                                    <div class="col-12">
+                                        <div class="d-flex align-items-center gap-3">
+                                            <button type="submit" class="btn btn-primary border border-primary-600 text-md px-56 py-12 radius-8">
+                                                Actualizar Usuario
+                                            </button>
+                                            <a href="{% url 'usersList' %}" class="btn btn-outline-primary border border-primary-600 text-md px-56 py-12 radius-8">
+                                                Cancelar
+                                            </a>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block script %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Funcionalidad para mostrar/ocultar contraseña
+        const togglePasswordButtons = document.querySelectorAll('.toggle-password');
+        
+        togglePasswordButtons.forEach(function(button) {
+            button.addEventListener('click', function() {
+                const passwordInput = document.querySelector(this.getAttribute('data-toggle'));
+                const icon = this.querySelector('iconify-icon');
+                
+                if (passwordInput && passwordInput.type === 'password') {
+                    passwordInput.type = 'text';
+                    icon.setAttribute('icon', 'solar:eye-closed-outline');
+                } else if (passwordInput) {
+                    passwordInput.type = 'password';
+                    icon.setAttribute('icon', 'solar:eye-outline');
+                }
+            });
+        });
+        
+        // Auto-hide alerts after 5 seconds
+        const alerts = document.querySelectorAll('.alert');
+        alerts.forEach(function(alert) {
+            setTimeout(function() {
+                if (alert.classList.contains('show')) {
+                    alert.classList.remove('show');
+                    alert.classList.add('fade');
+                }
+            }, 5000);
+        });
+    });
+</script>
+{% endblock %}

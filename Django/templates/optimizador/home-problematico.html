@@ -1,0 +1,536 @@
+{% extends '../layout/layout.html' %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">Optimizador de Materiales</h6>
+    <div class="d-flex align-items-center gap-2">
+        <button type="button" class="btn btn-primary radius-8 d-flex align-items-center gap-2" onclick="nuevoProyecto()">
+            <iconify-icon icon="solar:add-circle-outline" class="text-lg"></iconify-icon>
+            <span>Nuevo Proyecto</span>
+        </button>
+    </div>
+</div>
+
+<!-- Información del Proyecto -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:document-outline" class="text-xl me-2"></iconify-icon>
+            1. Información del Proyecto
+        </h6>
+    </div>
+    <div class="card-body">
+        <form id="proyectoForm">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Cliente <span class="text-danger">*</span></label>
+                    <div class="position-relative">
+                        <input type="text" class="form-control" id="clienteInput" placeholder="Buscar o escribir cliente..." 
+                               oninput="buscarClientes(this.value)" onblur="seleccionarCliente()" autocomplete="off" required>
+                        <div id="clientesSugerencias" class="position-absolute w-100 bg-white border rounded shadow-sm d-none" style="z-index: 1000; max-height: 200px; overflow-y: auto;"></div>
+                        <input type="hidden" id="clienteId" value="">
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">RUT <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="rutCliente" placeholder="12.345.678-9" required>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Nombre del Proyecto</label>
+                    <input type="text" class="form-control" id="nombreProyecto" placeholder="Se auto-completa con cliente + fecha">
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Materiales del Proyecto -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:layers-outline" class="text-xl me-2"></iconify-icon>
+            2. Materiales del Proyecto
+        </h6>
+    </div>
+    <div class="card-body">
+        <div id="materialesContainer">
+            <div class="d-flex align-items-center gap-2 mb-3">
+                <button type="button" class="btn btn-primary material-tab active fw-semibold" data-material="1" onclick="seleccionarMaterial(1)">
+                    Material 1
+                </button>
+                <button type="button" class="btn btn-success fw-semibold" onclick="agregarMaterial()">
+                    <iconify-icon icon="solar:add-circle-outline" class="me-1"></iconify-icon>
+                    Agregar Material
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Configuración del Material -->
+<div class="card mb-24">
+    <div class="card-header">
+        <h6 class="card-title mb-0">
+            <iconify-icon icon="solar:settings-outline" class="text-xl me-2"></iconify-icon>
+            3. Configuración del Material
+        </h6>
+        <small class="text-muted mt-1">Unidad: milímetros</small>
+    </div>
+    <div class="card-body">
+        <form id="configuracionMaterial">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Material <span class="text-danger">*</span></label>
+                    <select class="form-select" id="materialSelect" onchange="cargarInfoMaterial()" required>
+                        <option value="">Seleccionar material...</option>
+                        {% for tablero in tableros %}
+                            <option value="{{ tablero.id }}" data-ancho="{{ tablero.ancho }}" data-largo="{{ tablero.largo }}" data-espesor="{{ tablero.espesor }}">
+                                {{ tablero.nombre }} | {{ tablero.ancho }}x{{ tablero.largo }}mm | {{ tablero.espesor }}mm
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Ancho tablero (X) <span class="text-warning">*</span></label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="anchoTablero" min="100" max="5000" step="1" required>
+                        <span class="input-group-text">mm</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Largo tablero (Y) <span class="text-warning">*</span></label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="largoTablero" min="100" max="5000" step="1" required>
+                        <span class="input-group-text">mm</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row g-3 mt-2">
+                <div class="col-md-4">
+                    <label class="form-label">Tapacanto</label>
+                    <select class="form-select" id="tapacantoSelect">
+                        <option value="">Sin tapacanto</option>
+                        {% for tapacanto in tapacantos %}
+                            <option value="{{ tapacanto.id }}">{{ tapacanto.nombre }} ({{ tapacanto.espesor }}mm)</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Margen X</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="margenX" value="5" min="0" max="50" step="1">
+                        <span class="input-group-text">mm</span>
+                    </div>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Margen Y</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="margenY" value="5" min="0" max="50" step="1">
+                        <span class="input-group-text">mm</span>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Desperdicio Sierra</label>
+                    <div class="input-group">
+                        <input type="number" class="form-control" id="desperdicioSierra" value="3" min="1" max="10" step="0.5">
+                        <span class="input-group-text">mm</span>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Dimensiones de piezas -->
+<div class="card mb-24">
+    <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+            <h6 class="card-title mb-0">
+                <iconify-icon icon="solar:widget-4-outline" class="text-xl me-2"></iconify-icon>
+                4. Dimensiones de piezas
+            </h6>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-sm btn-success" onclick="agregarPieza()">
+                    <iconify-icon icon="solar:add-circle-outline" class="me-1"></iconify-icon>Añadir fila
+                </button>
+                <button type="button" class="btn btn-sm btn-info" onclick="cargarEjemplo()">
+                    <iconify-icon icon="solar:widget-outline" class="me-1"></iconify-icon>Ejemplo
+                </button>
+                <button type="button" class="btn btn-sm btn-danger" onclick="limpiarPiezas()">
+                    <iconify-icon icon="solar:trash-bin-minimalistic-outline" class="me-1"></iconify-icon>Limpiar
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-bordered" id="tablaPiezas">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 50px;">#</th>
+                        <th style="width: 90px;">Cant.</th>
+                        <th>Nombre</th>
+                        <th style="width: 120px;">Largo (Y)</th>
+                        <th style="width: 120px;">Ancho (X)</th>
+                        <th style="width: 80px;">Veta libre</th>
+                        <th style="width: 200px;">Tapacantos</th>
+                        <th style="width: 60px;">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="piezasTableBody">
+                    <tr id="pieza_1">
+                        <td class="text-center">1</td>
+                        <td><input type="number" class="form-control form-control-sm" value="1" min="1" style="width: 85px;"></td>
+                        <td><input type="text" class="form-control form-control-sm" placeholder="Nombre pieza"></td>
+                        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+                        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+                        <td class="text-center">
+                            <input type="checkbox" class="form-check-input">
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" title="Sin tapacanto">⬛</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto inferior">⬇️</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto derecho">➡️</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto superior">⬆️</button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto izquierdo">⬅️</button>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarPieza(1)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Botones de acción -->
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="mb-1">Resumen del proyecto</h6>
+                <small class="text-muted" id="resumenProyecto">Material 1: Sin configurar</small>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-success" onclick="guardarProyecto()">
+                    <iconify-icon icon="solar:floppy-disk-outline" class="me-1"></iconify-icon>Guardar
+                </button>
+                <button type="button" class="btn btn-primary btn-lg" onclick="optimizar()">
+                    <iconify-icon icon="solar:settings-outline" class="me-2"></iconify-icon>
+                    Optimizar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Variables globales
+let clientesData = [];
+let materialesData = [{ numero: 1, activo: true }];
+let materialActual = 1;
+let piezaCounter = 1;
+
+// ====================================================
+// FUNCIONES DE CLIENTE
+// ====================================================
+
+function buscarClientes(valor) {
+    if (!valor || valor.length < 2) {
+        document.getElementById('clientesSugerencias').classList.add('d-none');
+        return;
+    }
+
+    // Filtrar clientes
+    const resultados = clientesData.filter(cliente => 
+        cliente.nombre.toLowerCase().includes(valor.toLowerCase()) ||
+        (cliente.rut && cliente.rut.includes(valor))
+    );
+
+    mostrarSugerenciasClientes(resultados);
+}
+
+function mostrarSugerenciasClientes(clientes) {
+    const sugerencias = document.getElementById('clientesSugerencias');
+    
+    if (clientes.length === 0) {
+        sugerencias.classList.add('d-none');
+        return;
+    }
+
+    const html = clientes.map(cliente => `
+        <div class="p-2 border-bottom cursor-pointer" onclick="seleccionarClienteSugerido('${cliente.nombre}', '${cliente.rut || ''}', ${cliente.id})" style="cursor: pointer;">
+            <strong>${cliente.nombre}</strong>
+            ${cliente.rut ? `<br><small class="text-muted">${cliente.rut}</small>` : ''}
+        </div>
+    `).join('');
+
+    sugerencias.innerHTML = html;
+    sugerencias.classList.remove('d-none');
+}
+
+function seleccionarClienteSugerido(nombre, rut, id) {
+    document.getElementById('clienteInput').value = nombre;
+    document.getElementById('rutCliente').value = rut;
+    document.getElementById('clienteId').value = id;
+    document.getElementById('clientesSugerencias').classList.add('d-none');
+    
+    // Auto-generar nombre del proyecto
+    const fecha = new Date().toLocaleDateString('es-CL');
+    document.getElementById('nombreProyecto').value = `${nombre} - ${fecha}`;
+    
+    console.log('Cliente seleccionado:', nombre);
+}
+
+function seleccionarCliente() {
+    setTimeout(() => {
+        document.getElementById('clientesSugerencias').classList.add('d-none');
+    }, 200);
+}
+
+// ====================================================
+// FUNCIONES DE MATERIAL
+// ====================================================
+
+function cargarInfoMaterial() {
+    const select = document.getElementById('materialSelect');
+    const option = select.options[select.selectedIndex];
+    
+    if (option.value) {
+        document.getElementById('anchoTablero').value = option.dataset.ancho;
+        document.getElementById('largoTablero').value = option.dataset.largo;
+        console.log('Material cargado:', option.text);
+        actualizarResumenProyecto();
+    }
+}
+
+function seleccionarMaterial(numero) {
+    materialActual = numero;
+    
+    // Actualizar botones
+    document.querySelectorAll('.material-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-material="${numero}"]`).classList.add('active');
+    
+    console.log('Material seleccionado:', numero);
+    actualizarResumenProyecto();
+}
+
+function agregarMaterial() {
+    const nuevoNumero = materialesData.length + 1;
+    materialesData.push({ numero: nuevoNumero, activo: false });
+    
+    const container = document.querySelector('#materialesContainer > div');
+    const nuevoBoton = document.createElement('button');
+    nuevoBoton.type = 'button';
+    nuevoBoton.className = 'btn btn-outline-primary material-tab fw-semibold';
+    nuevoBoton.setAttribute('data-material', nuevoNumero);
+    nuevoBoton.onclick = () => seleccionarMaterial(nuevoNumero);
+    nuevoBoton.innerHTML = `
+        Material ${nuevoNumero}
+        <button type="button" class="btn-close ms-2" onclick="eliminarMaterial(${nuevoNumero})" style="font-size: 0.8em;"></button>
+    `;
+    
+    // Insertar antes del botón "Agregar Material"
+    const botonAgregar = container.lastElementChild;
+    container.insertBefore(nuevoBoton, botonAgregar);
+    
+    seleccionarMaterial(nuevoNumero);
+    console.log('Material agregado:', nuevoNumero);
+}
+
+// ====================================================
+// FUNCIONES DE PIEZAS
+// ====================================================
+
+function agregarPieza() {
+    const tbody = document.getElementById('piezasTableBody');
+    piezaCounter = tbody.children.length + 1;
+    
+    const nuevaFila = document.createElement('tr');
+    nuevaFila.id = `pieza_${piezaCounter}`;
+    nuevaFila.innerHTML = `
+        <td class="text-center">${piezaCounter}</td>
+        <td><input type="number" class="form-control form-control-sm" value="1" min="1" style="width: 85px;"></td>
+        <td><input type="text" class="form-control form-control-sm" placeholder="Nombre pieza"></td>
+        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+        <td><input type="number" class="form-control form-control-sm" placeholder="0" min="1" style="width: 115px;"></td>
+        <td class="text-center">
+            <input type="checkbox" class="form-check-input">
+        </td>
+        <td>
+            <div class="d-flex gap-1">
+                <button type="button" class="btn btn-outline-secondary btn-sm" title="Sin tapacanto">⬛</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto inferior">⬇️</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto derecho">➡️</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto superior">⬆️</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" title="Tapacanto izquierdo">⬅️</button>
+            </div>
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-danger" onclick="eliminarPieza(${piezaCounter})">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+
+    tbody.appendChild(nuevaFila);
+    console.log('Pieza agregada:', piezaCounter);
+    actualizarResumenProyecto();
+}
+
+function eliminarPieza(numero) {
+    const fila = document.getElementById(`pieza_${numero}`);
+    if (fila) {
+        fila.remove();
+        renumerarPiezas();
+        actualizarResumenProyecto();
+    }
+}
+
+function renumerarPiezas() {
+    const tbody = document.getElementById('piezasTableBody');
+    const filas = tbody.querySelectorAll('tr');
+    
+    filas.forEach((fila, index) => {
+        const numeroNuevo = index + 1;
+        fila.id = `pieza_${numeroNuevo}`;
+        fila.querySelector('td:first-child').textContent = numeroNuevo;
+        
+        const botonEliminar = fila.querySelector('.btn-danger');
+        botonEliminar.setAttribute('onclick', `eliminarPieza(${numeroNuevo})`);
+    });
+    
+    piezaCounter = filas.length;
+}
+
+function limpiarPiezas() {
+    const tbody = document.getElementById('piezasTableBody');
+    tbody.innerHTML = '';
+    piezaCounter = 0;
+    agregarPieza(); // Agregar una pieza inicial
+    console.log('Piezas limpiadas');
+}
+
+function cargarEjemplo() {
+    // Cargar datos del cliente
+    document.getElementById('clienteInput').value = 'Muebles del Hogar S.A.';
+    document.getElementById('rutCliente').value = '96.589.240-1';
+    document.getElementById('nombreProyecto').value = 'Muebles del Hogar S.A. - ' + new Date().toLocaleDateString('es-CL');
+    
+    // Limpiar y cargar piezas ejemplo
+    limpiarPiezas();
+    
+    // Agregar más piezas
+    for (let i = 2; i <= 4; i++) {
+        agregarPieza();
+    }
+    
+    // Llenar datos de ejemplo
+    setTimeout(() => {
+        const tbody = document.getElementById('piezasTableBody');
+        const filas = tbody.querySelectorAll('tr');
+        
+        if (filas[0]) {
+            filas[0].querySelector('td:nth-child(2) input').value = '2';
+            filas[0].querySelector('td:nth-child(3) input').value = 'Puerta Principal';
+            filas[0].querySelector('td:nth-child(4) input').value = '2000';
+            filas[0].querySelector('td:nth-child(5) input').value = '800';
+        }
+        
+        if (filas[1]) {
+            filas[1].querySelector('td:nth-child(2) input').value = '4';
+            filas[1].querySelector('td:nth-child(3) input').value = 'Estantes';
+            filas[1].querySelector('td:nth-child(4) input').value = '600';
+            filas[1].querySelector('td:nth-child(5) input').value = '300';
+        }
+        
+        if (filas[2]) {
+            filas[2].querySelector('td:nth-child(2) input').value = '2';
+            filas[2].querySelector('td:nth-child(3) input').value = 'Laterales';
+            filas[2].querySelector('td:nth-child(4) input').value = '1800';
+            filas[2].querySelector('td:nth-child(5) input').value = '400';
+        }
+        
+        if (filas[3]) {
+            filas[3].querySelector('td:nth-child(2) input').value = '1';
+            filas[3].querySelector('td:nth-child(3) input').value = 'Fondo';
+            filas[3].querySelector('td:nth-child(4) input').value = '1200';
+            filas[3].querySelector('td:nth-child(5) input').value = '800';
+        }
+        
+        actualizarResumenProyecto();
+    }, 200);
+    
+    console.log('Ejemplo cargado');
+}
+
+// ====================================================
+// FUNCIONES AUXILIARES
+// ====================================================
+
+function actualizarResumenProyecto() {
+    const tbody = document.getElementById('piezasTableBody');
+    const numPiezas = tbody ? tbody.children.length : 0;
+    const cliente = document.getElementById('clienteInput').value || 'Sin cliente';
+    const material = document.getElementById('materialSelect').selectedOptions[0]?.text || 'Sin material';
+    
+    document.getElementById('resumenProyecto').textContent = 
+        `${cliente} | Material ${materialActual}: ${material} | ${numPiezas} pieza(s)`;
+}
+
+function nuevoProyecto() {
+    if (confirm('¿Crear un nuevo proyecto? Se perderán los datos actuales.')) {
+        location.reload();
+    }
+}
+
+function guardarProyecto() {
+    console.log('Guardando proyecto...');
+    alert('Función de guardado en desarrollo');
+}
+
+function optimizar() {
+    console.log('Iniciando optimización...');
+    alert('Función de optimización en desarrollo');
+}
+
+// ====================================================
+// INICIALIZACIÓN
+// ====================================================
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Optimizador inicializado');
+    
+    // Cargar datos de clientes
+    try {
+        clientesData = [
+            {% for cliente in clientes %}
+            {
+                id: {{ cliente.id }},
+                nombre: "{{ cliente.nombre|addslashes }}",
+                rut: "{{ cliente.rut|default:''|addslashes }}"
+            }{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ];
+        console.log('Clientes cargados:', clientesData.length);
+    } catch (e) {
+        console.error('Error cargando clientes:', e);
+        clientesData = [];
+    }
+    
+    actualizarResumenProyecto();
+});
+</script>
+{% endblock %}

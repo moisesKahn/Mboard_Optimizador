@@ -1,0 +1,153 @@
+<!-- jQuery library js -->
+<script src="/static/js/lib/jquery-3.7.1.min.js"></script>
+<!-- Bootstrap js -->
+<script src="/static/js/lib/bootstrap.bundle.min.js"></script>
+<!-- Apex Chart js -->
+<script src="/static/js/lib/apexcharts.min.js"></script>
+<!-- Data Table js -->
+<script src="/static/js/lib/dataTables.min.js"></script>
+<!-- Iconify Font js -->
+<script src="/static/js/lib/iconify-icon.min.js"></script>
+<!-- jQuery UI js -->
+<script src="/static/js/lib/jquery-ui.min.js"></script>
+<!-- Vector Map js -->
+<script src="/static/js/lib/jquery-jvectormap-2.0.5.min.js"></script>
+<script src="/static/js/lib/jquery-jvectormap-world-mill-en.js"></script>
+<!-- Popup js -->
+<script src="/static/js/lib/magnifc-popup.min.js"></script>
+<!-- Slick Slider js -->
+<script src="/static/js/lib/slick.min.js"></script>
+<!-- prism js -->
+<script src="/static/js/lib/prism.js"></script>
+<!-- file upload js -->
+<script src="/static/js/lib/file-upload.js"></script>
+<!-- audioplayer -->
+<script src="/static/js/lib/audioplayer.js"></script>
+
+<!-- main js -->
+<script src="/static/js/app.js"></script>
+
+<script>
+// Polling simple de notificaciones de chat (no invasivo)
+(function(){
+	const pollIntervalMs = 5000; // 5s
+	const badge = document.getElementById('messagesBadge');
+	const list = document.getElementById('messagesList');
+	const empty = document.getElementById('noMessages');
+	if (!badge || !list) return;
+	let lastTotal = 0;
+	let intervalId = null;
+
+	function shouldPlaySoundOnNotify() {
+		// Por defecto activado, el usuario puede desactivarlo guardando 'false' en localStorage
+		const pref = localStorage.getItem('chatSoundEnabled');
+		if (pref === 'false') return false;
+		// Evitar sonido cuando se está en la página de chat activa (viendo mensajes)
+		const onChatPage = !!document.getElementById('mensajes-container');
+		return !onChatPage;
+	}
+
+	function playBeep() {
+		try {
+			const AudioCtx = window.AudioContext || window.webkitAudioContext;
+			if (!AudioCtx) return; // navegador muy viejo
+			if (!window.__chatAudioCtx) window.__chatAudioCtx = new AudioCtx();
+			const ctx = window.__chatAudioCtx;
+			const o = ctx.createOscillator();
+			const g = ctx.createGain();
+			o.type = 'sine';
+			o.frequency.value = 880; // Hz
+			g.gain.value = 0.001; // volumen bajo inicial para evitar clicks
+			o.connect(g);
+			g.connect(ctx.destination);
+			const now = ctx.currentTime;
+			g.gain.exponentialRampToValueAtTime(0.05, now + 0.01);
+			g.gain.exponentialRampToValueAtTime(0.0001, now + 0.20);
+			o.start(now);
+			o.stop(now + 0.22);
+		} catch(e) { /* noop */ }
+	}
+
+	async function refreshUnread(){
+		try {
+			const res = await fetch('/chat/unread-summary/');
+			if (!res.ok) return;
+			const data = await res.json();
+			if (!data.success) return;
+
+			const total = data.total_unread || 0;
+			if (total > 0){
+				badge.classList.remove('d-none');
+				badge.textContent = total;
+				if (total > lastTotal) {
+					try { showMiniToast('Nuevo mensaje recibido'); } catch(e) {}
+					if (shouldPlaySoundOnNotify()) playBeep();
+				}
+			} else {
+				badge.classList.add('d-none');
+				badge.textContent = '0';
+			}
+			lastTotal = total;
+
+			// Rellenar top de conversaciones con no leídos
+			if (Array.isArray(data.conversaciones)){
+				if (data.conversaciones.length === 0){
+					if (empty) empty.style.display = '';
+					return;
+				}
+				if (empty) empty.style.display = 'none';
+				list.innerHTML = '';
+				data.conversaciones.slice(0,10).forEach(item => {
+					const a = document.createElement('a');
+					a.href = `/chat/conversacion/${item.conversacion_id}/`;
+					a.className = 'px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between';
+					a.innerHTML = `
+						<div class="d-flex align-items-center gap-3">
+							<span class="w-32-px h-32-px bg-primary-subtle text-primary-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0">${item.unread}</span>
+							<div>
+								<h6 class="text-sm fw-semibold mb-2">${(item.nombre || 'Conversación')}</h6>
+								<p class="mb-0 text-xs text-secondary-light">${item.unread} mensaje(s) sin leer</p>
+							</div>
+						</div>`;
+					list.appendChild(a);
+				});
+			}
+		} catch(e){ /* silencioso */ }
+	}
+
+	function startPolling(){
+		if (intervalId) return;
+		intervalId = setInterval(refreshUnread, pollIntervalMs);
+	}
+	function stopPolling(){
+		if (!intervalId) return;
+		clearInterval(intervalId);
+		intervalId = null;
+	}
+
+	// Primera carga y arranque del polling
+	setTimeout(refreshUnread, 1000);
+	startPolling();
+
+	// Pausar/reanudar según visibilidad de la pestaña
+	document.addEventListener('visibilitychange', () => {
+		if (document.hidden) {
+			stopPolling();
+		} else {
+			refreshUnread();
+			startPolling();
+		}
+	});
+
+	function showMiniToast(msg){
+		const div = document.createElement('div');
+		div.className = 'alert alert-info position-fixed shadow';
+		div.style.cssText = 'right:16px; bottom:16px; z-index:1080;';
+		div.textContent = msg;
+		document.body.appendChild(div);
+		setTimeout(()=>{div.classList.add('show');}, 20);
+		setTimeout(()=>{div.remove();}, 2500);
+	}
+})();
+</script>
+

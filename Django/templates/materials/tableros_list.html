@@ -1,0 +1,238 @@
+{% extends '../layout/layout.html' %}
+
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">Lista de Tableros</h6>
+    <div class="d-flex align-items-center gap-2">
+        <a href="{% url 'add_tablero' %}" class="btn btn-sm btn-primary-600 radius-8 d-flex align-items-center gap-1">
+            <iconify-icon icon="solar:plus-outline" class="text-xl"></iconify-icon>
+            Agregar Tablero
+        </a>
+        <input type="file" id="importFileTableros" accept=".csv,.xlsx" class="d-none">
+        <button type="button" class="btn btn-sm btn-success-600 radius-8 d-flex align-items-center gap-1" onclick="document.getElementById('importFileTableros').click()">
+            <iconify-icon icon="solar:import-outline" class="text-xl"></iconify-icon>
+            Importar Tableros
+        </button>
+    </div>
+</div>
+
+<div class="card basic-data-table">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Gestión de Tableros</h5>
+        <div class="mt-3">
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <div class="position-relative">
+                        <input type="text" id="searchTableros" class="form-control pe-5" placeholder="Buscar por código, nombre, proveedor..." value="{{ search }}">
+                        <button type="button" id="clearSearchTableros" class="btn btn-sm position-absolute end-0 top-50 translate-middle-y me-2 d-none" style="border: none; background: none; color: #999; padding: 0; width: 20px; height: 20px;">
+                            <iconify-icon icon="solar:close-circle-bold" class="text-lg"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <select id="tipoFilterTableros" class="form-select">
+                        <option value="">Todos los Tipos</option>
+                        {% for value, label in tipos_materiales %}
+                            <option value="{{ value }}" {% if tipo_filter == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3 d-flex align-items-center gap-2">
+                    <span id="resultsCount" class="text-muted small">{{ total }} resultado{% if total != 1 %}s{% endif %}</span>
+                    <select name="page_size" id="pageSizeTableros" class="form-select form-select-sm w-auto">
+                        {% for size in page_sizes %}
+                            <option value="{{ size }}" {% if page_size|stringformat:'s' == size|stringformat:'s' %}selected{% endif %}>{{ size }}/pág</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <div id="tablerosTableContainer">
+            {% include 'materials/tableros_table_partial.html' %}
+        </div>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+            <span>Página {{ page }} de {{ total_pages }}</span>
+            <div class="btn-group" role="group" aria-label="Pagination">
+                {% with qs=request.GET.urlencode %}
+                    {% if page > 1 %}
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page=1">« Primero</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page={{ page|add:-1 }}">‹ Anterior</a>
+                    {% else %}
+                        <span class="btn btn-outline-secondary btn-sm disabled">« Primero</span>
+                        <span class="btn btn-outline-secondary btn-sm disabled">‹ Anterior</span>
+                    {% endif %}
+                    {% if page < total_pages %}
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page={{ page|add:1 }}">Siguiente ›</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page={{ total_pages }}">Último »</a>
+                    {% else %}
+                        <span class="btn btn-outline-secondary btn-sm disabled">Siguiente ›</span>
+                        <span class="btn btn-outline-secondary btn-sm disabled">Último »</span>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Calcula y pinta el precio por tablero (precio/m² * (ancho*largo/1e6))
+function renderPreciosPorTablero() {
+    document.querySelectorAll('.precio-tablero').forEach(span => {
+        const precioM2 = parseFloat(span.dataset.precioM2 || '0');
+        const ancho = parseFloat(span.dataset.ancho || '0');
+        const largo = parseFloat(span.dataset.largo || '0');
+        if (precioM2 > 0 && ancho > 0 && largo > 0) {
+            const areaM2 = (ancho * largo) / 1_000_000;
+            const precio = precioM2 * areaM2;
+            span.textContent = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 }).format(precio);
+            span.title = `Precio/m²: ${precioM2.toLocaleString('es-CL')} • Área: ${areaM2.toFixed(2)} m²`;
+        } else {
+            span.textContent = '—';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', renderPreciosPorTablero);
+
+function confirmDelete(button) {
+    const id = button.getAttribute('data-id');
+    const nombre = button.getAttribute('data-nombre');
+    
+    if (confirm(`¿Está seguro de que desea eliminar el tablero "${nombre}" (ID: ${id})?\n\nEsta acción no se puede deshacer.`)) {
+        // Realizar eliminación vía AJAX
+        fetch(`/materiales/tableros/eliminar/${id}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Tablero eliminado correctamente.');
+                location.reload();
+            } else {
+                alert('Error al eliminar el tablero: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error al eliminar el tablero.');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Búsqueda en tiempo real
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchTableros');
+    const tipoFilter = document.getElementById('tipoFilterTableros');
+    const clearButton = document.getElementById('clearSearchTableros');
+    const resultsCount = document.getElementById('resultsCount');
+    const tableContainer = document.getElementById('tablerosTableContainer');
+    const pageSizeSelect = document.getElementById('pageSizeTableros');
+    
+    let searchTimeout;
+
+    // Mostrar/ocultar botón X
+    function toggleClearButton() {
+        if (searchInput.value.trim() !== '') {
+            clearButton.classList.remove('d-none');
+        } else {
+            clearButton.classList.add('d-none');
+        }
+    }
+
+    // Función de búsqueda: recarga con query params
+    function performSearch() {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(() => {
+            const url = new URL(window.location.href);
+            const searchTerm = searchInput.value.trim();
+            const tipoValue = tipoFilter.value;
+            if (searchTerm) url.searchParams.set('search', searchTerm); else url.searchParams.delete('search');
+            if (tipoValue) url.searchParams.set('tipo', tipoValue); else url.searchParams.delete('tipo');
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
+        }, 300);
+    }
+
+    // Event listeners
+    searchInput.addEventListener('input', function() {
+        toggleClearButton();
+        performSearch();
+    });
+
+    tipoFilter.addEventListener('change', performSearch);
+    pageSizeSelect.addEventListener('change', function() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('page_size', this.value);
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    });
+
+    clearButton.addEventListener('click', function() {
+        searchInput.value = '';
+        toggleClearButton();
+        performSearch();
+        searchInput.focus();
+    });
+
+    // Inicializar estado del botón X
+    toggleClearButton();
+    // Sin AJAX: los filtros recargan la página
+});
+
+// Importación CSV/XLSX de tableros en cliente (validación básica: ancho debe ser la mayor medida)
+document.getElementById('importFileTableros').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['csv'].includes(ext)) { alert('Por ahora se admite CSV (separador coma).'); return; }
+    const text = await file.text();
+    // Formato esperado CSV con encabezados: codigo,nombre,tipo,espesor_mm,ancho_mm,largo_mm,precio_m2,stock
+    // Alternativamente puede usar precio_tablero (CLP) en vez de precio_m2, y se deriva el otro valor.
+    const rows = text.split(/\r?\n/).filter(r => r.trim().length);
+    const header = rows.shift();
+    const cols = header.split(',').map(h => h.trim().toLowerCase());
+    const baseRequired = ['codigo','nombre','tipo','espesor_mm','ancho_mm','largo_mm','stock'];
+    const hasPrecioM2 = cols.includes('precio_m2');
+    const hasPrecioTab = cols.includes('precio_tablero');
+    const missing = baseRequired.filter(k => !cols.includes(k));
+    if (!hasPrecioM2 && !hasPrecioTab) missing.push('precio_m2 o precio_tablero');
+    if (missing.length) { alert('Faltan columnas en CSV: ' + missing.join(', ')); return; }
+    const idx = Object.fromEntries(cols.map((c,i)=>[c,i]));
+    const errores = [];
+    const items = rows.map((r, line) => {
+        const parts = r.split(',');
+        const ancho = parseFloat(parts[idx['ancho_mm']]||'0');
+        const largo = parseFloat(parts[idx['largo_mm']]||'0');
+        const mayor = Math.max(ancho, largo); const menor = Math.min(ancho, largo);
+        if (!(mayor>0 && menor>0)) { errores.push(`Línea ${line+2}: medidas inválidas`); }
+        if (mayor !== ancho) { errores.push(`Línea ${line+2}: el ancho debe ser la medida mayor (ancho=${ancho}, largo=${largo})`); }
+        let precio_m2 = hasPrecioM2 ? parseFloat(parts[idx['precio_m2']]||'0') : 0;
+        const precio_tablero = hasPrecioTab ? parseFloat(parts[idx['precio_tablero']]||'0') : 0;
+        if (!hasPrecioM2 && hasPrecioTab) {
+            const areaM2 = (mayor*menor)/1_000_000; precio_m2 = areaM2>0 ? (precio_tablero/areaM2) : 0;
+        }
+        return { linea: line+2, codigo: parts[idx['codigo']], nombre: parts[idx['nombre']], tipo: parts[idx['tipo']], espesor: parseFloat(parts[idx['espesor_mm']]), ancho: mayor, largo: menor, precio_m2, stock: parseInt(parts[idx['stock']]||'0',10) };
+    });
+    if (errores.length) { alert('No se puede importar:\n' + errores.join('\n')); return; }
+    // Aquí deberíamos enviar al servidor via fetch POST para guardar; por ahora, solo vista previa rápida
+    // Enviar al backend
+    const res = await fetch(`{% url 'importar_tableros_csv' %}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }, body: text });
+    const data = await res.json();
+    if (data.success) {
+        alert(`Importación exitosa. Creados: ${data.creados}, Actualizados: ${data.actualizados}`);
+        location.reload();
+    } else {
+        alert('Errores en importación:\n' + (data.errores ? data.errores.join('\n') : data.message));
+    }
+});
+</script>
+
+{% csrf_token %}
+{% endblock %}

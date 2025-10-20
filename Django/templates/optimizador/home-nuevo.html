@@ -1,0 +1,1053 @@
+{% extends '../layout/layout.html' %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">Optimizador de Materiales</h6>
+</div>
+
+<!-- 1. Información del Proyecto -->
+<div class="card mb-24" style="background-color: #2a3441; border: 1px solid #3e4853;">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label text-light">Nombre del proyecto</label>
+                <input type="text" class="form-control bg-dark text-light border-secondary" 
+                       id="nombreProyecto" placeholder="Ej: Cocina Dpto 702" 
+                       style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-light">Cliente</label>
+                <div class="position-relative">
+              <input type="text" class="form-control bg-dark text-light border-secondary" 
+                  id="clienteInput" placeholder="Escribe al menos 3 letras..." list="clientesDatalistNuevo"
+                  oninput="buscarClientesDBNuevo(this.value)" onchange="onClienteElegidoNuevo(this.value)" autocomplete="off"
+                           style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                    <datalist id="clientesDatalistNuevo"></datalist>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label text-light">RUT</label>
+                <input type="text" class="form-control bg-dark text-light border-secondary" 
+                       id="rutCliente" placeholder="12.345.678-9"
+                       style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Selección de Tablero -->
+<div class="card mb-24" style="background-color: #2a3441; border: 1px solid #3e4853;">
+    <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #2a3441; border-bottom: 1px solid #3e4853;">
+        <h6 class="card-title mb-0 text-light">
+            <span class="badge bg-secondary me-2">2</span>
+            Selección de Tablero
+        </h6>
+        <small class="text-muted">Unidad: milímetros</small>
+    </div>
+    <div class="card-body">
+        <!-- Pestañas de Material -->
+        <div class="mb-3">
+            <ul class="nav nav-tabs" id="materialTabs" role="tablist" style="border-bottom: 1px solid #3e4853;">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="material1-tab" data-bs-toggle="tab" data-bs-target="#material1" 
+                            type="button" role="tab" style="background-color: #1a2332; color: #fff; border-color: #3e4853;">
+                        Material 1
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="btn btn-sm btn-outline-primary ms-2" onclick="agregarMaterial()" type="button">
+                        <i class="fas fa-plus"></i> Agregar Material
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Contenido de Pestañas -->
+        <div class="tab-content" id="materialTabContent">
+            <div class="tab-pane fade show active" id="material1" role="tabpanel">
+                <!-- Material y dimensiones -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label text-light">Material</label>
+                        <select class="form-select bg-dark text-light border-secondary" id="materialSelect1" 
+                                onchange="cargarDimensionesMaterial(1)" 
+                                style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                            <option value="">Seleccionar material...</option>
+                            <option value="melamina_blanca">Melamina blanca 15mm</option>
+                            <option value="melamina_roble">Melamina roble 18mm</option>
+                            <option value="mdf_crudo">MDF crudo 15mm</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label text-light">Ancho tablero (X)</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                               id="anchoTablero1" value="1830" disabled
+                               style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label text-light">Largo tablero (Y)</label>
+                        <input type="number" class="form-control bg-dark text-light border-secondary" 
+                               id="largoTablero1" value="2500" disabled
+                               style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                    </div>
+                </div>
+
+                <!-- Tapacanto -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-12">
+                        <label class="form-label text-light">Tapacanto</label>
+                        <select class="form-select bg-dark text-light border-secondary" id="tapacantoSelect1" 
+                                style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                            <option value="">Seleccionar tapacanto...</option>
+                            <option value="pvc_blanco">PVC BLANCO 19X1.5MM RO 100MT</option>
+                            <option value="pvc_roble">PVC ROBLE 19X1.5MM RO 100MT</option>
+                            <option value="abs_negro">ABS NEGRO 22X1MM RO 50MT</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Márgenes y Desperdicio - con botón editar -->
+                <div class="position-relative">
+                    <button class="btn btn-sm btn-outline-warning position-absolute" 
+                            style="top: 0; right: 0; z-index: 10;" onclick="habilitarEdicion(1)">
+                        <i class="fas fa-edit"></i> Editar
+                    </button>
+                    
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Margen X (mm)</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                   id="margenX1" value="10" disabled
+                                   style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Margen Y (mm)</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                   id="margenY1" value="10" disabled
+                                   style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label text-light">Desperdicio sierra (mm)</label>
+                            <input type="number" class="form-control bg-dark text-light border-secondary" 
+                                   id="desperdicioSierra1" value="3" disabled
+                                   style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                        </div>
+                    </div>
+                </div>
+
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Dimensiones de piezas -->
+<div class="card mb-24" style="background-color: #2a3441; border: 1px solid #3e4853;">
+    <div class="card-header d-flex justify-content-between align-items-center" style="background-color: #2a3441; border-bottom: 1px solid #3e4853;">
+        <h6 class="card-title mb-0 text-light">
+            <span class="badge bg-secondary me-2">3</span>
+            Dimensiones de piezas
+        </h6>
+        <div class="d-flex gap-2">
+            <div class="input-group input-group-sm" style="width: 220px;">
+                <span class="input-group-text bg-dark text-light border-secondary">Cant.</span>
+                <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                       id="cantidadFilas" value="1" min="1" max="200"
+                       style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                <button class="btn btn-success" onclick="agregarFilas()" title="Añadir filas">
+                    <i class="fas fa-plus"></i>
+                </button>
+            </div>
+            <button class="btn btn-sm btn-success" onclick="importarExcel()" title="Importar CSV/Excel">
+                <i class="fas fa-file-excel"></i> Importar
+            </button>
+            <button class="btn btn-sm btn-info" onclick="cargarEjemplo()" title="Cargar ejemplo">
+                Cargar ejemplo
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="limpiarTabla()" title="Limpiar tabla de piezas">
+                Limpiar
+            </button>
+        </div>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-dark table-hover mb-0" style="background-color: #2a3441;">
+                <thead style="background-color: #1a2332;">
+                    <tr>
+                        <th width="60">#</th>
+                        <th width="80">Cant.</th>
+                        <th>Nombre</th>
+                        <th width="100">Largo (Y)</th>
+                        <th width="100">Ancho (X)</th>
+                        <th width="100" class="text-center">Veta libre</th>
+                        <th width="200" class="text-center">Tapacantos</th>
+                        <th width="80">Acción</th>
+                    </tr>
+                </thead>
+                <tbody id="piezasTableBody" style="background-color: #2a3441;">
+                    <tr id="pieza_1">
+                        <td class="text-center">1</td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                                   value="1" min="1" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                                   placeholder="pieza" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                                   placeholder="600" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                        </td>
+                        <td>
+                            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                                   placeholder="400" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+                        </td>
+                        <td class="text-center">
+                            <div class="form-check form-switch d-flex justify-content-center">
+                                <input class="form-check-input" type="checkbox" id="vetaLibre1">
+                                <label class="form-check-label text-light" for="vetaLibre1">Sí</label>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex justify-content-center gap-1 flex-wrap">
+                                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(1, 'sup')" 
+                                        title="Superior" data-pieza="1" data-lado="sup">
+                                    <i class="fas fa-arrow-up"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(1, 'inf')" 
+                                        title="Inferior" data-pieza="1" data-lado="inf">
+                                    <i class="fas fa-arrow-down"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(1, 'izq')" 
+                                        title="Izquierda" data-pieza="1" data-lado="izq">
+                                    <i class="fas fa-arrow-left"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(1, 'der')" 
+                                        title="Derecha" data-pieza="1" data-lado="der">
+                                    <i class="fas fa-arrow-right"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-warning" onclick="toggleTapacanto(1, 'todos')" 
+                                        title="Todos los lados" data-pieza="1" data-lado="todos">
+                                    <i class="fas fa-square"></i>
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="limpiarTapacantos(1)" 
+                                        title="Limpiar tapacantos" data-pieza="1">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-outline-danger" onclick="eliminarPieza(1)" title="Eliminar">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Botón para agregar fila rápida -->
+        <div class="text-center py-3" style="background-color: #1a2332; border-top: 1px solid #3e4853;">
+            <button class="btn btn-outline-success btn-sm" onclick="agregarFilaRapida()" title="Agregar fila">
+                <i class="fas fa-plus-circle"></i> Agregar pieza
+            </button>
+        </div>
+        <div class="text-end p-3" style="background-color: #2a3441; border-top: 1px solid #3e4853;">
+            <button type="button" class="btn btn-primary" onclick="optimizar()">
+                <i class="fas fa-magic me-2"></i>
+                Optimizar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Botón imprimir/exportar -->
+<div class="row g-3 mb-24">
+    <div class="col-md-12">
+        <button type="button" class="btn btn-outline-secondary w-100" onclick="imprimirPDF()">
+            <i class="fas fa-print me-2"></i>
+            Imprimir / Exportar PDF
+        </button>
+    </div>
+    </div>
+
+<!-- Resultados de optimización -->
+<div id="resultadosOptimizacionNuevo" class="mt-4" style="display:none;">
+    <div class="p-3 rounded mb-3" style="background-color:#1a2332; color:#e9ecef; border:1px solid #3e4853;">
+        <div class="row align-items-center g-2">
+            <div class="col-auto"><span class="badge bg-primary">Tableros: <strong id="tablerosUsadosNuevo">0</strong></span></div>
+            <div class="col-auto"><span class="badge bg-success">Aprovechamiento: <strong id="aprovechamientoNuevo">0%</strong></span></div>
+            <div class="col-auto"><span class="badge bg-warning text-dark">Desperdicio: <strong id="desperdicioNuevo">0 m²</strong></span></div>
+            <div class="col-auto"><span class="badge bg-info text-dark">Tapacantos: <strong id="tapacantosNuevo">0 m</strong></span></div>
+        </div>
+    </div>
+    <div id="visualizacionTablerosNuevo" class="p-3 rounded" style="background-color:#0d1421; border:1px solid #3e4853;"></div>
+    
+    <div class="text-center mt-2">
+        <small class="text-muted">Tip: Usa la opción de Veta Libre pieza a pieza para permitir rotaciones</small>
+    </div>
+    
+    <div class="text-center mt-3">
+        <button class="btn btn-sm btn-outline-light" onclick="window.scrollTo({top:0, behavior:'smooth'})">Volver arriba</button>
+    </div>
+    
+    <div class="my-3" style="border-top:1px dashed #3e4853;"></div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+console.log('Optimizador de materiales inicializado');
+
+// Variables globales
+let contadorPiezas = 1;
+let contadorMateriales = 1;
+
+// Función para cargar dimensiones del material seleccionado
+function cargarDimensionesMaterial(materialNum) {
+    const selectMaterial = document.getElementById(`materialSelect${materialNum}`);
+    const anchoInput = document.getElementById(`anchoTablero${materialNum}`);
+    const largoInput = document.getElementById(`largoTablero${materialNum}`);
+    
+    // Datos de ejemplo - en producción vendrían de la base de datos
+    const materiales = {
+        'melamina_blanca': { ancho: 1830, largo: 2500 },
+        'melamina_roble': { ancho: 1830, largo: 2440 },
+        'mdf_crudo': { ancho: 1220, largo: 2440 }
+    };
+    
+    const materialSeleccionado = selectMaterial.value;
+    if (materialSeleccionado && materiales[materialSeleccionado]) {
+        const a = materiales[materialSeleccionado].ancho;
+        const b = materiales[materialSeleccionado].largo;
+        const mayor = Math.max(a,b); const menor = Math.min(a,b);
+        anchoInput.value = mayor; // Ancho = medida mayor
+        largoInput.value = menor; // Largo = menor
+        validarTodasLasPiezasContraTableroNuevo();
+        // Mostrar medidas en el option seleccionado (ANCHO×LARGO mm)
+        const sel = document.getElementById(`materialSelect${materialNum}`);
+        if (sel && sel.selectedIndex >= 0) {
+            const opt = sel.options[sel.selectedIndex];
+            const baseText = opt.textContent.split('(')[0].trim();
+            opt.textContent = `${baseText} (${mayor}×${menor} mm)`;
+        }
+    }
+}
+
+// Función para habilitar edición de dimensiones
+function habilitarEdicion(materialNum) {
+    const inputs = [
+        document.getElementById(`anchoTablero${materialNum}`),
+        document.getElementById(`largoTablero${materialNum}`),
+        document.getElementById(`margenX${materialNum}`),
+        document.getElementById(`margenY${materialNum}`),
+        document.getElementById(`desperdicioSierra${materialNum}`)
+    ];
+    
+    inputs.forEach(input => {
+        if (input) {
+            input.disabled = !input.disabled;
+            if (!input.disabled) {
+                input.style.backgroundColor = '#0d1421';
+                input.style.borderColor = '#6c757d';
+            } else {
+                input.style.backgroundColor = '#1a2332';
+                input.style.borderColor = '#3e4853';
+            }
+        }
+    });
+}
+
+// Función para agregar material (nueva pestaña)
+function agregarMaterial() {
+    contadorMateriales++;
+    const tabsList = document.querySelector('#materialTabs');
+    const tabContent = document.querySelector('#materialTabContent');
+    
+    // Crear nueva pestaña
+    const newTabLi = document.createElement('li');
+    newTabLi.className = 'nav-item';
+    newTabLi.setAttribute('role', 'presentation');
+    newTabLi.innerHTML = `
+        <button class="nav-link" id="material${contadorMateriales}-tab" data-bs-toggle="tab" 
+                data-bs-target="#material${contadorMateriales}" type="button" role="tab" 
+                style="background-color: #1a2332; color: #fff; border-color: #3e4853;">
+            Material ${contadorMateriales}
+        </button>
+    `;
+    
+    // Insertar antes del botón "Agregar Material"
+    tabsList.insertBefore(newTabLi, tabsList.lastElementChild);
+    
+    // Crear contenido de la nueva pestaña (copia del material 1)
+    const newTabContent = document.createElement('div');
+    newTabContent.className = 'tab-pane fade';
+    newTabContent.id = `material${contadorMateriales}`;
+    newTabContent.setAttribute('role', 'tabpanel');
+    newTabContent.innerHTML = document.getElementById('material1').innerHTML.replace(/1/g, contadorMateriales);
+    
+    tabContent.appendChild(newTabContent);
+}
+
+// Función para eliminar material
+function eliminarMaterial(materialNum) {
+    if (materialNum === 1) {
+        alert('No se puede eliminar el Material 1');
+        return;
+    }
+    
+    if (confirm(`¿Eliminar Material ${materialNum}?`)) {
+        document.getElementById(`material${materialNum}-tab`).parentElement.remove();
+        document.getElementById(`material${materialNum}`).remove();
+    }
+}
+
+// Función para agregar filas según el número especificado
+function agregarFilas() {
+    // Gating: requiere material seleccionado
+    const sel = document.getElementById('materialSelect1');
+    if(!sel || !sel.value){ flashNuevo('Seleccione un material/tablero antes de agregar piezas'); return; }
+    const cantidad = Math.max(1, Math.min(200, parseInt(document.getElementById('cantidadFilas').value) || 1));
+    
+    for (let i = 0; i < cantidad; i++) {
+        agregarFilaRapida();
+    }
+}
+
+// Función para agregar una fila rápida
+function agregarFilaRapida() {
+    const sel = document.getElementById('materialSelect1');
+    if(!sel || !sel.value){ flashNuevo('Seleccione un material/tablero antes de agregar piezas'); return; }
+    contadorPiezas++;
+    const tbody = document.getElementById('piezasTableBody');
+    
+    const nuevaFila = document.createElement('tr');
+    nuevaFila.id = `pieza_${contadorPiezas}`;
+    nuevaFila.innerHTML = `
+        <td class="text-center">${contadorPiezas}</td>
+        <td>
+            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                   value="1" min="1" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+        </td>
+        <td>
+            <input type="text" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                   placeholder="pieza" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                   placeholder="600" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+        </td>
+        <td>
+            <input type="number" class="form-control form-control-sm bg-dark text-light border-secondary" 
+                   placeholder="400" style="background-color: #1a2332 !important; border-color: #3e4853 !important;">
+        </td>
+        <td class="text-center">
+            <div class="form-check form-switch d-flex justify-content-center">
+                <input class="form-check-input" type="checkbox" id="vetaLibre${contadorPiezas}">
+                <label class="form-check-label text-light" for="vetaLibre${contadorPiezas}">Sí</label>
+            </div>
+        </td>
+        <td>
+            <div class="d-flex justify-content-center gap-1 flex-wrap">
+                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(${contadorPiezas}, 'sup')" 
+                        title="Superior" data-pieza="${contadorPiezas}" data-lado="sup">
+                    <i class="fas fa-arrow-up"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(${contadorPiezas}, 'inf')" 
+                        title="Inferior" data-pieza="${contadorPiezas}" data-lado="inf">
+                    <i class="fas fa-arrow-down"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(${contadorPiezas}, 'izq')" 
+                        title="Izquierda" data-pieza="${contadorPiezas}" data-lado="izq">
+                    <i class="fas fa-arrow-left"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-light" onclick="toggleTapacanto(${contadorPiezas}, 'der')" 
+                        title="Derecha" data-pieza="${contadorPiezas}" data-lado="der">
+                    <i class="fas fa-arrow-right"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-warning" onclick="toggleTapacanto(${contadorPiezas}, 'todos')" 
+                        title="Todos los lados" data-pieza="${contadorPiezas}" data-lado="todos">
+                    <i class="fas fa-square"></i>
+                </button>
+                <button class="btn btn-sm btn-outline-danger" onclick="limpiarTapacantos(${contadorPiezas})" 
+                        title="Limpiar tapacantos" data-pieza="${contadorPiezas}">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+        </td>
+        <td class="text-center">
+            <button class="btn btn-sm btn-outline-danger" onclick="eliminarPieza(${contadorPiezas})" title="Eliminar">
+                <i class="fas fa-trash"></i>
+            </button>
+        </td>
+    `;
+    
+    tbody.appendChild(nuevaFila);
+    engancharValidacionFilaNuevo(nuevaFila);
+}
+
+// Función para manejar tapacantos
+function toggleTapacanto(piezaNum, lado) {
+    const boton = document.querySelector(`[data-pieza="${piezaNum}"][data-lado="${lado}"]`);
+    const sel = document.getElementById('tapacantoSelect1');
+    if (!sel || !sel.value) { if(boton){ boton.classList.add('shake'); setTimeout(()=>boton.classList.remove('shake'), 400);} flashNuevo('Seleccione un tapacanto primero'); return; }
+    if (lado === 'todos') {
+        // Activar todos los lados
+        const botones = document.querySelectorAll(`[data-pieza="${piezaNum}"]`);
+        botones.forEach(btn => {
+            if (btn.dataset.lado !== 'todos' && btn.dataset.lado) {
+                btn.classList.remove('btn-outline-light');
+                btn.classList.add('btn-success');
+            }
+        });
+    } else if (lado) {
+        // Toggle individual
+        if (boton.classList.contains('btn-outline-light')) {
+            boton.classList.remove('btn-outline-light');
+            boton.classList.add('btn-success');
+        } else {
+            boton.classList.remove('btn-success');
+            boton.classList.add('btn-outline-light');
+        }
+    }
+}
+
+// Avisos livianos
+function flashNuevo(msg){
+    let el = document.getElementById('toastNuevo');
+    if(!el){
+        el = document.createElement('div');
+        el.id='toastNuevo';
+        el.style.position='fixed'; el.style.right='16px'; el.style.top='16px'; el.style.zIndex=9999;
+        el.style.background='#0d6efd'; el.style.color='#fff'; el.style.padding='10px 14px'; el.style.borderRadius='6px';
+        el.style.boxShadow='0 4px 12px rgba(0,0,0,0.3)';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg; el.style.display='block';
+    setTimeout(()=>{ el.style.display='none'; }, 2500);
+}
+
+// Validación de piezas contra dimensiones útiles del tablero (marca en rojo + ícono)
+function getDimensionesUtilesNuevo(){
+    const ax = parseFloat(document.getElementById('anchoTablero1').value||'0');
+    const ay = parseFloat(document.getElementById('largoTablero1').value||'0');
+    const mx = parseFloat(document.getElementById('margenX1').value||'0');
+    const my = parseFloat(document.getElementById('margenY1').value||'0');
+    return {ux: Math.max(0, ax - 2*mx), uy: Math.max(0, ay - 2*my)};
+}
+function validarFilaNuevo(tr){
+    const {ux, uy} = getDimensionesUtilesNuevo();
+    // En esta tabla las columnas son: Largo(Y) luego Ancho(X)
+    const yInput = tr.querySelector('td:nth-child(4) input');
+    const xInput = tr.querySelector('td:nth-child(5) input');
+    if(!xInput||!yInput) return;
+    const w = parseFloat(xInput.value||'0');
+    const h = parseFloat(yInput.value||'0');
+    const veta = tr.querySelector('input[id^="vetaLibre"]');
+    const libre = veta ? veta.checked : false;
+
+    // resetear estado visual
+    xInput.classList.remove('is-invalid');
+    yInput.classList.remove('is-invalid');
+
+    let ok = false;
+    if (libre) {
+        const fitsNormal = (w <= ux && h <= uy);
+        const fitsRotada = (h <= ux && w <= uy);
+        ok = fitsNormal || fitsRotada;
+        if (!ok) {
+            const violN_W = Math.max(0, w - ux);
+            const violN_H = Math.max(0, h - uy);
+            const sumN = violN_W + violN_H;
+            const violR_W = Math.max(0, h - ux);
+            const violR_H = Math.max(0, w - uy);
+            const sumR = violR_W + violR_H;
+            if (sumN <= sumR) {
+                if (w > ux) xInput.classList.add('is-invalid');
+                if (h > uy) yInput.classList.add('is-invalid');
+            } else {
+                if (h > ux) yInput.classList.add('is-invalid');
+                if (w > uy) xInput.classList.add('is-invalid');
+            }
+        }
+    } else {
+        ok = (w <= ux && h <= uy);
+        if (!ok) {
+            if (w > ux) xInput.classList.add('is-invalid');
+            if (h > uy) yInput.classList.add('is-invalid');
+        }
+    }
+
+    let badge = tr.querySelector('.pieza-imposible');
+    if(!ok){
+        if(!badge){
+            const td = tr.querySelector('td:nth-child(3)');
+            badge = document.createElement('span');
+            badge.className = 'pieza-imposible text-danger ms-2';
+            badge.title = 'No cabe en el tablero seleccionado';
+            badge.innerHTML = '<i class="fas fa-exclamation-triangle"></i>';
+            td.appendChild(badge);
+        }
+    } else if(badge){ badge.remove(); }
+}
+function engancharValidacionFilaNuevo(tr){
+    const y = tr.querySelector('td:nth-child(4) input');
+    const x = tr.querySelector('td:nth-child(5) input');
+    if(y) y.addEventListener('input', ()=>validarFilaNuevo(tr));
+    if(x) x.addEventListener('input', ()=>validarFilaNuevo(tr));
+}
+function validarTodasLasPiezasContraTableroNuevo(){
+    document.querySelectorAll('#piezasTableBody tr').forEach(tr=>validarFilaNuevo(tr));
+}
+
+// Función para limpiar tapacantos
+function limpiarTapacantos(piezaNum) {
+    const botones = document.querySelectorAll(`[data-pieza="${piezaNum}"]`);
+    botones.forEach(btn => {
+        if (btn.dataset.lado && btn.dataset.lado !== 'todos') {
+            btn.classList.remove('btn-success');
+            btn.classList.add('btn-outline-light');
+        }
+    });
+}
+
+// Función para eliminar pieza
+function eliminarPieza(piezaNum) {
+    const fila = document.getElementById(`pieza_${piezaNum}`);
+    if (fila) {
+        fila.remove();
+    }
+}
+
+// Función para limpiar toda la tabla
+function limpiarTabla() {
+    if (confirm('Esto limpiará solo la tabla de piezas. ¿Continuar?')) {
+        const tbody = document.getElementById('piezasTableBody');
+        tbody.innerHTML = '';
+        contadorPiezas = 0;
+        agregarFilaRapida(); // Agregar una fila inicial
+    }
+}
+
+// Función para cargar ejemplo
+function cargarEjemplo() {
+    // Limpiar tabla primero
+    document.getElementById('piezasTableBody').innerHTML = '';
+    contadorPiezas = 0;
+    
+    // Datos de ejemplo
+    const ejemplos = [
+        { cantidad: 2, nombre: 'Puerta', largo: 2000, ancho: 800 },
+        { cantidad: 4, nombre: 'Estante', largo: 600, ancho: 300 },
+        { cantidad: 1, nombre: 'Fondo', largo: 1200, ancho: 800 }
+    ];
+    
+    ejemplos.forEach(ejemplo => {
+        agregarFilaRapida();
+        const fila = document.getElementById(`pieza_${contadorPiezas}`);
+        const inputs = fila.querySelectorAll('input');
+        inputs[0].value = ejemplo.cantidad; // cantidad
+        inputs[1].value = ejemplo.nombre;   // nombre
+        inputs[2].value = ejemplo.largo;    // largo
+        inputs[3].value = ejemplo.ancho;    // ancho
+    });
+    flashNuevo('Ejemplo cargado');
+}
+
+// Función para importar Excel (placeholder)
+function importarExcel() {
+    alert('Función de importar Excel en desarrollo...\nPróximamente permitirá cargar datos desde archivos Excel.');
+}
+
+// ===== Algoritmo de optimización 2D (portado y adaptado) =====
+
+class Pieza {
+    constructor(numero, cantidad, nombre, ancho, alto, vetaLibre, tapacantos) {
+        this.numero = numero; this.cantidad = cantidad; this.nombre = nombre;
+        this.ancho = ancho; this.alto = alto; this.vetaLibre = vetaLibre; this.tapacantos = tapacantos || {arriba:false,derecha:false,abajo:false,izquierda:false};
+        this.rotada = false; this.x = 0; this.y = 0; this.colocada = false; this.indiceUnidad = 1; this.totalUnidades = cantidad || 1;
+    }
+    puedeRotar(){ return !!this.vetaLibre; }
+    rotar(){ if(this.puedeRotar()){ [this.ancho,this.alto] = [this.alto,this.ancho]; const t=this.tapacantos; this.tapacantos={arriba:t.izquierda,derecha:t.arriba,abajo:t.derecha,izquierda:t.abajo}; this.rotada=!this.rotada; } }
+    getArea(){ return this.ancho*this.alto; }
+}
+
+class Tablero {
+    constructor(ancho, alto, margen=10, kerf=3){
+        this.ancho=ancho; this.alto=alto; this.margenOriginal=margen; this.kerf=kerf;
+        this.anchoUtil=ancho-(2*margen); this.altoUtil=alto-(2*margen); this.piezas=[]; this.numero=1;
+    }
+    piezaCabe(pieza,x,y){
+        if(x<0||y<0||x+pieza.ancho>this.anchoUtil||y+pieza.alto>this.altoUtil) return false;
+        for(const p of this.piezas){
+            if(x < p.x + p.ancho + this.kerf && x + pieza.ancho + this.kerf > p.x && y < p.y + p.alto + this.kerf && y + pieza.alto + this.kerf > p.y) return false;
+        }
+        return true;
+    }
+    agregarPiezaEn(pieza,x,y){ if(this.piezaCabe(pieza,x,y)){ pieza.x=x; pieza.y=y; pieza.colocada=true; this.piezas.push(pieza); return true; } return false; }
+    encontrarPosicion(pieza){
+        if(this.piezas.length===0) return this.piezaCabe(pieza,0,0)?{x:0,y:0}:null;
+        let mejor=null, mejorScore=-1e9;
+        const candidatos=[]; for(const p of this.piezas){
+            candidatos.push({x:p.x+p.ancho+this.kerf,y:p.y});
+            candidatos.push({x:p.x,y:p.y+p.alto+this.kerf});
+            candidatos.push({x:p.x+p.ancho+this.kerf,y:p.y+p.alto+this.kerf});
+        }
+        // posiciones de borde útiles
+        candidatos.push({x:0,y:0});
+        candidatos.push({x:this.anchoUtil - pieza.ancho, y:0});
+        candidatos.push({x:0, y:this.altoUtil - pieza.alto});
+        candidatos.push({x:this.anchoUtil - pieza.ancho, y:this.altoUtil - pieza.alto});
+        for(const c of candidatos){ if(this.piezaCabe(pieza,c.x,c.y)){ const s=this.calcularPuntuacionEficiencia(pieza,c.x,c.y); if(s>mejorScore){mejorScore=s; mejor={x:c.x,y:c.y};} } }
+        if(!mejor){
+            const paso=Math.max(5,this.kerf), maxIter=2000; let it=0;
+            for(let y=0;y<=this.altoUtil-pieza.alto;y+=paso){ for(let x=0;x<=this.anchoUtil-pieza.ancho;x+=paso){ if(++it>maxIter) break; if(this.piezaCabe(pieza,x,y)){ const s=this.calcularPuntuacionEficiencia(pieza,x,y); if(s>mejorScore){mejorScore=s; mejor={x,y};} } } if(it>maxIter) break; }
+        }
+        return mejor;
+    }
+    calcularPuntuacionEficiencia(pieza,x,y){
+        let score=0; let contactos=0; let distMin=Infinity;
+        for(const p of this.piezas){ const dist=Math.hypot(x-p.x,y-p.y); distMin=Math.min(distMin,dist);
+            const contactoV = (Math.abs(x-(p.x+p.ancho+this.kerf))<1||Math.abs((x+pieza.ancho+this.kerf)-p.x)<1) && !(y+pieza.alto<p.y||y>p.y+p.alto);
+            const contactoH = (Math.abs(y-(p.y+p.alto+this.kerf))<1||Math.abs((y+pieza.alto+this.kerf)-p.y)<1) && !(x+pieza.ancho<p.x||x>p.x+p.ancho);
+            if(contactoV||contactoH) contactos++;
+        }
+        score += contactos*500; if(distMin<Infinity) score += 200/(distMin+1);
+        const enBorde=(x===0)+(y===0)+(x+pieza.ancho===this.anchoUtil)+(y+pieza.alto===this.altoUtil); score+=enBorde*100; if(enBorde>=2) score+=200;
+        const espDer=this.anchoUtil-(x+pieza.ancho), espAb=this.altoUtil-(y+pieza.alto); if(espDer>0&&espDer<150) score-= (150-espDer)*3; if(espAb>0&&espAb<150) score-=(150-espAb)*3;
+        return score;
+    }
+    agregarPieza(pieza){ const pos=this.encontrarPosicion(pieza); if(pos){ pieza.x=pos.x; pieza.y=pos.y; pieza.colocada=true; this.piezas.push(pieza); return true; } return false; }
+    getAprovechamiento(){ const areaUsada=this.piezas.reduce((s,p)=>s+p.getArea(),0); return (areaUsada/(this.anchoUtil*this.altoUtil))*100; }
+    getDesperdicio(){ const areaUsada=this.piezas.reduce((s,p)=>s+p.getArea(),0); return this.anchoUtil*this.altoUtil - areaUsada; }
+    calcularAreaUsada(){ return this.piezas.reduce((s,p)=>s+p.getArea(),0); }
+}
+
+function recopilarPiezasDeTablaNuevo(){
+    const piezas=[]; const filas=document.querySelectorAll('#piezasTableBody tr');
+    filas.forEach((fila,idx)=>{
+        const inputs=fila.querySelectorAll('input');
+        // Estructura: [cantidad, nombre, largo(Y), ancho(X)] en este template
+        const cantidad=parseInt(inputs[0]?.value)||1; const nombre=(inputs[1]?.value||`Pieza ${idx+1}`).trim();
+        const largo=parseInt(inputs[2]?.value)||0; const ancho=parseInt(inputs[3]?.value)||0;
+        const vetaLibre=fila.querySelector('input[type="checkbox"]')?.checked||false;
+        if(ancho>0 && largo>0){ const tapacantos=obtenerTapacantosNuevo(fila, idx+1); piezas.push(new Pieza(idx+1,cantidad,nombre,ancho,largo,vetaLibre,tapacantos)); }
+    });
+    return piezas;
+}
+
+function obtenerTapacantosNuevo(fila, piezaNum){
+    const estado=(lado)=>{
+        const btn=fila.querySelector(`[data-pieza="${piezaNum}"][data-lado="${lado}"]`);
+        return btn && btn.classList.contains('btn-success');
+    };
+    return { arriba:estado('sup'), derecha:estado('der'), abajo:estado('inf'), izquierda:estado('izq') };
+}
+
+function expandirPiezas(piezas){ const out=[]; piezas.forEach(p=>{ for(let i=1;i<=p.cantidad;i++){ const c=new Pieza(p.numero,1,p.nombre,p.ancho,p.alto,p.vetaLibre,{...p.tapacantos}); c.indiceUnidad=i; c.totalUnidades=p.cantidad; out.push(c);} }); return out; }
+
+function agruparPiezasPorDimensiones(piezas){
+    const grupos=new Map();
+    piezas.forEach(p=>{ const d1=Math.min(p.ancho,p.alto), d2=Math.max(p.ancho,p.alto); const k=`${d1}x${d2}`; if(!grupos.has(k)) grupos.set(k,[]); grupos.get(k).push(p); });
+    const lista=[]; [...grupos.values()].sort((a,b)=> (b.length||0) - (a.length||0)).forEach(g=>{ g.sort((x,y)=>y.getArea()-x.getArea()); lista.push(...g); });
+    return lista;
+}
+
+function calcularAprovechamientoTotal(tableros){ let total=0, usada=0; for(const t of tableros){ total += t.ancho*t.alto; usada += t.calcularAreaUsada(); } return total>0 ? (usada/total)*100 : 0; }
+
+function optimizarEstantesRapido(piezas, W, H, margen, kerf, start, budgetMs){
+    const tableros=[]; let t=new Tablero(W,H,margen,kerf); t.numero=1; tableros.push(t);
+    let estantes=[{y:0,altura:0,x:0}];
+    for(let i=0;i<piezas.length;i++){
+        const p=piezas[i]; if(p.colocada) continue; if(Date.now()-start>budgetMs) break;
+        const variantes=[{w:p.ancho,h:p.alto,rot:false}]; if(p.puedeRotar()) variantes.push({w:p.alto,h:p.ancho,rot:true});
+        let colocada=false;
+        const estOrden=[...estantes].sort((a,b)=>a.altura-b.altura);
+        for(const est of estOrden){ for(const v of variantes){ const alt=Math.max(est.altura||v.h, v.h); if(v.h<= (est.altura||v.h) && est.x+v.w<=t.anchoUtil && est.y+alt<=t.altoUtil){ if(v.rot) p.rotar(); if(t.agregarPiezaEn(p, est.x, est.y)){ est.altura=alt; est.x+=v.w+kerf; colocada=true; rellenarEstanteRapido(piezas,t,est,alt,kerf,start,budgetMs); break; } if(v.rot) p.rotar(); } } if(colocada) break; }
+        if(!colocada){
+            const yNuevo=estantes.reduce((s,e)=>Math.max(s,e.y+(e.altura||0)+kerf),0);
+            const minAlt=p.puedeRotar()?Math.min(p.alto,p.ancho):p.alto; if(yNuevo+minAlt>t.altoUtil){ t=new Tablero(W,H,margen,kerf); t.numero=tableros.length+1; tableros.push(t); estantes=[{y:0,altura:0,x:0}]; }
+            const est={y:yNuevo,altura:0,x:0}; estantes.push(est); let puesta=false;
+            for(const v of variantes){ if(v.w<=t.anchoUtil && v.h<=t.altoUtil-est.y){ if(v.rot) p.rotar(); if(t.agregarPiezaEn(p, est.x, est.y)){ est.altura=v.h; est.x+=v.w+kerf; puesta=true; break; } if(v.rot) p.rotar(); } }
+            if(puesta) rellenarEstanteRapido(piezas,t,est,est.altura,kerf,start,budgetMs);
+        }
+    }
+    return tableros;
+}
+
+function rellenarEstanteRapido(piezas, t, est, altObj, kerf, start, budgetMs){
+    const tol=10, maxIns=12, maxScan=200; let ins=0, esc=0;
+    for(let j=0;j<piezas.length && ins<maxIns && esc<maxScan;j++){
+        if(Date.now()-start>budgetMs) break; const p=piezas[j]; if(!p||p.colocada) continue; esc++;
+        const cands=[{w:p.ancho,h:p.alto,rot:false}]; if(p.puedeRotar()) cands.push({w:p.alto,h:p.ancho,rot:true});
+        for(const c of cands){ const altOk=Math.abs(c.h-altObj)<=tol || c.h<=altObj; const wRest=t.anchoUtil-est.x; if(altOk && c.w<=wRest){ if(c.rot) p.rotar(); if(t.agregarPiezaEn(p,est.x,est.y)){ est.x+=c.w+kerf; est.altura=Math.max(est.altura,c.h); ins++; break; } if(c.rot) p.rotar(); }
+        }
+    }
+}
+
+function calcularCompatibilidadDimensional(tablero, pieza){ if(tablero.piezas.length===0) return 200; let s=50, tol=20; for(const pe of tablero.piezas){ if(Math.abs(pe.ancho-pieza.ancho)<=5) s+=150; else if(Math.abs(pe.ancho-pieza.ancho)<=tol) s+=80; if(Math.abs(pe.alto-pieza.alto)<=5) s+=150; else if(Math.abs(pe.alto-pieza.alto)<=tol) s+=80; if(Math.abs(pe.ancho-pieza.alto)<=tol) s+=60; if(Math.abs(pe.alto-pieza.ancho)<=tol) s+=60; if(Math.abs(pe.alto-pieza.alto)<=tol) s+=40; if(Math.abs(pe.ancho-pieza.ancho)<=tol) s+=40; } const ap=tablero.getAprovechamiento(); if(ap>30&&ap<85) s+=100; s+=Math.min(tablero.piezas.length*10,50); return Math.max(s,10); }
+
+function optimizarConAgrupacionDimensiones(piezas, W,H,margen,kerf){
+    const tableros=[new Tablero(W,H,margen,kerf)]; let tActual=tableros[0];
+    for(const pieza of piezas){ let colocada=false; let mejor=null, mejorScore=-1e9;
+        for(const t of tableros){ if(t.getAprovechamiento()<98){ const pos1=t.encontrarPosicion(pieza); if(pos1){ const sc=calcularCompatibilidadDimensional(t,pieza)+ (t.calcularAreaUsada()+pieza.getArea())/(t.anchoUtil*t.altoUtil)*200; if(sc>mejorScore){ mejorScore=sc; mejor={t,pos:pos1,rot:false}; } }
+            if(pieza.puedeRotar()){ pieza.rotar(); const pos2=t.encontrarPosicion(pieza); if(pos2){ const sc=calcularCompatibilidadDimensional(t,pieza)+ (t.calcularAreaUsada()+pieza.getArea())/(t.anchoUtil*t.altoUtil)*200; if(sc>mejorScore){ mejorScore=sc; mejor={t,pos:pos2,rot:true}; } } pieza.rotar(); }
+        } }
+        if(mejor){ if(mejor.rot) pieza.rotar(); pieza.x=mejor.pos.x; pieza.y=mejor.pos.y; pieza.colocada=true; mejor.t.piezas.push(pieza); colocada=true; }
+        if(!colocada){ const nuevo=new Tablero(W,H,margen,kerf); nuevo.numero=tableros.length+1; tableros.push(nuevo); if(nuevo.agregarPieza(pieza)){} else if(pieza.puedeRotar()){ pieza.rotar(); nuevo.agregarPieza(pieza); }
+        }
+    }
+    tableros.forEach((t,i)=>t.numero=i+1); return tableros;
+}
+
+function compactarTableros(tableros){
+    if(!Array.isArray(tableros)||tableros.length<=1) return tableros;
+    let moved=true; let passes=0;
+    while(moved && passes<3){
+        moved=false; passes++;
+        for(let i=1;i<tableros.length;i++){
+            const src=tableros[i]; if(!src || !src.piezas || src.piezas.length===0) continue;
+            // Prioriza piezas delgadas (área pequeña primero)
+            const piezas=[...src.piezas].sort((a,b)=>a.getArea()-b.getArea());
+            for(const p of piezas){
+                let recolocada=false;
+                for(let j=0;j<i && !recolocada;j++){
+                    const dst=tableros[j]; if(!dst) continue;
+                    if(dst.agregarPieza(p)){
+                        src.piezas=src.piezas.filter(x=>x!==p); recolocada=true; moved=true; break;
+                    }
+                    if(p.puedeRotar()){
+                        p.rotar();
+                        if(dst.agregarPieza(p)){
+                            src.piezas=src.piezas.filter(x=>x!==p); recolocada=true; moved=true; break;
+                        } else {
+                            p.rotar();
+                        }
+                    }
+                }
+            }
+        }
+    }
+    const filtered=tableros.filter(t=>t.piezas&&t.piezas.length>0); filtered.forEach((t,i)=>t.numero=i+1); return filtered;
+}
+
+function reempacarGlobal(tableros,W,H,margen,kerf){
+    try{
+        if(!Array.isArray(tableros)||tableros.length===0) return null;
+        const piezas=[];
+        tableros.forEach(t=> (t.piezas||[]).forEach(p=>{
+            const c=new Pieza(p.numero,1,p.nombre,p.ancho,p.alto,p.vetaLibre,{...p.tapacantos});
+            c.indiceUnidad=p.indiceUnidad||1; c.totalUnidades=p.totalUnidades||1; c.rotada = !!p.rotada; // conservar símbolo de rotación
+            piezas.push(c);
+        }));
+        if(piezas.length===0) return null;
+        const agrup=agruparPiezasPorDimensiones(piezas);
+        const nuevos=optimizarConAgrupacionDimensiones(agrup,W,H,margen,kerf);
+        const filtrados=nuevos.filter(t=>t&&t.piezas&&t.piezas.length>0); filtrados.forEach((t,i)=>t.numero=i+1);
+        return filtrados;
+    } catch(e){ console.warn('Reempacado global falló:', e); return null; }
+}
+
+function optimizar(){
+    // Parámetros del tablero
+    const W=parseFloat(document.getElementById('anchoTablero1')?.value)||1830;
+    const H=parseFloat(document.getElementById('largoTablero1')?.value)||2500;
+    const margenX=parseFloat(document.getElementById('margenX1')?.value)||10; // usamos el mismo margen en ambos ejes
+    const kerf=parseFloat(document.getElementById('desperdicioSierra1')?.value)||3;
+
+    const piezasBase=recopilarPiezasDeTablaNuevo(); if(piezasBase.length===0){ alert('No hay piezas válidas.'); return; }
+    const piezas=expandirPiezas(piezasBase);
+
+    // Estrategias con límite de tiempo
+    const budget=3500; const start=Date.now();
+    const clone=list=>list.map(p=>{ const c=new Pieza(p.numero,1,p.nombre,p.ancho,p.alto,p.vetaLibre,{...p.tapacantos}); c.indiceUnidad=p.indiceUnidad; c.totalUnidades=p.totalUnidades; return c; });
+    const ordenAltura=clone([...piezas].sort((a,b)=>Math.max(b.alto,b.ancho)-Math.max(a.alto,a.ancho)));
+    const ordenAncho=clone([...piezas].sort((a,b)=>Math.min(b.alto,b.ancho)-Math.min(a.alto,a.ancho)));
+    const tries=[];
+    tries.push(optimizarEstantesRapido(ordenAltura,W,H,margenX,kerf,start,budget)); if(Date.now()-start<budget) tries.push(optimizarEstantesRapido(ordenAncho,W,H,margenX,kerf,start,budget));
+    // 2 barajadas rápidas
+    for(let s=0;s<2 && Date.now()-start<budget;s++){ const shuffled=clone([...piezas].sort(()=>Math.random()-0.5)); tries.push(optimizarEstantesRapido(shuffled,W,H,margenX,kerf,start,budget)); }
+    
+    const score=(ts)=> ts? (calcularAprovechamientoTotal(ts) - (ts.length-1)*6) : -1e9;
+    let mejor=tries.reduce((acc,t)=> (score(t)>score(acc)?t:acc), tries[0]);
+    if(!mejor || score(mejor)<0){ const agrup=agruparPiezasPorDimensiones(piezas); mejor=optimizarConAgrupacionDimensiones(agrup,W,H,margenX,kerf); }
+
+    // Compactar y reempacar
+    mejor=compactarTableros(mejor);
+    const reemp=reempacarGlobal(mejor,W,H,margenX,kerf);
+    if(reemp){ const betterCount=reemp.length<mejor.length; const utilOld=calcularAprovechamientoTotal(mejor); const utilNew=calcularAprovechamientoTotal(reemp); if(betterCount || (reemp.length===mejor.length && utilNew>=utilOld-0.1)) mejor=reemp; }
+
+    // Filtrar vacíos y renderizar
+    mejor=mejor.filter(t=>t.piezas && t.piezas.length>0); mejor.forEach((t,i)=>t.numero=i+1);
+    mostrarResultadosNuevo(mejor);
+}
+
+// ===== Visualización SVG (tema oscuro) =====
+function mostrarResultadosNuevo(tableros){
+    const total=tableros.length; const aprovech=tableros.reduce((s,t)=>s+t.getAprovechamiento(),0)/Math.max(1,total); const desperdicio=tableros.reduce((s,t)=>s+t.getDesperdicio(),0); const tapac=calcularTapacantoTotal(tableros);
+    document.getElementById('tablerosUsadosNuevo').textContent=total; document.getElementById('aprovechamientoNuevo').textContent=aprovech.toFixed(1)+'%'; document.getElementById('desperdicioNuevo').textContent=(desperdicio/1e6).toFixed(3)+' m²'; document.getElementById('tapacantosNuevo').textContent=(tapac/1000).toFixed(1)+' m';
+    const cont=document.getElementById('visualizacionTablerosNuevo'); cont.innerHTML='';
+    tableros.forEach(t=> cont.appendChild(crearSVGTableroNuevo(t)) );
+    document.getElementById('resultadosOptimizacionNuevo').style.display='block';
+    document.getElementById('resultadosOptimizacionNuevo').scrollIntoView({behavior:'smooth'});
+}
+
+function calcularTapacantoTotal(tableros){ let total=0; tableros.forEach(t=> t.piezas.forEach(p=>{ if(p.tapacantos.arriba) total+=p.ancho; if(p.tapacantos.abajo) total+=p.ancho; if(p.tapacantos.derecha) total+=p.alto; if(p.tapacantos.izquierda) total+=p.alto; })); return total; }
+
+function crearSVGTableroNuevo(tablero){
+    const escala=0.4, margenSVG=80; const w=(tablero.ancho*escala)+(margenSVG*2), h=(tablero.alto*escala)+(margenSVG*2)+60;
+    const div=document.createElement('div'); div.className='mb-4 d-inline-block me-4'; div.style.verticalAlign='top';
+    const infoTop=document.createElement('div'); infoTop.className='text-center mb-2'; infoTop.innerHTML=`<div class="fw-bold text-info">Tablero ${tablero.numero}</div><div class="text-muted">${tablero.getAprovechamiento().toFixed(1)}% aprovechamiento</div>`; div.appendChild(infoTop);
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg'); svg.setAttribute('width',w); svg.setAttribute('height',h); svg.setAttribute('viewBox',`0 0 ${w} ${h}`); svg.style.background='#0d1421'; svg.style.border='1px solid #3e4853';
+    const offX=margenSVG, offY=margenSVG, tw=tablero.ancho*escala, th=tablero.alto*escala;
+    const bg=document.createElementNS('http://www.w3.org/2000/svg','rect'); bg.setAttribute('x',offX); bg.setAttribute('y',offY); bg.setAttribute('width',tw); bg.setAttribute('height',th); bg.setAttribute('fill','#1a2332'); bg.setAttribute('stroke','#888'); bg.setAttribute('stroke-width','1.5'); svg.appendChild(bg);
+    // Medidas
+    const txtTop=document.createElementNS('http://www.w3.org/2000/svg','text'); txtTop.setAttribute('x',offX+tw/2); txtTop.setAttribute('y',offY-20); txtTop.setAttribute('text-anchor','middle'); txtTop.setAttribute('fill','#ffc107'); txtTop.setAttribute('font-weight','bold'); txtTop.setAttribute('font-size','14'); txtTop.textContent=`${tablero.ancho}mm`; svg.appendChild(txtTop);
+    const txtTopUtil=document.createElementNS('http://www.w3.org/2000/svg','text'); txtTopUtil.setAttribute('x',offX+tw/2); txtTopUtil.setAttribute('y',offY-5); txtTopUtil.setAttribute('text-anchor','middle'); txtTopUtil.setAttribute('fill','#bbb'); txtTopUtil.setAttribute('font-size','12'); txtTopUtil.textContent=`(${tablero.anchoUtil}mm útil)`; svg.appendChild(txtTopUtil);
+    const txtLeft=document.createElementNS('http://www.w3.org/2000/svg','text'); txtLeft.setAttribute('x',offX-10); txtLeft.setAttribute('y',offY+th/2); txtLeft.setAttribute('text-anchor','end'); txtLeft.setAttribute('dominant-baseline','middle'); txtLeft.setAttribute('fill','#ffc107'); txtLeft.setAttribute('font-weight','bold'); txtLeft.setAttribute('font-size','14'); txtLeft.textContent=`${tablero.alto}mm`; svg.appendChild(txtLeft);
+    const txtLeftUtil=document.createElementNS('http://www.w3.org/2000/svg','text'); txtLeftUtil.setAttribute('x',8); txtLeftUtil.setAttribute('y',offY+th/2+18); txtLeftUtil.setAttribute('text-anchor','start'); txtLeftUtil.setAttribute('dominant-baseline','middle'); txtLeftUtil.setAttribute('fill','#bbb'); txtLeftUtil.setAttribute('font-size','12'); txtLeftUtil.textContent=`(${tablero.altoUtil}mm útil)`; svg.appendChild(txtLeftUtil);
+    // Patrón descarte + borde útil
+    const defs=document.createElementNS('http://www.w3.org/2000/svg','defs'); const pat=document.createElementNS('http://www.w3.org/2000/svg','pattern'); pat.setAttribute('id','discardPatternDark'); pat.setAttribute('patternUnits','userSpaceOnUse'); pat.setAttribute('width',8); pat.setAttribute('height',8); const path=document.createElementNS('http://www.w3.org/2000/svg','path'); path.setAttribute('d','M0,0 L8,8 M8,0 L0,8'); path.setAttribute('stroke','#ffc107'); path.setAttribute('stroke-width','1'); path.setAttribute('opacity','0.6'); pat.appendChild(path); defs.appendChild(pat); svg.appendChild(defs);
+    const m=tablero.margenOriginal*escala, uW=tablero.anchoUtil*escala, uH=tablero.altoUtil*escala;
+    const utileRect=document.createElementNS('http://www.w3.org/2000/svg','rect'); utileRect.setAttribute('x',offX+m); utileRect.setAttribute('y',offY+m); utileRect.setAttribute('width',uW); utileRect.setAttribute('height',uH); utileRect.setAttribute('fill','none'); utileRect.setAttribute('stroke','#ffc107'); utileRect.setAttribute('stroke-width','2'); utileRect.setAttribute('stroke-dasharray','6,3'); svg.appendChild(utileRect);
+    // Descarte
+    const topD=document.createElementNS('http://www.w3.org/2000/svg','rect'); topD.setAttribute('x',offX); topD.setAttribute('y',offY); topD.setAttribute('width',tw); topD.setAttribute('height',m); topD.setAttribute('fill','url(#discardPatternDark)'); svg.appendChild(topD);
+    const botD=document.createElementNS('http://www.w3.org/2000/svg','rect'); botD.setAttribute('x',offX); botD.setAttribute('y',offY+m+uH); botD.setAttribute('width',tw); botD.setAttribute('height',m); botD.setAttribute('fill','url(#discardPatternDark)'); svg.appendChild(botD);
+    const leftD=document.createElementNS('http://www.w3.org/2000/svg','rect'); leftD.setAttribute('x',offX); leftD.setAttribute('y',offY+m); leftD.setAttribute('width',m); leftD.setAttribute('height',uH); leftD.setAttribute('fill','url(#discardPatternDark)'); svg.appendChild(leftD);
+    const rightD=document.createElementNS('http://www.w3.org/2000/svg','rect'); rightD.setAttribute('x',offX+m+uW); rightD.setAttribute('y',offY+m); rightD.setAttribute('width',m); rightD.setAttribute('height',uH); rightD.setAttribute('fill','url(#discardPatternDark)'); svg.appendChild(rightD);
+    // Piezas
+    const colores=['#b8c7ff','#ffd1dc','#c0f7d3','#ffe9b3','#d7b8ff','#b8fff1','#f7c0e7','#c0d5f7','#f7dec0','#c0f1f7'];
+    tablero.piezas.forEach((p,idx)=>{
+        const x=offX+(tablero.margenOriginal+p.x)*escala, y=offY+(tablero.margenOriginal+p.y)*escala, wP=p.ancho*escala, hP=p.alto*escala;
+        const r=document.createElementNS('http://www.w3.org/2000/svg','rect'); r.setAttribute('x',x); r.setAttribute('y',y); r.setAttribute('width',wP); r.setAttribute('height',hP); r.setAttribute('fill',colores[p.numero%colores.length]); r.setAttribute('stroke','#666'); r.setAttribute('stroke-width','1.3'); r.setAttribute('rx','3'); r.setAttribute('ry','3'); svg.appendChild(r);
+        dibujarTapacantosDentroNuevo(svg,p,x,y,wP,hP);
+    const nombreBase=p.totalUnidades>1? `${p.nombre} (${p.indiceUnidad}/${p.totalUnidades})` : p.nombre; const label=p.rotada? `${nombreBase} ↻` : nombreBase;
+        // Texto pieza delgada en una sola línea, más grande + fondo
+        const esDelgada=hP<36; const tx=document.createElementNS('http://www.w3.org/2000/svg','text'); tx.setAttribute('x', x + wP/2); tx.setAttribute('y', y + hP/2); tx.setAttribute('text-anchor','middle'); tx.setAttribute('dominant-baseline','middle'); tx.setAttribute('font-family','Arial, sans-serif');
+        const fontSize = esDelgada ? Math.max(10, Math.min(15, hP*0.65)) : Math.max(11, Math.min(18, wP/7, hP/4));
+        tx.setAttribute('font-size', fontSize); tx.setAttribute('font-weight','bold'); tx.setAttribute('fill','#222');
+        const texto = esDelgada ? `${label} - ${p.ancho}×${p.alto}mm` : label;
+        if(esDelgada){ const approx=Math.min(wP*0.92, Math.max(40, (String(texto).length) * (fontSize*0.58))); const bg=document.createElementNS('http://www.w3.org/2000/svg','rect'); bg.setAttribute('x', x + wP/2 - approx/2 - 4); bg.setAttribute('y', y + hP/2 - fontSize/1.2); bg.setAttribute('width', approx + 8); bg.setAttribute('height', fontSize*1.6); bg.setAttribute('rx','3'); bg.setAttribute('ry','3'); bg.setAttribute('fill','rgba(255,255,255,0.92)'); svg.appendChild(bg); }
+        tx.textContent = texto; svg.appendChild(tx);
+    if(!esDelgada){ const dim=document.createElementNS('http://www.w3.org/2000/svg','text'); dim.setAttribute('x', x + wP/2); dim.setAttribute('y', y + hP/2 + 13); dim.setAttribute('text-anchor','middle'); dim.setAttribute('dominant-baseline','middle'); dim.setAttribute('font-family','Arial, sans-serif'); dim.setAttribute('font-size', Math.max(9, Math.min(15, wP/11, hP/5))); dim.setAttribute('fill','#ccc'); dim.textContent=`${p.ancho}×${p.alto}mm`; svg.appendChild(dim); }
+    });
+    // Líneas de corte (suaves)
+    const cortes=generarSecuenciaCortesNuevo(tablero); dibujarLineasCorteNuevo(svg,cortes,tablero,offX,offY,escala);
+    const infoBottom=document.createElement('div'); infoBottom.className='text-center mt-2 small text-muted'; infoBottom.innerHTML=`<div>Área útil: ${tablero.anchoUtil}×${tablero.altoUtil}mm</div><div>Piezas colocadas: ${tablero.piezas.length}</div>`; div.appendChild(svg); div.appendChild(infoBottom); return div;
+}
+
+function dibujarTapacantosDentroNuevo(svg,p,x,y,w,h){
+    // Líneas de tapacanto más delgadas y sin texto de código
+    const g=2, m=6;
+    const draw=(x1,y1,x2,y2)=>{
+        const l=document.createElementNS('http://www.w3.org/2000/svg','line');
+        l.setAttribute('x1',x1); l.setAttribute('y1',y1); l.setAttribute('x2',x2); l.setAttribute('y2',y2);
+        l.setAttribute('stroke','#dc3545'); l.setAttribute('stroke-width',g); l.setAttribute('stroke-dasharray','8,4');
+        svg.appendChild(l);
+        return l;
+    };
+    if(p.tapacantos.arriba){ draw(x+m,y+m,x+w-m,y+m); }
+    if(p.tapacantos.derecha){ draw(x+w-m,y+m,x+w-m,y+h-m); }
+    if(p.tapacantos.abajo){ draw(x+m,y+h-m,x+w-m,y+h-m); }
+    if(p.tapacantos.izquierda){ draw(x+m,y+m,x+m,y+h-m); }
+}
+
+function generarSecuenciaCortesNuevo(tablero){ if(!tablero.piezas.length) return {lineasVerticales:[], lineasHorizontales:[]}; const V=new Set([0,tablero.anchoUtil]); const H=new Set([0,tablero.altoUtil]); tablero.piezas.forEach(p=>{ V.add(p.x); V.add(p.x+p.ancho); H.add(p.y); H.add(p.y+p.alto); }); return { lineasVerticales:[...V].sort((a,b)=>a-b), lineasHorizontales:[...H].sort((a,b)=>a-b) } }
+
+function dibujarLineasCorteNuevo(svg,cortes,tablero,offX,offY,esc){ const m=tablero.margenOriginal*esc; const V=Array.isArray(cortes.lineasVerticales)?cortes.lineasVerticales:[]; const H=Array.isArray(cortes.lineasHorizontales)?cortes.lineasHorizontales:[]; V.forEach(x=>{ if(x>0 && x<tablero.anchoUtil){ const l=document.createElementNS('http://www.w3.org/2000/svg','line'); const xPos=offX+m+(x*esc); l.setAttribute('x1',xPos); l.setAttribute('y1',offY+m); l.setAttribute('x2',xPos); l.setAttribute('y2',offY+m+(tablero.altoUtil*esc)); l.setAttribute('stroke','#95a5a6'); l.setAttribute('stroke-width','1'); l.setAttribute('stroke-dasharray','5,3'); l.setAttribute('opacity','0.4'); svg.appendChild(l);} }); H.forEach(y=>{ if(y>0 && y<tablero.altoUtil){ const l=document.createElementNS('http://www.w3.org/2000/svg','line'); const yPos=offY+m+(y*esc); l.setAttribute('x1',offX+m); l.setAttribute('y1',yPos); l.setAttribute('x2',offX+m+(tablero.anchoUtil*esc)); l.setAttribute('y2',yPos); l.setAttribute('stroke','#95a5a6'); l.setAttribute('stroke-width','1'); l.setAttribute('stroke-dasharray','5,3'); l.setAttribute('opacity','0.4'); svg.appendChild(l);} }); }
+
+// Función para imprimir PDF
+function imprimirPDF() {
+    alert('Función de exportar PDF en desarrollo...\nPróximamente permitirá generar reportes en PDF.');
+}
+
+// Inicialización
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('Optimizador de materiales inicializado completamente');
+    // Bloquear acciones sin material/tapacanto seleccionado
+    const btnAdd=document.querySelector('button[onclick^="agregarFilaRapida"]');
+    const tbody=document.getElementById('piezasTableBody');
+    const matSel=document.getElementById('materialSelect1');
+    const tapSel=document.getElementById('tapacantoSelect1');
+    const updateTabla=()=>{ const ok=!!(matSel && matSel.value); if(btnAdd) btnAdd.disabled=!ok; if(tbody){ tbody.style.pointerEvents= ok?'auto':'none'; tbody.style.opacity= ok?'1':'0.6'; } };
+    const updateTap=()=>{ const ok=!!(tapSel && tapSel.value); document.querySelectorAll('[data-pieza][data-lado]').forEach(btn=>{ btn.disabled=!ok; btn.classList.toggle('disabled',!ok); if(!ok) btn.title='Seleccione un tapacanto primero'; }); };
+    updateTabla(); updateTap();
+    if(matSel) matSel.addEventListener('change', updateTabla);
+    if(tapSel) tapSel.addEventListener('change', updateTap);
+    // Hook validación para fila inicial
+    const fila1 = document.querySelector('#piezasTableBody tr');
+    if(fila1) engancharValidacionFilaNuevo(fila1);
+
+    // Inicializar etiquetas de material con (ANCHO×LARGO)
+    (function initMaterialLabels(){
+        const sel = document.getElementById('materialSelect1');
+        if(!sel) return;
+        const materiales = {
+            'melamina_blanca': { ancho: 1830, largo: 2500 },
+            'melamina_roble': { ancho: 1830, largo: 2440 },
+            'mdf_crudo': { ancho: 1220, largo: 2440 }
+        };
+        for(let i=0;i<sel.options.length;i++){
+            const opt=sel.options[i];
+            const data=materiales[opt.value];
+            if(data){
+                const mayor=Math.max(data.ancho,data.largo), menor=Math.min(data.ancho,data.largo);
+                const baseText = opt.textContent.split('(')[0].trim();
+                opt.textContent = `${baseText} (${mayor}×${menor} mm)`;
+            }
+        }
+    })();
+});
+
+// ====== Búsqueda de clientes en tiempo real (datalist) ======
+let clientesCacheNuevo = [];
+let buscarClientesTimerNuevo = null;
+function buscarClientesDBNuevo(query){
+    const q=(query||'').trim();
+    if(q.length<3){
+        const dl=document.getElementById('clientesDatalistNuevo');
+        if(dl) dl.innerHTML='';
+        return;
+    }
+    clearTimeout(buscarClientesTimerNuevo);
+    buscarClientesTimerNuevo = setTimeout(()=>{
+        fetch(`{% url 'buscar_clientes_ajax' %}?q=${encodeURIComponent(q)}`)
+            .then(r=>r.json())
+            .then(data=>{
+                clientesCacheNuevo = data.clientes||[];
+                const dl=document.getElementById('clientesDatalistNuevo');
+                if(!dl) return;
+                dl.innerHTML='';
+                clientesCacheNuevo.forEach(c=>{
+                    const opt=document.createElement('option');
+                    opt.value=c.nombre;
+                    const org = c.organizacion ? ` - ${c.organizacion}` : '';
+                    opt.label = c.rut ? `${c.nombre} (${c.rut})${org}` : `${c.nombre}${org}`;
+                    dl.appendChild(opt);
+                });
+            })
+            .catch(e=>console.error('Error al buscar clientes:', e));
+    }, 250);
+}
+
+function onClienteElegidoNuevo(nombre){
+    if(!nombre) return;
+    const c = (clientesCacheNuevo||[]).find(x=>x.nombre===nombre);
+    if(c){
+        const rut = document.getElementById('rutCliente');
+        if(rut) rut.value = c.rut || '';
+        flashNuevo('Cliente seleccionado');
+    }
+}
+</script>
+<style>
+@keyframes shakeX { 10%, 90% { transform: translateX(-1px); } 20%, 80% { transform: translateX(2px); } 30%, 50%, 70% { transform: translateX(-4px);} 40%, 60% { transform: translateX(4px);} }
+.shake { animation: shakeX 0.4s ease; }
+.is-invalid { border-color:#dc3545 !important; }
+</style>
+{% endblock %}

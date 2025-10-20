@@ -1,0 +1,149 @@
+{% extends '../layout/layout.html' %}
+
+{% block title %}{{ title }}{% endblock title %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">{{ title }}</h6>
+    <ul class="d-flex align-items-center gap-2">
+        <li class="fw-medium">
+            <a href="{% url 'index' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                <iconify-icon icon="solar:home-smile-angle-outline" class="icon text-lg"></iconify-icon>
+                Dashboard
+            </a>
+        </li>
+        <li>-</li>
+        <li class="fw-medium">
+            <a href="{% url 'organizaciones_lista' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                Organizaciones
+            </a>
+        </li>
+        <li>-</li>
+        <li class="fw-medium">{{ subTitle }}</li>
+    </ul>
+</div>
+
+<div class="row gy-4">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">{{ title }}</h6>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {% csrf_token %}
+                    <div class="row gy-3">
+                        <!-- Código -->
+                        <div class="col-sm-6">
+                            <label for="codigo" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Código <span class="text-danger-600">*</span>
+                            </label>
+                            <input type="text" class="form-control radius-8" id="codigo" name="codigo" 
+                                   placeholder="Ej: SOD001" required>
+                        </div>
+
+                        <!-- Nombre -->
+                        <div class="col-sm-6">
+                            <label for="nombre" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Nombre <span class="text-danger-600">*</span>
+                            </label>
+                            <input type="text" class="form-control radius-8" id="nombre" name="nombre" 
+                                   placeholder="Nombre de la organización" required>
+                        </div>
+
+                        <!-- Email -->
+                        <div class="col-sm-6">
+                            <label for="email" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Email
+                            </label>
+                            <input type="email" class="form-control radius-8" id="email" name="email" 
+                                   placeholder="contacto@organizacion.com">
+                        </div>
+
+                        <!-- Teléfono -->
+                        <div class="col-sm-6">
+                            <label for="telefono" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Teléfono
+                            </label>
+                            <input type="tel" class="form-control radius-8" id="telefono" name="telefono" 
+                                   placeholder="+56 2 2345 6789">
+                        </div>
+
+                        <!-- Dirección -->
+                        <div class="col-12">
+                            <label for="direccion" class="form-label fw-semibold text-primary-light text-sm mb-8">
+                                Dirección
+                            </label>
+                            <textarea class="form-control radius-8" id="direccion" name="direccion" rows="3" 
+                                      placeholder="Dirección completa de la organización"></textarea>
+                        </div>
+
+                        <!-- Estado -->
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="activo" name="activo" checked>
+                                <label class="form-check-label" for="activo">
+                                    Organización activa
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Botones -->
+                        <div class="col-12">
+                            <div class="d-flex align-items-center justify-content-end gap-3">
+                                <a href="{% url 'organizaciones_lista' %}" class="btn btn-outline-primary border text-primary-600 px-16 py-11 radius-8">
+                                    Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary border border-primary-600 text-white px-16 py-11 radius-8">
+                                    Crear Organización
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="card-title mb-0">Información</h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-column gap-16">
+                    <div class="d-flex align-items-center gap-10">
+                        <div class="w-44-px h-44-px bg-primary-50 rounded-circle d-flex align-items-center justify-content-center">
+                            <iconify-icon icon="solar:buildings-outline" class="text-primary-600 text-xl"></iconify-icon>
+                        </div>
+                        <div>
+                            <span class="text-md fw-medium text-secondary-light mb-0">Código Único</span>
+                            <p class="text-sm text-secondary-light mb-0">Cada organización debe tener un código único</p>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-10">
+                        <div class="w-44-px h-44-px bg-success-50 rounded-circle d-flex align-items-center justify-content-center">
+                            <iconify-icon icon="solar:user-check-outline" class="text-success-600 text-xl"></iconify-icon>
+                        </div>
+                        <div>
+                            <span class="text-md fw-medium text-secondary-light mb-0">Clientes y Usuarios</span>
+                            <p class="text-sm text-secondary-light mb-0">Los clientes y usuarios pueden asociarse a organizaciones</p>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-10">
+                        <div class="w-44-px h-44-px bg-warning-50 rounded-circle d-flex align-items-center justify-content-center">
+                            <iconify-icon icon="solar:shield-check-outline" class="text-warning-600 text-xl"></iconify-icon>
+                        </div>
+                        <div>
+                            <span class="text-md fw-medium text-secondary-light mb-0">Control de Acceso</span>
+                            <p class="text-sm text-secondary-light mb-0">Permite organizar y controlar accesos por empresa</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

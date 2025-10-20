@@ -1,0 +1,760 @@
+{% extends './layout/layout.html' %} 
+{% load static %}
+{% load ui_extras %}
+
+{% block content %}
+
+<div class="chat-wrapper">
+    <style>
+        /* Burbujas más compactas */
+        .chat-single-message { margin: 6px 0; gap: 8px; }
+        .chat-single-message .chat-message-content {
+            position: relative; padding: 8px 10px 18px 10px; border-radius: 10px; max-width: 75%;
+        }
+    .chat-single-message.right .chat-message-content { margin-left: auto; background: var(--bs-primary); color: #fff; }
+        .chat-single-message.left .chat-message-content { background: #f5f5f5; }
+        .chat-message-content p.mb-3 { margin-bottom: 6px !important; }
+        .chat-time { position: absolute; bottom: 4px; right: 8px; margin: 0; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; color: #6b7280; }
+        .chat-single-message.right .chat-message-content .chat-time { color: rgba(255,255,255,.85); }
+
+        /* Lista de conversaciones: scroll interno y altura limitada (~8 items) */
+        #conversaciones-lista { max-height: 480px; overflow: auto; }
+
+    /* Lista de usuarios disponibles: flotante y sobrepuesta al enfocar filtro */
+    .usuarios-wrapper { position: relative; }
+    #lista-usuarios-disponibles { position: absolute; left: 12px; right: 12px; top: 58px; background: #fff; border: 1px solid #e5e7eb; box-shadow: 0 6px 20px rgba(0,0,0,.08); z-index: 1050; border-radius: 8px; }
+    #lista-usuarios-disponibles.hidden { display: none; }
+
+        /* Caja de entrada: fija en altura y sin auto-expansión */
+        .chat-message-box { gap: 8px; }
+        .chat-message-box input[type="text"]{
+            height: 40px; line-height: 40px; overflow-x: auto; white-space: nowrap;
+        }
+    </style>
+    <div class="chat-sidebar card">
+        <!-- Perfil del usuario actual -->
+        <div class="chat-sidebar-single active top-profile">
+            <div class="img d-inline-flex align-items-center justify-content-center rounded-circle bg-primary text-white" style="width:36px;height:36px;">
+                <span class="fw-semibold">{{ user|user_initials }}</span>
+            </div>
+            <div class="info">
+                <h6 class="text-md mb-0">{{ user.get_full_name|default:user.username }}</h6>
+                <p class="mb-0">Disponible - {{ user.usuarioperfiloptimizador.organizacion.nombre|default:"Sistema" }}</p>
+            </div>
+            <div class="action">
+                <div class="btn-group">
+                    <button type="button" class="text-secondary-light text-xl" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                        <iconify-icon icon="bi:three-dots"></iconify-icon>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-lg-end border">
+                        <li>
+                            <a href="{% url 'chatProfile' %}" class="dropdown-item rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-2">
+                                <iconify-icon icon="fluent:person-32-regular"></iconify-icon>
+                                Perfil
+                            </a>
+                        </li>
+                        <li>
+                            <button type="button" class="dropdown-item rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-1" onclick="abrirModalNuevaConversacion()">
+                                <iconify-icon icon="material-symbols:add-circle-outline"></iconify-icon>
+                                <span>Nueva Conversación</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div><!-- chat-sidebar-single end -->
+
+        <!-- Búsqueda -->
+        <div class="chat-search">
+            <span class="icon">
+                <iconify-icon icon="iconoir:search"></iconify-icon>
+            </span>
+            <input type="text" id="buscar-conversaciones" autocomplete="off" placeholder="Buscar conversaciones...">
+        </div>
+        <div id="resultados-busqueda" class="list-group px-12 pb-8" style="display:none; max-height:220px; overflow:auto;"></div>
+
+        <!-- Lista rápida de usuarios disponibles (misma organización) -->
+    <div class="px-12 py-8 usuarios-wrapper">
+            <div class="d-flex align-items-center justify-content-between mb-8">
+                <span class="text-xs text-secondary-light">Usuarios disponibles</span>
+            </div>
+            <input type="text" id="filtro-usuarios-disponibles" class="form-control form-control-sm" placeholder="Filtrar usuarios...">
+            <div id="lista-usuarios-disponibles" class="list-group hidden" style="max-height: 240px; overflow:auto;">
+                {% for u in usuarios_disponibles %}
+                <a href="javascript:void(0)" class="list-group-item list-group-item-action d-flex align-items-center justify-content-between py-2 usuario-disponible-item" data-nombre="{{ u.get_full_name|default:u.username|lower }}" onclick="iniciarChatCon('{{ u.id }}')">
+                    <span class="d-inline-flex align-items-center gap-2">
+                        <span class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width:24px;height:24px;font-size:12px;">
+                            {{ u|user_initials }}
+                        </span>
+                        <span class="text-sm">{{ u.get_full_name|default:u.username }}</span>
+                    </span>
+                </a>
+                {% empty %}
+                <div class="text-xs text-secondary-light">No hay usuarios disponibles</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Lista de conversaciones -->
+        <div class="chat-all-list" id="conversaciones-lista">
+            {% for conversacion in conversaciones %}
+            <div class="chat-sidebar-single {% if conversacion_actual and conversacion.id == conversacion_actual.id %}active{% endif %}" 
+                 data-conversacion-id="{{ conversacion.id }}" onclick="seleccionarConversacion('{{ conversacion.id }}')">
+                <div class="img d-inline-flex align-items-center justify-content-center rounded-circle bg-primary text-white" style="width:36px;height:36px;">
+                    {% if conversacion.es_grupal %}
+                        <span class="fw-semibold">{{ conversacion.nombre_display|slice:":2"|upper }}</span>
+                    {% else %}
+                        <span class="fw-semibold">{{ conversacion.nombre_display|slice:":2"|upper }}</span>
+                    {% endif %}
+                </div>
+                <div class="info">
+                    <h6 class="text-sm mb-1">{{ conversacion.nombre_display }}</h6>
+                    <p class="mb-0 text-xs">
+                        {% if conversacion.ultimo_mensaje %}
+                            {{ conversacion.ultimo_mensaje.contenido|truncatechars:30 }}
+                        {% else %}
+                            Sin mensajes
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="action text-end">
+                    <p class="mb-0 text-neutral-400 text-xs lh-1">
+                        {% if conversacion.ultimo_mensaje %}
+                            {{ conversacion.ultimo_mensaje.enviado_en|date:"H:i" }}
+                        {% endif %}
+                    </p>
+                    {% if conversacion.mensajes_no_leidos > 0 %}
+                        <span class="w-16-px h-16-px text-xs rounded-circle bg-success-main text-white d-inline-flex align-items-center justify-content-center">
+                            {{ conversacion.mensajes_no_leidos }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div><!-- chat-sidebar-single end -->
+            {% empty %}
+            <div class="text-center p-4">
+                <p class="text-muted">No tienes conversaciones aún</p>
+                <button type="button" class="btn btn-primary btn-sm d-inline-flex align-items-center gap-1" onclick="abrirModalNuevaConversacion()">
+                    <iconify-icon icon="material-symbols:add-circle-outline"></iconify-icon>
+                    <span>Iniciar Chat</span>
+                </button>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Área principal del chat -->
+    <div class="chat-main card">
+        {% if conversacion_actual %}
+        <div id="chat-meta" data-es-grupal="{% if conversacion_actual.es_grupal %}true{% else %}false{% endif %}" data-user-id="{{ user.id }}"></div>
+        <!-- Header de la conversación -->
+    <div class="chat-sidebar-single active">
+            <div class="img d-inline-flex align-items-center justify-content-center rounded-circle bg-primary text-white" style="width:36px;height:36px;">
+                {% if conversacion_actual.es_grupal %}
+                    <span class="fw-semibold">{{ conversacion_actual.nombre_display|slice:":2"|upper }}</span>
+                {% else %}
+                    <span class="fw-semibold">{{ conversacion_actual.nombre_display|slice:":2"|upper }}</span>
+                {% endif %}
+            </div>
+            <div class="info">
+                {% if conversacion_actual.es_grupal %}
+                <h6 class="text-md mb-0">{{ conversacion_actual.nombre_display }}</h6>
+                {% else %}
+                <h6 class="text-md mb-0">Conversación con {{ conversacion_actual.nombre_display }}</h6>
+                {% endif %}
+                {% if conversacion_actual.es_grupal %}
+                <p class="mb-0 text-secondary-light">Grupo con {{ conversacion_actual.participantes.count }} participantes</p>
+                {% else %}
+                <p class="mb-0 text-secondary-light">&nbsp;</p>
+                {% endif %}
+            </div>
+            <div class="action d-inline-flex align-items-center gap-3">
+                <div class="btn-group">
+                    <button type="button" class="text-primary-light text-xl" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false">
+                        <iconify-icon icon="tabler:dots-vertical"></iconify-icon>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-lg-end border">
+                        <li>
+                            <button class="dropdown-item rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-2" type="button" onclick="limpiarConversacion()">
+                                <iconify-icon icon="mdi:clear-circle-outline"></iconify-icon>
+                                Limpiar Chat
+                            </button>
+                        </li>
+                        {% if conversacion_actual.es_grupal %}
+                        <li>
+                            <button class="dropdown-item rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-2" type="button" onclick="gestionarGrupo()">
+                                <iconify-icon icon="mdi:account-group-outline"></iconify-icon>
+                                Gestionar Grupo
+                            </button>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div><!-- chat-sidebar-single end -->
+
+        <!-- Lista de mensajes -->
+        <div class="chat-message-list" id="mensajes-container">
+            {% for mensaje in mensajes %}
+            <div class="chat-single-message {% if mensaje.autor == user %}right{% else %}left{% endif %}" data-mensaje-id="{{ mensaje.id }}">
+                {% if mensaje.autor != user %}
+                <span class="avatar-lg rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:14px;">
+                    {{ mensaje.autor|user_initials }}
+                </span>
+                {% endif %}
+                <div class="chat-message-content">
+                    {% if mensaje.autor != user and conversacion_actual.es_grupal %}
+                    <small class="text-muted d-block mb-1">{{ mensaje.autor.get_full_name|default:mensaje.autor.username }}</small>
+                    {% endif %}
+                    <p class="mb-3">{{ mensaje.contenido }}</p>
+                    {% if mensaje.archivo_adjunto %}
+                    <div class="chat-attachment mb-2">
+                        <a href="{{ mensaje.archivo_adjunto.url }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <iconify-icon icon="ph:link"></iconify-icon>
+                            Archivo adjunto
+                        </a>
+                    </div>
+                    {% endif %}
+                    <p class="chat-time mb-0">
+                        <span>{{ mensaje.enviado_en|date:"H:i" }}</span>
+                        {% if mensaje.autor == user %}
+                            {% if mensaje.leido %}
+                                <iconify-icon icon="mdi:check-all" class="text-success"></iconify-icon>
+                            {% else %}
+                                <iconify-icon icon="mdi:check" class="text-muted"></iconify-icon>
+                            {% endif %}
+                        {% endif %}
+                    </p>
+                </div>
+            </div><!-- chat-single-message end -->
+            {% empty %}
+            <div class="text-center p-4">
+                <p class="text-muted">No hay mensajes en esta conversación</p>
+                <p class="text-muted">¡Envía el primer mensaje!</p>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Formulario para enviar mensajes -->
+    <form class="chat-message-box" id="mensaje-form" enctype="multipart/form-data" autocomplete="off">
+            {% csrf_token %}
+            <input type="hidden" id="conversacion-id" value="{{ conversacion_actual.id }}">
+            <input type="text" id="mensaje-input" placeholder="Escribe tu mensaje..." required autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+            <div class="chat-message-box-action">
+                <input type="file" id="archivo-input" name="archivo" style="display: none;">
+                <button type="button" class="text-xl" onclick="document.getElementById('archivo-input').click();">
+                    <iconify-icon icon="ph:link"></iconify-icon>
+                </button>
+                <button type="submit" class="btn btn-sm btn-primary-600 radius-8 d-inline-flex align-items-center gap-1">
+                    Enviar
+                    <iconify-icon icon="f7:paperplane"></iconify-icon>
+                </button>
+            </div>
+        </form>
+        {% else %}
+        <!-- Vista cuando no hay conversación seleccionada -->
+        <div class="d-flex align-items-center justify-content-center h-100">
+            <div class="text-center">
+                <iconify-icon icon="mdi:chat-outline" class="text-primary" style="font-size: 4rem;"></iconify-icon>
+                <h4 class="mt-3">Selecciona una conversación</h4>
+                <p class="text-muted">Elige una conversación de la lista o inicia una nueva</p>
+                <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" onclick="abrirModalNuevaConversacion()">
+                    <iconify-icon icon="material-symbols:add-circle-outline"></iconify-icon>
+                    <span>Nueva Conversación</span>
+                </button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Modal para nueva conversación -->
+<div class="modal fade" id="nuevaConversacionModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Nueva Conversación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="nueva-conversacion-form">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Buscar usuarios</label>
+                        <input type="text" id="buscar-usuarios" class="form-control" placeholder="Escribe el nombre del usuario...">
+                    </div>
+                    <div id="usuarios-encontrados" class="list-group mb-3"></div>
+                    <div id="usuarios-seleccionados"></div>
+                    <div class="mb-3">
+                        <label class="form-label">Tipo de conversación</label>
+                        <select id="tipo-conversacion" class="form-select">
+                            <option value="individual">Individual</option>
+                            <option value="grupal">Grupal</option>
+                        </select>
+                    </div>
+                    <div class="mb-3" id="nombre-grupo-container" style="display: none;">
+                        <label class="form-label">Nombre del grupo</label>
+                        <input type="text" id="nombre-grupo" class="form-control" placeholder="Nombre del grupo...">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary d-inline-flex align-items-center gap-1" onclick="crearConversacion()">
+                    <iconify-icon icon="material-symbols:add-circle-outline"></iconify-icon>
+                    <span>Crear Conversación</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript para funcionalidad de chat -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Configurar CSRF token para todas las peticiones AJAX
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    
+    // Envío de mensajes
+    const mensajeForm = document.getElementById('mensaje-form');
+    if (mensajeForm) {
+        mensajeForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            enviarMensaje();
+        });
+    }
+    
+    // Búsqueda de usuarios
+    const buscarUsuarios = document.getElementById('buscar-usuarios');
+    if (buscarUsuarios) {
+        let timeoutId;
+        buscarUsuarios.addEventListener('input', function() {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                buscarUsuariosAjax(this.value);
+            }, 300);
+        });
+    }
+    
+    // Cambio de tipo de conversación
+    const tipoConversacion = document.getElementById('tipo-conversacion');
+    if (tipoConversacion) {
+        tipoConversacion.addEventListener('change', function() {
+            const nombreGrupoContainer = document.getElementById('nombre-grupo-container');
+            if (this.value === 'grupal') {
+                nombreGrupoContainer.style.display = 'block';
+            } else {
+                nombreGrupoContainer.style.display = 'none';
+            }
+        });
+    }
+    
+    // Auto-scroll al final de los mensajes
+    scrollToBottom();
+
+    // Live polling de mensajes nuevos cuando hay conversación activa
+    const convInput = document.getElementById('conversacion-id');
+    if (convInput) {
+        const metaEl = document.getElementById('chat-meta');
+        const esGrupal = metaEl ? (metaEl.dataset.esGrupal === 'true') : false;
+        const currentUserId = metaEl ? parseInt(metaEl.dataset.userId || '0') : 0;
+        let lastId = (() => {
+            const last = document.querySelector('#mensajes-container .chat-single-message:last-child');
+            return last ? parseInt(last.getAttribute('data-mensaje-id')||'0') : 0;
+        })();
+        let chatIntervalId = null;
+
+        function startChatPolling(){
+            if (chatIntervalId) return;
+            chatIntervalId = setInterval(pollNew, 3000);
+        }
+        function stopChatPolling(){
+            if (!chatIntervalId) return;
+            clearInterval(chatIntervalId);
+            chatIntervalId = null;
+        }
+        async function pollNew(){
+            const cid = convInput.value;
+            if (!cid) return;
+            try {
+                const res = await fetch(`{% url "obtener_mensajes" 999 %}?ultimo_id=${lastId}`.replace('999', cid));
+                const data = await res.json();
+                if (!data.success) return;
+                if (Array.isArray(data.mensajes) && data.mensajes.length){
+                    appendMensajes(data.mensajes);
+                    scrollToBottom();
+                }
+            } catch(e) { /* silencioso */ }
+        }
+        startChatPolling();
+
+        // Pausar/reanudar según visibilidad de la pestaña
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                stopChatPolling();
+            } else {
+                pollNew();
+                startChatPolling();
+            }
+        });
+
+        function appendMensajes(mensajes){
+            const container = document.getElementById('mensajes-container');
+            mensajes.forEach(m => {
+                lastId = Math.max(lastId, m.id);
+                const div = document.createElement('div');
+                div.className = 'chat-single-message ' + (m.es_mio ? 'right' : 'left');
+                div.setAttribute('data-mensaje-id', m.id);
+                div.innerHTML = `
+                    ${m.es_mio ? '' : `<span class="avatar-lg rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:14px;">${(m.autor||'?').split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase()}</span>`}
+                    <div class="chat-message-content">
+                        ${(!m.es_mio && esGrupal) ? `<small class=\"text-muted d-block mb-1\">${m.autor}</small>` : ''}
+                        <p class="mb-3"></p>
+                        <p class="chat-time mb-0">
+                            <span>${m.enviado_en}</span>
+                            ${m.es_mio ? '<iconify-icon icon="mdi:check" class="text-muted"></iconify-icon>' : ''}
+                        </p>
+                    </div>`;
+                div.querySelector('.chat-message-content .mb-3').textContent = m.contenido;
+                container.appendChild(div);
+            });
+        }
+
+        // helper global para que enviarMensaje pueda insertar inmediatamente
+        window.__appendChatMessage = function(m){
+            if (!m) return;
+            if (typeof m.es_mio === 'undefined') m.es_mio = (m.autor_id === currentUserId);
+            appendMensajes([m]);
+            scrollToBottom();
+        }
+    }
+
+    // Filtro de usuarios disponibles
+    const filtro = document.getElementById('filtro-usuarios-disponibles');
+    const listaUsuarios = document.getElementById('lista-usuarios-disponibles');
+    if (filtro) {
+        filtro.addEventListener('focus', function(){
+            if (listaUsuarios) listaUsuarios.classList.remove('hidden');
+        });
+        filtro.addEventListener('input', function() {
+            const val = this.value.trim().toLowerCase();
+            document.querySelectorAll('#lista-usuarios-disponibles .usuario-disponible-item').forEach(el => {
+                const n = el.getAttribute('data-nombre') || '';
+                el.style.display = n.includes(val) ? '' : 'none';
+            });
+        });
+        document.addEventListener('click', function(e){
+            if (!filtro.contains(e.target) && !listaUsuarios.contains(e.target)) {
+                listaUsuarios.classList.add('hidden');
+            }
+        });
+    }
+
+    // Búsqueda en vivo de conversaciones (por nombre o último mensaje)
+    const buscarConversaciones = document.getElementById('buscar-conversaciones');
+    if (buscarConversaciones) {
+        let searchTimeout;
+        buscarConversaciones.addEventListener('input', function() {
+            const q = this.value.trim().toLowerCase();
+            document.querySelectorAll('#conversaciones-lista .chat-sidebar-single').forEach(item => {
+                const nombre = (item.querySelector('.info h6')?.innerText || '').toLowerCase();
+                const preview = (item.querySelector('.info p')?.innerText || '').toLowerCase();
+                item.style.display = (!q || nombre.includes(q) || preview.includes(q)) ? '' : 'none';
+            });
+
+            // Además, si hay conversación activa, filtrar mensajes visibles por contenido
+            const mensajesContainer = document.getElementById('mensajes-container');
+            if (mensajesContainer) {
+                mensajesContainer.querySelectorAll('.chat-single-message').forEach(msg => {
+                    const texto = (msg.querySelector('.chat-message-content p.mb-3')?.innerText || '').toLowerCase();
+                    msg.style.display = (!q || texto.includes(q)) ? '' : 'none';
+                });
+            }
+
+            // Búsqueda avanzada en backend cuando hay 2+ caracteres
+            const resBox = document.getElementById('resultados-busqueda');
+            if (!q || q.length < 2) {
+                if (resBox) { resBox.style.display = 'none'; resBox.innerHTML = ''; }
+                return;
+            }
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                fetch(`{% url 'buscar_mensajes' %}?q=${encodeURIComponent(q)}`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (!resBox) return;
+                        const lista = data.resultados || [];
+                        if (!lista.length) { resBox.style.display = 'none'; resBox.innerHTML=''; return; }
+                        resBox.innerHTML = '';
+                        lista.forEach(it => {
+                            const a = document.createElement('a');
+                            a.href = `{{ request.scheme }}://{{ request.get_host }}{% url 'chat_conversacion' 999 %}?focus=${encodeURIComponent(it.mensaje_id)}`.replace('999', it.conversacion_id);
+                            a.className = 'list-group-item list-group-item-action py-2';
+                            a.innerHTML = `<div class="d-flex justify-content-between">
+                                <strong>${it.conversacion_nombre || ('Conv. '+it.conversacion_id)}</strong>
+                                <small class="text-muted">${it.hora}</small>
+                              </div>
+                              <div class="text-truncate"><span class="text-muted">${it.autor}:</span> ${it.snippet}</div>`;
+                            resBox.appendChild(a);
+                        });
+                        resBox.style.display = '';
+                    })
+                    .catch(() => { if (resBox) { resBox.style.display = 'none'; resBox.innerHTML=''; } });
+            }, 300);
+        });
+    }
+});
+
+function enviarMensaje() {
+    const form = document.getElementById('mensaje-form');
+    const conversacionId = document.getElementById('conversacion-id').value;
+    const contenido = document.getElementById('mensaje-input').value.trim();
+    
+    if (!conversacionId) {
+        alert('No hay conversación seleccionada');
+        return;
+    }
+    if (!contenido) {
+        return; // no enviar vacío
+    }
+    
+    fetch('{% url "enviar_mensaje" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ conversacion_id: parseInt(conversacionId), contenido })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Limpiar formulario
+            document.getElementById('mensaje-input').value = '';
+            const archivo = document.getElementById('archivo-input');
+            if (archivo) archivo.value = '';
+
+            // Añadir inmediatamente el mensaje propio sin recargar
+            try {
+                const metaEl2 = document.getElementById('chat-meta');
+                const currentUserId2 = metaEl2 ? parseInt(metaEl2.dataset.userId || '0') : 0;
+                const m = data.mensaje || {};
+                m.es_mio = true;
+                m.autor_id = currentUserId2;
+                if (window.__appendChatMessage) window.__appendChatMessage(m);
+            } catch (e) { /* noop */ }
+        } else {
+            alert('Error al enviar mensaje: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al enviar mensaje');
+    });
+}
+
+function seleccionarConversacion(conversacionId) {
+    window.location.href = `{% url "chat_conversacion" 999 %}`.replace('999', conversacionId);
+}
+
+function cargarMensajes(conversacionId) {
+    fetch(`{% url "obtener_mensajes" 999 %}`.replace('999', conversacionId))
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            actualizarMensajes(data.mensajes);
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+function actualizarMensajes(mensajes) {
+    // Reemplazo total de mensajes (fallback), pero preferimos append vía polling
+    const container = document.getElementById('mensajes-container');
+    container.innerHTML = '';
+    const metaEl3 = document.getElementById('chat-meta');
+    const esGrupal2 = metaEl3 ? (metaEl3.dataset.esGrupal === 'true') : false;
+    mensajes.forEach(m => {
+        const div = document.createElement('div');
+        div.className = 'chat-single-message ' + (m.es_mio ? 'right' : 'left');
+        div.setAttribute('data-mensaje-id', m.id);
+        div.innerHTML = `
+            ${m.es_mio ? '' : `<span class="avatar-lg rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center" style="width:40px;height:40px;font-size:14px;">${(m.autor||'?').split(' ').map(p=>p[0]).slice(0,2).join('').toUpperCase()}</span>`}
+            <div class="chat-message-content">
+                ${(!m.es_mio && esGrupal2) ? `<small class=\"text-muted d-block mb-1\">${m.autor}</small>` : ''}
+                <p class="mb-3"></p>
+                <p class="chat-time mb-0">
+                    <span>${m.enviado_en}</span>
+                    ${m.es_mio ? '<iconify-icon icon="mdi:check" class="text-muted"></iconify-icon>' : ''}
+                </p>
+            </div>`;
+        div.querySelector('.chat-message-content .mb-3').textContent = m.contenido;
+        container.appendChild(div);
+    });
+    scrollToBottom();
+}
+
+function abrirModalNuevaConversacion() {
+    const modal = new bootstrap.Modal(document.getElementById('nuevaConversacionModal'));
+    modal.show();
+}
+
+// Iniciar chat individual al hacer clic en un usuario disponible
+function iniciarChatCon(userId) {
+    fetch('{% url "crear_conversacion" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify({ participante_id: parseInt(userId) })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = `{% url "chat_conversacion" 999 %}`.replace('999', data.conversacion_id);
+        } else {
+            alert('No se pudo iniciar el chat: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert('Error de red al iniciar chat');
+    });
+}
+
+function buscarUsuariosAjax(query) {
+    if (query.length < 2) {
+        document.getElementById('usuarios-encontrados').innerHTML = '';
+        return;
+    }
+    
+    fetch(`{% url "buscar_usuarios" %}?q=${encodeURIComponent(query)}`)
+    .then(response => response.json())
+    .then(data => {
+        const container = document.getElementById('usuarios-encontrados');
+        container.innerHTML = '';
+        
+        data.usuarios.forEach(usuario => {
+            const initials = (usuario.nombre || '?')
+                .split(/\s+/)
+                .filter(Boolean)
+                .map(p => p[0])
+                .slice(0,2)
+                .join('')
+                .toUpperCase();
+            const item = document.createElement('div');
+            item.className = 'list-group-item list-group-item-action';
+            item.innerHTML = `
+                <div class="d-flex align-items-center">
+                    <span class="rounded-circle bg-primary text-white d-inline-flex align-items-center justify-content-center me-2" style="width:32px;height:32px;font-size:12px;">${initials}</span>
+                    <div>
+                        <strong>${usuario.nombre}</strong>
+                        <small class="text-muted d-block">${usuario.email}</small>
+                    </div>
+                </div>
+            `;
+            item.onclick = () => seleccionarUsuario(usuario);
+            container.appendChild(item);
+        });
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+let usuariosSeleccionados = [];
+
+function seleccionarUsuario(usuario) {
+    if (!usuariosSeleccionados.find(u => u.id === usuario.id)) {
+        usuariosSeleccionados.push(usuario);
+        actualizarUsuariosSeleccionados();
+    }
+    document.getElementById('buscar-usuarios').value = '';
+    document.getElementById('usuarios-encontrados').innerHTML = '';
+}
+
+function actualizarUsuariosSeleccionados() {
+    const container = document.getElementById('usuarios-seleccionados');
+    container.innerHTML = '';
+    
+    usuariosSeleccionados.forEach(usuario => {
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-primary me-2 mb-2';
+        badge.innerHTML = `
+            ${usuario.nombre}
+            <button type="button" class="btn-close btn-close-white ms-1" onclick="removerUsuario(${usuario.id})"></button>
+        `;
+        container.appendChild(badge);
+    });
+}
+
+function removerUsuario(userId) {
+    usuariosSeleccionados = usuariosSeleccionados.filter(u => u.id !== userId);
+    actualizarUsuariosSeleccionados();
+}
+
+function crearConversacion() {
+    if (usuariosSeleccionados.length === 0) {
+        alert('Selecciona al menos un usuario');
+        return;
+    }
+    
+    const tipo = document.getElementById('tipo-conversacion').value;
+    const nombreGrupo = document.getElementById('nombre-grupo').value;
+    
+    if (tipo === 'grupal' && !nombreGrupo.trim()) {
+        alert('Ingresa un nombre para el grupo');
+        return;
+    }
+    
+    const data = {
+        participantes: usuariosSeleccionados.map(u => u.id),
+        es_grupal: tipo === 'grupal',
+        nombre: nombreGrupo
+    };
+    
+    fetch('{% url "crear_conversacion" %}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            window.location.href = `{% url "chat_conversacion" 999 %}`.replace('999', data.conversacion_id);
+        } else {
+            alert('Error al crear conversación: ' + (data.error || 'Error desconocido'));
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('Error al crear conversación');
+    });
+}
+
+function scrollToBottom() {
+    const container = document.getElementById('mensajes-container');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+function actualizarListaConversaciones() {
+    // Recargar la lista de conversaciones
+    location.reload();
+}
+
+function limpiarConversacion() {
+    if (confirm('¿Estás seguro de que quieres limpiar esta conversación? Esta acción no se puede deshacer.')) {
+        // Implementar limpiar conversación
+        alert('Funcionalidad por implementar');
+    }
+}
+
+function gestionarGrupo() {
+    alert('Funcionalidad de gestión de grupo por implementar');
+}
+</script>
+
+{% endblock content %}

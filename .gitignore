@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+ENV/
+*~
+
+# Django
+*.log
+*.pot
+*.pyc
+*.sqlite3
+media/
+staticfiles/
+
+# VS Code
+.vscode/
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage & test
+htmlcov/
+.coverage
+.tox/
+.pytest_cache/
+
+# Node
+node_modules/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Local configs
+*.local
+*.bak
+*.tmp
+
+# Cache
+.cache/
+
+# Project specifics
+Django/db.sqlite3
+Django/media/
+**/__pycache__/
+**/*.sqlite3
+**/backup_optimizador_*/

@@ -1,0 +1,784 @@
+<!-- Modal Preview Proyecto -->
+<div class="modal fade" id="projectPreviewModal" tabindex="-1" aria-labelledby="projectPreviewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+                <div id="projectPreviewContent">
+                    <!-- El contenido se llenará dinámicamente según el tipo de vista -->
+                </div>
+            </div>
+            <div class="modal-footer" id="modalFooter">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Datos de ejemplo de proyectos (simulando base de datos)
+const projectsData = {
+    '001': {
+        "project": {
+            "name": "Sistema de Inventario Digital",
+            "client": "Patricia González Herrera",
+            "rut": "15.234.567-8",
+            "date": "15-01-2024"
+        },
+        "summary": {
+            "totalMaterials": 2,
+            "totalBoards": 3,
+            "totalPieces": 12,
+            "avgEfficiency": 85.5
+        },
+        "materials": [
+            {
+                "materialId": "material_1",
+                "materialName": "Melamina blanca 18mm",
+                "materialType": "Melamina blanca 18mm 1,83x2,50mt",
+                "boardDimensions": {
+                    "width": 2500,
+                    "height": 1830
+                },
+                "edgeband": "PVC BLANCO 22X2MM",
+                "optimization": {
+                    "totalBoards": 2,
+                    "efficiency": 87.2,
+                    "totalArea": 915000
+                }
+            },
+            {
+                "materialId": "material_2", 
+                "materialName": "Melamina grafito 15mm",
+                "materialType": "Melamina grafito 15mm 1,83x2,50mt",
+                "boardDimensions": {
+                    "width": 2500,
+                    "height": 1830
+                },
+                "edgeband": "PVC GRAFITO 19X1,5MM",
+                "optimization": {
+                    "totalBoards": 1,
+                    "efficiency": 83.8,
+                    "totalArea": 465750
+                }
+            }
+        ]
+    },
+    '002': {
+        "project": {
+            "name": "Plataforma E-commerce Muebles",
+            "client": "Rodrigo Jiménez Soto", 
+            "rut": "18.765.432-1",
+            "date": "22-01-2024"
+        },
+        "summary": {
+            "totalMaterials": 1,
+            "totalBoards": 2,
+            "totalPieces": 8,
+            "avgEfficiency": 78.3
+        },
+        "materials": [
+            {
+                "materialId": "material_1",
+                "materialName": "Melamina nogal 18mm",
+                "materialType": "Melamina nogal 18mm 1,83x2,50mt",
+                "boardDimensions": {
+                    "width": 2500,
+                    "height": 1830
+                },
+                "edgeband": "PVC NOGAL 22X2MM",
+                "optimization": {
+                    "totalBoards": 2,
+                    "efficiency": 78.3,
+                    "totalArea": 715900
+                }
+            }
+        ]
+    },
+    '003': {
+        "project": {
+            "name": "App Móvil Gestión Logística",
+            "client": "Carmen Morales Espinoza",
+            "rut": "12.987.654-3",
+            "date": "05-02-2024"
+        },
+        "summary": {
+            "totalMaterials": 3,
+            "totalBoards": 4,
+            "totalPieces": 18,
+            "avgEfficiency": 92.1
+        }
+    },
+    '004': {
+        "project": {
+            "name": "Optimización Costos Producción",
+            "client": "Diego Vargas Mendoza",
+            "rut": "16.543.210-9",
+            "date": "18-02-2024"
+        },
+        "summary": {
+            "totalMateriales": 2,
+            "totalBoards": 5,
+            "totalPieces": 15,
+            "avgEfficiency": 89.7
+        }
+    },
+    '005': {
+        "project": {
+            "name": "Análisis Eficiencia Materiales",
+            "client": "Francisca Ramírez Castro",
+            "rut": "13.456.789-0",
+            "date": "28-02-2024"
+        },
+        "summary": {
+            "totalMaterials": 4,
+            "totalBoards": 7,
+            "totalPieces": 24,
+            "avgEfficiency": 94.3
+        }
+    },
+    '006': {
+        "project": {
+            "name": "Monitor Rendimiento Recursos",
+            "client": "Alejandro Pérez Fuentes",
+            "rut": "14.321.987-6",
+            "date": "03-03-2024"
+        },
+        "summary": {
+            "totalMaterials": 2,
+            "totalBoards": 3,
+            "totalPieces": 11,
+            "avgEfficiency": 87.9
+        }
+    },
+    '007': {
+        "project": {
+            "name": "Plataforma Gestión Inventario",
+            "client": "Valentina Silva Rojas",
+            "rut": "11.654.789-2",
+            "date": "15-03-2024"
+        },
+        "summary": {
+            "totalMaterials": 3,
+            "totalBoards": 6,
+            "totalPieces": 20,
+            "avgEfficiency": 91.5
+        }
+    },
+    '008': {
+        "project": {
+            "name": "Automatización Cadena Suministro",
+            "client": "Ignacio Muñoz Bravo",
+            "rut": "17.234.561-4",
+            "date": "22-03-2024"
+        },
+        "summary": {
+            "totalMaterials": 5,
+            "totalBoards": 8,
+            "totalPieces": 32,
+            "avgEfficiency": 96.2
+        }
+    },
+    '009': {
+        "project": {
+            "name": "Calculadora Costos Materiales",
+            "client": "Sofía Herrera Núñez",
+            "rut": "19.876.543-7",
+            "date": "28-03-2024"
+        },
+        "summary": {
+            "totalMaterials": 1,
+            "totalBoards": 2,
+            "totalPieces": 9,
+            "avgEfficiency": 82.4
+        }
+    },
+    '010': {
+        "project": {
+            "name": "Configurador Parámetros Avanzados",
+            "client": "Benjamín Torres Vega",
+            "rut": "20.123.456-5",
+            "date": "05-04-2024"
+        },
+        "summary": {
+            "totalMaterials": 2,
+            "totalBoards": 4,
+            "totalPieces": 16,
+            "avgEfficiency": 93.8
+        }
+    },
+    'default': {
+        "project": {
+            "name": "Proyecto de Ejemplo",
+            "client": "Cliente de Ejemplo",
+            "rut": "XX.XXX.XXX-X",
+            "date": "02-10-2025"
+        },
+        "summary": {
+            "totalMaterials": 1,
+            "totalBoards": 1,
+            "totalPieces": 6,
+            "avgEfficiency": 30.9
+        },
+        "materials": [
+            {
+                "materialId": "material_1",
+                "materialName": "Melamina grafito 15mm",
+                "materialType": "Melamina grafito 15mm 1,83x2,50mt",
+                "boardDimensions": {
+                    "width": 2500,
+                    "height": 1830
+                },
+                "edgeband": "PVC BLANCO 19X1,5MM RO 100MT",
+                "optimization": {
+                    "totalBoards": 1,
+                    "efficiency": 30.9,
+                    "totalArea": 429750
+                }
+            }
+        ]
+    }
+};
+
+// Función para abrir el modal de preview
+function openProjectPreview(projectId) {
+    const projectData = projectsData[projectId] || projectsData['default'];
+    const contentContainer = document.getElementById('projectPreviewContent');
+    
+    // Actualizar título del modal
+    const modalTitle = document.querySelector('#projectPreviewModal .modal-header');
+    modalTitle.innerHTML = `
+        <h6 class="modal-title fw-medium text-dark d-flex align-items-center">
+            <iconify-icon icon="solar:document-text-outline" class="me-2"></iconify-icon>
+            Proyecto #${projectId.padStart(3, '0')} - ${projectData.project.name}
+        </h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+    `;
+    
+    // Todos los proyectos ahora muestran la vista PDF por defecto
+    contentContainer.innerHTML = generatePDFView(projectData);
+    updateModalFooter('pdf', projectData);
+    
+    // Mostrar el modal
+    const modal = new bootstrap.Modal(document.getElementById('projectPreviewModal'));
+    modal.show();
+    
+    // Guardar el ID del proyecto actual para exportar
+    window.currentProjectData = projectData;
+}
+
+// Función para actualizar el footer del modal según el tipo de vista
+function updateModalFooter(viewType, projectData = null) {
+    const footerContainer = document.getElementById('modalFooter');
+    
+    if (viewType === 'pdf' && projectData) {
+        const pdfUrl = '/static/pdfs/proyecto_optimizacion_profesional_002.pdf';
+        footerContainer.innerHTML = `
+            <div class="d-flex justify-content-center gap-2">
+                <a href="${pdfUrl}" target="_blank" class="btn btn-outline-primary btn-sm" title="Abrir en nueva pestaña">
+                    <iconify-icon icon="solar:arrow-up-outline"></iconify-icon>
+                </a>
+                <a href="${pdfUrl}" download="Optimizacion_${projectData.project.name.replace(/\\s+/g, '_')}.pdf" class="btn btn-outline-success btn-sm" title="Descargar">
+                    <iconify-icon icon="solar:download-outline"></iconify-icon>
+                </a>
+                <button onclick="window.print()" class="btn btn-outline-info btn-sm" title="Imprimir">
+                    <iconify-icon icon="solar:printer-outline"></iconify-icon>
+                </button>
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" title="Cerrar">
+                    <iconify-icon icon="solar:close-circle-outline"></iconify-icon>
+                </button>
+            </div>
+        `;
+    } else {
+        // Footer por defecto para otras vistas
+        footerContainer.innerHTML = `
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" title="Cerrar">
+                <iconify-icon icon="solar:close-circle-outline"></iconify-icon>
+            </button>
+        `;
+    }
+}
+
+// Vista 1: Cards con estadísticas (Vista actual)
+function generateCardView(projectData) {
+    return `
+        <!-- Información del Proyecto -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0 fw-semibold">Información del Proyecto</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-secondary-light">Nombre del Proyecto:</label>
+                            <p class="mb-0 fw-medium">${projectData.project.name}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-secondary-light">Cliente:</label>
+                            <p class="mb-0 fw-medium">${projectData.project.client}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-secondary-light">RUT Cliente:</label>
+                            <p class="mb-0 fw-medium">${projectData.project.rut}</p>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label class="form-label text-secondary-light">Fecha de Creación:</label>
+                            <p class="mb-0 fw-medium">${projectData.project.date}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resumen de Optimización -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h6 class="mb-0 fw-semibold">Resumen de Optimización</h6>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-primary-50 rounded-4">
+                            <iconify-icon icon="solar:layers-outline" class="text-2xl text-primary-600 mb-2"></iconify-icon>
+                            <h5 class="mb-1 fw-bold text-primary-600">${projectData.summary.totalMaterials}</h5>
+                            <p class="mb-0 text-sm text-secondary-light">Total Materiales</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-success-50 rounded-4">
+                            <iconify-icon icon="solar:document-outline" class="text-2xl text-success-600 mb-2"></iconify-icon>
+                            <h5 class="mb-1 fw-bold text-success-600">${projectData.summary.totalBoards}</h5>
+                            <p class="mb-0 text-sm text-secondary-light">Total Tableros</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-warning-50 rounded-4">
+                            <iconify-icon icon="solar:widget-2-outline" class="text-2xl text-warning-600 mb-2"></iconify-icon>
+                            <h5 class="mb-1 fw-bold text-warning-600">${projectData.summary.totalPieces}</h5>
+                            <p class="mb-0 text-sm text-secondary-light">Total Piezas</p>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="text-center p-3 bg-info-50 rounded-4">
+                            <iconify-icon icon="solar:chart-outline" class="text-2xl text-info-600 mb-2"></iconify-icon>
+                            <h5 class="mb-1 fw-bold text-info-600">${projectData.summary.avgEfficiency.toFixed(1)}%</h5>
+                            <p class="mb-0 text-sm text-secondary-light">Eficiencia Promedio</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Detalles de Materiales -->
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0 fw-semibold">Detalles de Materiales</h6>
+            </div>
+            <div class="card-body">
+                ${projectData.materials.map(material => `
+                    <div class="border rounded-4 p-3 mb-3">
+                        <div class="d-flex align-items-center mb-3">
+                            <div class="w-40-px h-40-px bg-secondary-50 text-secondary-600 rounded-circle d-flex align-items-center justify-content-center me-3">
+                                <iconify-icon icon="solar:layers-outline" class="text-lg"></iconify-icon>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-semibold">${material.materialName}</h6>
+                                <p class="mb-0 text-sm text-secondary-light">${material.materialType}</p>
+                            </div>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-2">
+                                    <span class="text-xs text-secondary-light d-block">Dimensiones Tablero:</span>
+                                    <span class="text-sm fw-medium">${material.boardDimensions.width} x ${material.boardDimensions.height} mm</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-2">
+                                    <span class="text-xs text-secondary-light d-block">Tapacanto:</span>
+                                    <span class="text-sm fw-medium">${material.edgeband}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-2">
+                                    <span class="text-xs text-secondary-light d-block">Eficiencia:</span>
+                                    <span class="text-sm fw-medium text-success-600">${material.optimization.efficiency.toFixed(1)}%</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+}
+
+// Vista 2: PDF Original incrustado
+function generatePDFView(projectData) {
+    // En producción, esta URL vendría de la base de datos (projectData.pdfUrl)
+    // Por ahora, usamos el mismo PDF de ejemplo para todos los proyectos
+    const pdfUrl = '/static/pdfs/proyecto_optimizacion_profesional_002.pdf';
+    
+    return `
+        <!-- Visor PDF Directo -->
+        <div class="pdf-viewer-container">
+            <iframe 
+                id="pdfViewer"
+                src="${pdfUrl}#view=FitH&toolbar=1&navpanes=0" 
+                type="application/pdf" 
+                width="100%" 
+                height="600px" 
+                style="border: 1px solid #dee2e6; border-radius: 0.375rem;"
+                title="PDF - ${projectData.project.name}">
+                <!-- Fallback para navegadores que no soportan PDFs -->
+                <div class="alert alert-warning text-center p-5">
+                    <iconify-icon icon="solar:document-add-outline" class="text-4xl text-warning-600 mb-3 d-block"></iconify-icon>
+                    <h6 class="fw-semibold">No se puede mostrar el PDF</h6>
+                    <p class="mb-3">Tu navegador no soporta la visualización de PDFs incrustados.</p>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="${pdfUrl}" target="_blank" class="btn btn-primary btn-sm">
+                            <iconify-icon icon="solar:arrow-up-outline"></iconify-icon>
+                        </a>
+                        <a href="${pdfUrl}" download="reporte_optimizacion.pdf" class="btn btn-success btn-sm">
+                            <iconify-icon icon="solar:download-outline"></iconify-icon>
+                        </a>
+                    </div>
+                </div>
+            </iframe>
+        </div>
+    `;
+}
+
+// Vista 3: Híbrida (datos JSON con estilo PDF)
+function generateHybridView(projectData) {
+    return `
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold text-primary-600 mb-1">${projectData.project.name}</h4>
+                <p class="text-secondary-light mb-0">Análisis de Optimización de Materiales</p>
+            </div>
+            <div class="text-end">
+                <div class="badge bg-success-100 text-success-700 fs-6 px-3 py-2">
+                    Eficiencia: ${projectData.summary.avgEfficiency.toFixed(1)}%
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-4">
+                <div class="border-start border-primary-600 border-4 ps-3">
+                    <h6 class="fw-semibold text-primary-600">INFORMACIÓN DEL CLIENTE</h6>
+                    <p class="mb-1"><strong>${projectData.project.client}</strong></p>
+                    <p class="mb-1 text-sm">RUT: ${projectData.project.rut}</p>
+                    <p class="mb-0 text-sm text-secondary-light">Fecha: ${projectData.project.date}</p>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="bg-gradient-primary-light p-3 rounded">
+                    <div class="row text-center">
+                        <div class="col-3">
+                            <div class="text-white">
+                                <h3 class="fw-bold mb-0">${projectData.summary.totalMaterials}</h3>
+                                <small>Materiales</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-white">
+                                <h3 class="fw-bold mb-0">${projectData.summary.totalBoards}</h3>
+                                <small>Tableros</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-white">
+                                <h3 class="fw-bold mb-0">${projectData.summary.totalPieces}</h3>
+                                <small>Piezas</small>
+                            </div>
+                        </div>
+                        <div class="col-3">
+                            <div class="text-white">
+                                <h3 class="fw-bold mb-0">${projectData.summary.avgEfficiency.toFixed(0)}%</h3>
+                                <small>Eficiencia</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <h5 class="fw-semibold mb-3 d-flex align-items-center">
+            <iconify-icon icon="solar:layers-outline" class="me-2 text-primary-600"></iconify-icon>
+            Especificaciones Técnicas
+        </h5>
+        
+        ${projectData.materials.map((material, index) => `
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="fw-semibold mb-0">Material ${index + 1}: ${material.materialName}</h6>
+                        <span class="badge bg-primary-600 text-white">${material.optimization.efficiency.toFixed(1)}% Eficiencia</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-8">
+                            <table class="table table-sm table-borderless mb-0">
+                                <tr>
+                                    <td class="fw-medium text-secondary-light" width="30%">Tipo de Material:</td>
+                                    <td>${material.materialType}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-medium text-secondary-light">Dimensiones Tablero:</td>
+                                    <td>${material.boardDimensions.width} mm × ${material.boardDimensions.height} mm</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-medium text-secondary-light">Tapacanto:</td>
+                                    <td>${material.edgeband}</td>
+                                </tr>
+                                <tr>
+                                    <td class="fw-medium text-secondary-light">Tableros Necesarios:</td>
+                                    <td><span class="fw-bold text-primary-600">${material.optimization.totalBoards}</span> unidades</td>
+                                </tr>
+                            </table>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center p-3 bg-success-50 rounded">
+                                <h4 class="fw-bold text-success-600 mb-1">${(material.optimization.totalArea / 1000000).toFixed(2)}</h4>
+                                <p class="text-sm text-success-600 mb-0">Área Total (m²)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `).join('')}
+        
+        <div class="alert alert-info mt-4">
+            <div class="d-flex align-items-start">
+                <iconify-icon icon="solar:info-circle-outline" class="me-2 mt-1"></iconify-icon>
+                <div>
+                    <h6 class="fw-semibold mb-1">Información Técnica</h6>
+                    <p class="mb-0 text-sm">Este reporte incluye cálculos de optimización basados en algoritmos avanzados que consideran márgenes de seguridad, ancho de corte y eficiencia de material para minimizar desperdicios.</p>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Función para exportar JSON
+function exportProjectJSON() {
+    if (window.currentProjectData) {
+        const dataStr = JSON.stringify(window.currentProjectData, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+        
+        const exportFileDefaultName = `${window.currentProjectData.project.name.replace(/\s+/g, '_')}_optimizacion.json`;
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', exportFileDefaultName);
+        linkElement.click();
+    }
+}
+
+// Función para abrir PDF en nueva pestaña
+function openPDFInNewTab(pdfUrl) {
+    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
+}
+
+// Función para descargar PDF
+function downloadPDF(pdfUrl, projectName) {
+    const link = document.createElement('a');
+    link.href = pdfUrl;
+    link.download = `${projectName.replace(/\s+/g, '_')}_reporte.pdf`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Funciones para controlar el zoom del PDF
+function zoomPDF(action) {
+    const pdfViewer = document.getElementById('pdfViewer');
+    if (!pdfViewer) return;
+    
+    const currentSrc = pdfViewer.src;
+    const baseUrl = currentSrc.split('#')[0];
+    
+    switch(action) {
+        case 'in':
+            pdfViewer.src = baseUrl + '#view=FitH&zoom=150';
+            break;
+        case 'out':
+            pdfViewer.src = baseUrl + '#view=FitH&zoom=75';
+            break;
+        case 'fit':
+            pdfViewer.src = baseUrl + '#view=FitH&zoom=100';
+            break;
+    }
+    
+    // Mostrar feedback visual
+    showZoomFeedback(action);
+}
+
+// Mostrar feedback visual para el zoom
+function showZoomFeedback(action) {
+    const actionNames = {
+        'in': 'Zoom aumentado',
+        'out': 'Zoom reducido', 
+        'fit': 'Ajustado a ventana'
+    };
+    
+    // Crear elemento de feedback si no existe
+    let feedback = document.querySelector('.zoom-feedback');
+    if (!feedback) {
+        feedback = document.createElement('div');
+        feedback.className = 'zoom-feedback';
+        feedback.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            z-index: 9999;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        `;
+        document.body.appendChild(feedback);
+    }
+    
+    feedback.textContent = actionNames[action];
+    feedback.style.opacity = '1';
+    
+    setTimeout(() => {
+        feedback.style.opacity = '0';
+    }, 1500);
+}
+</script>
+
+<style>
+/* Estilos para la vista PDF profesional */
+.bg-gradient-primary-light {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+/* Estilos para tablas profesionales */
+.table-borderless td {
+    padding: 0.25rem 0.5rem;
+    border: none;
+}
+
+.table-bordered th, .table-bordered td {
+    border: 1px solid #dee2e6;
+    vertical-align: middle;
+}
+
+.table-bordered thead th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* Estilos para badges y elementos destacados */
+.badge {
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+}
+
+.bg-success-100 {
+    background-color: #d1f2eb !important;
+}
+
+.text-success-700 {
+    color: #0d7377 !important;
+}
+
+/* Estilos para bordes coloreados */
+.border-primary-600 {
+    border-color: #4f46e5 !important;
+}
+
+.border-4 {
+    border-width: 4px !important;
+}
+
+/* Animaciones suaves */
+.card {
+    transition: all 0.3s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Estilos responsivos para el modal */
+@media (max-width: 768px) {
+    .modal-xl {
+        max-width: 95%;
+    }
+    
+    .table-responsive {
+        font-size: 0.8rem;
+    }
+}
+
+/* Estilos para alertas informativas */
+.alert-info {
+    background-color: #e7f3ff;
+    border-color: #b3d9ff;
+    color: #0066cc;
+}
+
+/* Estilos para el visor PDF */
+.pdf-viewer-container {
+    border-radius: 0.375rem;
+    overflow: hidden;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.pdf-viewer-container iframe {
+    display: block;
+    border: none;
+    border-radius: 0.375rem;
+}
+
+/* Botones para acciones del PDF */
+.btn-group .btn {
+    font-size: 0.875rem;
+    padding: 0.375rem 0.75rem;
+}
+
+/* Estilos para mensaje de error del PDF */
+.alert-warning {
+    background-color: #fff3cd;
+    border-color: #ffeaa7;
+    color: #856404;
+}
+
+/* Responsivo para PDF en móviles */
+@media (max-width: 768px) {
+    .pdf-viewer-container iframe {
+        height: 400px;
+    }
+    
+    .btn-group {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+        border-radius: 0.375rem !important;
+    }
+}
+</style>

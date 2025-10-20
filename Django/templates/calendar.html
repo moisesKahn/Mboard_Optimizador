@@ -1,0 +1,476 @@
+{% extends './layout/layout.html' %} 
+
+{% block content %}
+
+<div class="row gy-4">
+    <div class="col-xxl-3 col-lg-4">
+        <div class="card h-100 p-0">
+            <div class="card-body p-24">
+                <button type="button" class="btn btn-primary text-sm btn-sm px-12 py-12 w-100 radius-8 d-flex align-items-center gap-2 mb-32" data-bs-toggle="modal" data-bs-target="#exampleModal">
+                    <iconify-icon icon="fa6-regular:square-plus" class="icon text-lg line-height-1"></iconify-icon>
+                    Agregar Evento
+                </button>
+
+                <div class="mt-32">
+                    <div class="event-item d-flex align-items-center justify-content-between gap-4 pb-16 mb-16 border border-start-0 border-end-0 border-top-0">
+                        <div class="">
+                            <div class="d-flex align-items-center gap-10">
+                                <span class="w-12-px h-12-px bg-warning-600 rounded-circle fw-medium"></span>
+                                <span class="text-secondary-light">Hoy, 10:30 PM - 02:30 AM</span>
+                            </div>
+                            <span class="text-primary-light fw-semibold text-md mt-4">Conferencia de Diseño</span>
+                        </div>
+                        <div class="dropdown">
+                            <button type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <iconify-icon icon="entypo:dots-three-vertical" class="icon text-secondary-light"></iconify-icon>
+                            </button>
+                            <ul class="dropdown-menu p-12 border bg-base shadow">
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalView">
+                                        <iconify-icon icon="hugeicons:view" class="icon text-lg line-height-1"></iconify-icon>
+                                        Ver
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalEdit">
+                                        <iconify-icon icon="lucide:edit" class="icon text-lg line-height-1"></iconify-icon>
+                                        Editar
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="delete-item dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-danger-100 text-hover-danger-600 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalDelete">
+                                        <iconify-icon icon="fluent:delete-24-regular" class="icon text-lg line-height-1"></iconify-icon>
+                                        Eliminar
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="event-item d-flex align-items-center justify-content-between gap-4 pb-16 mb-16 border border-start-0 border-end-0 border-top-0">
+                        <div class="">
+                            <div class="d-flex align-items-center gap-10">
+                                <span class="w-12-px h-12-px bg-success-600 rounded-circle fw-medium"></span>
+                                <span class="text-secondary-light">Hoy, 10:30 PM - 02:30 AM</span>
+                            </div>
+                            <span class="text-primary-light fw-semibold text-md mt-4">Festival de Fin de Semana</span>
+                        </div>
+                        <div class="dropdown">
+                            <button type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <iconify-icon icon="entypo:dots-three-vertical" class="icon text-secondary-light"></iconify-icon>
+                            </button>
+                            <ul class="dropdown-menu p-12 border bg-base shadow">
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalView">
+                                        <iconify-icon icon="hugeicons:view" class="icon text-lg line-height-1"></iconify-icon>
+                                        Ver
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalEdit">
+                                        <iconify-icon icon="lucide:edit" class="icon text-lg line-height-1"></iconify-icon>
+                                        Editar
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="delete-item dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-danger-100 text-hover-danger-600 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalDelete">
+                                        <iconify-icon icon="fluent:delete-24-regular" class="icon text-lg line-height-1"></iconify-icon>
+                                        Eliminar
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="event-item d-flex align-items-center justify-content-between gap-4 pb-16 mb-16 border border-start-0 border-end-0 border-top-0">
+                        <div class="">
+                            <div class="d-flex align-items-center gap-10">
+                                <span class="w-12-px h-12-px bg-info-600 rounded-circle fw-medium"></span>
+                                <span class="text-secondary-light">Hoy, 10:30 PM - 02:30 AM</span>
+                            </div>
+                            <span class="text-primary-light fw-semibold text-md mt-4">Conferencia de Diseño</span>
+                        </div>
+                        <div class="dropdown">
+                            <button type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <iconify-icon icon="entypo:dots-three-vertical" class="icon text-secondary-light"></iconify-icon>
+                            </button>
+                            <ul class="dropdown-menu p-12 border bg-base shadow">
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalView">
+                                        <iconify-icon icon="hugeicons:view" class="icon text-lg line-height-1"></iconify-icon>
+                                        Ver
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalEdit">
+                                        <iconify-icon icon="lucide:edit" class="icon text-lg line-height-1"></iconify-icon>
+                                        Editar
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="delete-item dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-danger-100 text-hover-danger-600 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalDelete">
+                                        <iconify-icon icon="fluent:delete-24-regular" class="icon text-lg line-height-1"></iconify-icon>
+                                        Eliminar
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="event-item d-flex align-items-center justify-content-between gap-4 pb-16 mb-16 border border-start-0 border-end-0 border-top-0">
+                        <div class="">
+                            <div class="d-flex align-items-center gap-10">
+                                <span class="w-12-px h-12-px bg-warning-600 rounded-circle fw-medium"></span>
+                                <span class="text-secondary-light">Hoy, 10:30 PM - 02:30 AM</span>
+                            </div>
+                            <span class="text-primary-light fw-semibold text-md mt-4">Ultra Europa 2019</span>
+                        </div>
+                        <div class="dropdown">
+                            <button type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <iconify-icon icon="entypo:dots-three-vertical" class="icon text-secondary-light"></iconify-icon>
+                            </button>
+                            <ul class="dropdown-menu p-12 border bg-base shadow">
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalView">
+                                        <iconify-icon icon="hugeicons:view" class="icon text-lg line-height-1"></iconify-icon>
+                                        Ver
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalEdit">
+                                        <iconify-icon icon="lucide:edit" class="icon text-lg line-height-1"></iconify-icon>
+                                        Editar
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="delete-item dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-danger-100 text-hover-danger-600 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalDelete">
+                                        <iconify-icon icon="fluent:delete-24-regular" class="icon text-lg line-height-1"></iconify-icon>
+                                        Eliminar
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="event-item d-flex align-items-center justify-content-between gap-4 pb-16 mb-16 border border-start-0 border-end-0 border-top-0">
+                        <div class="">
+                            <div class="d-flex align-items-center gap-10">
+                                <span class="w-12-px h-12-px bg-warning-600 rounded-circle fw-medium"></span>
+                                <span class="text-secondary-light">Hoy, 10:30 PM - 02:30 AM</span>
+                            </div>
+                            <span class="text-primary-light fw-semibold text-md mt-4">Conferencia de Diseño</span>
+                        </div>
+                        <div class="dropdown">
+                            <button type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <iconify-icon icon="entypo:dots-three-vertical" class="icon text-secondary-light"></iconify-icon>
+                            </button>
+                            <ul class="dropdown-menu p-12 border bg-base shadow">
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalView">
+                                        <iconify-icon icon="hugeicons:view" class="icon text-lg line-height-1"></iconify-icon>
+                                        Ver
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-neutral-200 text-hover-neutral-900 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalEdit">
+                                        <iconify-icon icon="lucide:edit" class="icon text-lg line-height-1"></iconify-icon>
+                                        Editar
+                                    </button>
+                                </li>
+                                <li>
+                                    <button type="button" class="delete-item dropdown-item px-16 py-8 rounded text-secondary-light bg-hover-danger-100 text-hover-danger-600 d-flex align-items-center gap-10" data-bs-toggle="modal" data-bs-target="#exampleModalDelete">
+                                        <iconify-icon icon="fluent:delete-24-regular" class="icon text-lg line-height-1"></iconify-icon>
+                                        Eliminar
+                                    </button>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+    <div class="col-xxl-9 col-lg-8">
+        <div class="card h-100 p-0">
+            <div class="card-body p-24">
+                <div id='wrap'>
+                    <div id='calendar'></div>
+                    <div style='clear:both'></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Agregar Evento -->
+<div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog modal-dialog-centered">
+        <div class="modal-content radius-16 bg-base">
+            <div class="modal-header py-16 px-24 border border-top-0 border-start-0 border-end-0">
+                <h1 class="modal-title fs-5" id="exampleModalLabel">Agregar Nuevo Evento</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-24">
+                <form action="#">
+                    <div class="row">
+                        <div class="col-12 mb-20">
+                            <label class="form-label fw-semibold text-primary-light text-sm mb-8">Título del Evento : </label>
+                            <input type="text" class="form-control radius-8" placeholder="Ingrese Título del Evento ">
+                        </div>
+                        <div class="col-md-6 mb-20">
+                            <label for="startDate" class="form-label fw-semibold text-primary-light text-sm mb-8">Fecha de Inicio</label>
+                            <div class=" position-relative">
+                                <input class="form-control radius-8 bg-base" id="startDate" type="text" placeholder="03/12/2024, 10:30 AM">
+                                <span class="position-absolute end-0 top-50 translate-middle-y me-12 line-height-1">
+                                    <iconify-icon icon="solar:calendar-linear" class="icon text-lg"></iconify-icon>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-20">
+                            <label for="endDate" class="form-label fw-semibold text-primary-light text-sm mb-8">Fecha de Fin </label>
+                            <div class=" position-relative">
+                                <input class="form-control radius-8 bg-base" id="endDate" type="text" placeholder="03/12/2024, 2:30 PM">
+                                <span class="position-absolute end-0 top-50 translate-middle-y me-12 line-height-1">
+                                    <iconify-icon icon="solar:calendar-linear" class="icon text-lg"></iconify-icon>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-20">
+                            <label for="endDate" class="form-label fw-semibold text-primary-light text-sm mb-8">Etiqueta </label>
+                            <div class="d-flex align-items-center flex-wrap gap-28">
+                                <div class="form-check checked-success d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="label" id="Personal">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="Personal">
+                                        <span class="w-8-px h-8-px bg-success-600 rounded-circle"></span>
+                                        Personal
+                                    </label>
+                                </div>
+                                <div class="form-check checked-primary d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="label" id="Business">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="Business">
+                                        <span class="w-8-px h-8-px bg-primary-600 rounded-circle"></span>
+                                        Negocio
+                                    </label>
+                                </div>
+                                <div class="form-check checked-warning d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="label" id="Family">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="Family">
+                                        <span class="w-8-px h-8-px bg-warning-600 rounded-circle"></span>
+                                        Familia
+                                    </label>
+                                </div>
+                                <div class="form-check checked-secondary d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="label" id="Important">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="Important">
+                                        <span class="w-8-px h-8-px bg-lilac-600 rounded-circle"></span>
+                                        Importante
+                                    </label>
+                                </div>
+                                <div class="form-check checked-danger d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="label" id="Holiday">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="Holiday">
+                                        <span class="w-8-px h-8-px bg-danger-600 rounded-circle"></span>
+                                        Vacaciones
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mb-20">
+                            <label for="desc" class="form-label fw-semibold text-primary-light text-sm mb-8">Descripción</label>
+                            <textarea class="form-control" id="desc" rows="4" cols="50" placeholder="Escriba algún texto"></textarea>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-center gap-3 mt-24">
+                            <button type="reset" class="border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-40 py-11 radius-8">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="btn btn-primary border border-primary-600 text-md px-24 py-12 radius-8">
+                                Guardar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Ver Evento -->
+<div class="modal fade" id="exampleModalView" tabindex="-1" aria-labelledby="exampleModalViewLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog modal-dialog-centered">
+        <div class="modal-content radius-16 bg-base">
+            <div class="modal-header py-16 px-24 border border-top-0 border-start-0 border-end-0">
+                <h1 class="modal-title fs-5" id="exampleModalViewLabel">Detalles del Evento</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-24">
+                <div class="row">
+                    <div class="col-12 mb-20">
+                        <div class="d-flex align-items-center gap-2 border border-start-0 border-end-0 border-top-0 pb-16 mb-16">
+                            <span class="w-12-px h-12-px bg-warning-600 rounded-circle"></span>
+                            <h6 class="text-md mb-0">Conferencia de Diseño</h6>
+                        </div>
+                        <div class="d-flex align-items-center gap-10 mb-16">
+                            <iconify-icon icon="solar:calendar-linear" class="icon text-lg"></iconify-icon>
+                            <span class="text-secondary-light text-sm">Hoy, 10:30 PM - 02:30 AM</span>
+                        </div>
+                        <p class="text-secondary-light mb-0">Esta es una conferencia de diseño donde discutiremos las últimas tendencias en diseño UI/UX y mejores prácticas de la industria.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Editar Evento -->
+<div class="modal fade" id="exampleModalEdit" tabindex="-1" aria-labelledby="exampleModalEditLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog modal-dialog-centered">
+        <div class="modal-content radius-16 bg-base">
+            <div class="modal-header py-16 px-24 border border-top-0 border-start-0 border-end-0">
+                <h1 class="modal-title fs-5" id="exampleModalEditLabel">Editar Evento</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-24">
+                <form action="#">
+                    <div class="row">
+                        <div class="col-12 mb-20">
+                            <label class="form-label fw-semibold text-primary-light text-sm mb-8">Título del Evento : </label>
+                            <input type="text" class="form-control radius-8" placeholder="Conferencia de Diseño" value="Conferencia de Diseño">
+                        </div>
+                        <div class="col-md-6 mb-20">
+                            <label for="editStartDate" class="form-label fw-semibold text-primary-light text-sm mb-8">Fecha de Inicio</label>
+                            <div class=" position-relative">
+                                <input class="form-control radius-8 bg-base" id="editStartDate" type="text" placeholder="03/12/2024, 10:30 AM" value="03/12/2024, 10:30 AM">
+                                <span class="position-absolute end-0 top-50 translate-middle-y me-12 line-height-1">
+                                    <iconify-icon icon="solar:calendar-linear" class="icon text-lg"></iconify-icon>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-md-6 mb-20">
+                            <label for="editEndDate" class="form-label fw-semibold text-primary-light text-sm mb-8">Fecha de Fin </label>
+                            <div class=" position-relative">
+                                <input class="form-control radius-8 bg-base" id="editEndDate" type="text" placeholder="03/12/2024, 2:30 PM" value="03/12/2024, 2:30 PM">
+                                <span class="position-absolute end-0 top-50 translate-middle-y me-12 line-height-1">
+                                    <iconify-icon icon="solar:calendar-linear" class="icon text-lg"></iconify-icon>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="col-12 mb-20">
+                            <label class="form-label fw-semibold text-primary-light text-sm mb-8">Etiqueta </label>
+                            <div class="d-flex align-items-center flex-wrap gap-28">
+                                <div class="form-check checked-success d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="editLabel" id="editPersonal">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="editPersonal">
+                                        <span class="w-8-px h-8-px bg-success-600 rounded-circle"></span>
+                                        Personal
+                                    </label>
+                                </div>
+                                <div class="form-check checked-primary d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="editLabel" id="editBusiness" checked>
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="editBusiness">
+                                        <span class="w-8-px h-8-px bg-primary-600 rounded-circle"></span>
+                                        Negocio
+                                    </label>
+                                </div>
+                                <div class="form-check checked-warning d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="editLabel" id="editFamily">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="editFamily">
+                                        <span class="w-8-px h-8-px bg-warning-600 rounded-circle"></span>
+                                        Familia
+                                    </label>
+                                </div>
+                                <div class="form-check checked-secondary d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="editLabel" id="editImportant">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="editImportant">
+                                        <span class="w-8-px h-8-px bg-lilac-600 rounded-circle"></span>
+                                        Importante
+                                    </label>
+                                </div>
+                                <div class="form-check checked-danger d-flex align-items-center gap-2">
+                                    <input class="form-check-input" type="radio" name="editLabel" id="editHoliday">
+                                    <label class="form-check-label line-height-1 fw-medium text-secondary-light text-sm d-flex align-items-center gap-1" for="editHoliday">
+                                        <span class="w-8-px h-8-px bg-danger-600 rounded-circle"></span>
+                                        Vacaciones
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-12 mb-20">
+                            <label for="editDesc" class="form-label fw-semibold text-primary-light text-sm mb-8">Descripción</label>
+                            <textarea class="form-control" id="editDesc" rows="4" cols="50" placeholder="Escriba algún texto">Esta es una conferencia de diseño donde discutiremos las últimas tendencias en diseño UI/UX.</textarea>
+                        </div>
+
+                        <div class="d-flex align-items-center justify-content-center gap-3 mt-24">
+                            <button type="reset" class="border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-40 py-11 radius-8">
+                                Cancelar
+                            </button>
+                            <button type="submit" class="btn btn-primary border border-primary-600 text-md px-24 py-12 radius-8">
+                                Actualizar
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal Eliminar Evento -->
+<div class="modal fade" id="exampleModalDelete" tabindex="-1" aria-labelledby="exampleModalDeleteLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content radius-16 bg-base">
+            <div class="modal-header py-16 px-24 border border-top-0 border-start-0 border-end-0">
+                <h1 class="modal-title fs-5" id="exampleModalDeleteLabel">Eliminar Evento</h1>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-24">
+                <div class="text-center">
+                    <iconify-icon icon="line-md:alert" class="text-warning-600 text-xxl mb-16"></iconify-icon>
+                    <h6 class="text-md mb-8">¿Estás seguro?</h6>
+                    <p class="text-secondary-light text-sm">¿Quieres eliminar este evento? Esta acción no se puede deshacer.</p>
+                    <div class="d-flex align-items-center justify-content-center gap-3 mt-24">
+                        <button type="button" class="border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-40 py-11 radius-8" data-bs-dismiss="modal">
+                            Cancelar
+                        </button>
+                        <button type="submit" class="btn btn-danger text-md px-24 py-12 radius-8">
+                            Sí, Eliminar
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}
+
+{% block script %}
+<script src='/static/js/full-calendar.js'></script>
+<script src='/static/js/flatpickr.js'></script>
+
+<script>
+    // Flatpickr or date picker js con configuración en español
+    function getDatePicker(receiveID) {
+        flatpickr(receiveID, {
+            enableTime: true,
+            dateFormat: 'd/m/Y H:i',
+            locale: {
+                firstDayOfWeek: 1,
+                weekdays: {
+                    shorthand: ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'],
+                    longhand: ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+                },
+                months: {
+                    shorthand: ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'],
+                    longhand: ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
+                },
+                time_24hr: true
+            }
+        });
+    }
+    getDatePicker('#startDate');
+    getDatePicker('#endDate');
+
+    getDatePicker('#editstartDate');
+    getDatePicker('#editendDate');
+</script>
+{% endblock %}

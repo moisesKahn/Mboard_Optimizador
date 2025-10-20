@@ -1,0 +1,299 @@
+{% extends '../layout/layout.html' %} 
+
+{% block content %}
+
+<div class="card h-100 p-0 radius-12">
+    <div class="card-header border-bottom bg-base py-16 px-24 d-flex align-items-center flex-wrap gap-3 justify-content-between">
+        <div class="d-flex align-items-center flex-wrap gap-3">
+            <span class="text-md fw-medium text-secondary-light mb-0">Mostrar</span>
+            <select class="form-select form-select-sm w-auto ps-12 py-6 radius-12 h-40-px">
+                <option>1</option>
+                <option>2</option>
+                <option>3</option>
+                <option>4</option>
+                <option>5</option>
+                <option>6</option>
+                <option>7</option>
+                <option>8</option>
+                <option>9</option>
+                <option>10</option>
+            </select>
+            <form class="navbar-search">
+                <input type="text" class="bg-base h-40-px w-auto" name="search" placeholder="Buscar">
+                <iconify-icon icon="ion:search-outline" class="icon"></iconify-icon>
+            </form>
+            <select class="form-select form-select-sm w-auto ps-12 py-6 radius-12 h-40-px">
+                <option>Estado</option>
+                <option>Activo</option>
+                <option>Inactivo</option>
+            </select>
+        </div>
+        <a href="{% url 'addUser' %}" class="btn btn-primary text-sm btn-sm px-12 py-12 radius-8 d-flex align-items-center gap-2">
+            <iconify-icon icon="ic:baseline-plus" class="icon text-xl line-height-1"></iconify-icon>
+            Agregar Nuevo Usuario
+        </a>
+    </div>
+    <div class="card-body p-24">
+        <div class="table-responsive scroll-sm">
+            <table class="table bordered-table sm-table mb-0">
+                <thead>
+                    <tr>
+                        <th scope="col" style="width: 80px;">
+                            <div class="d-flex align-items-center gap-10">
+                                <div class="form-check style-check d-flex align-items-center">
+                                    <input class="form-check-input radius-4 border input-form-dark" type="checkbox" name="checkbox" id="selectAll">
+                                </div>
+                                ID
+                            </div>
+                        </th>
+                        <th scope="col" style="width: 200px;">Nombre Completo</th>
+                        <th scope="col" style="width: 200px;">Correo Electrónico</th>
+                        <th scope="col" style="width: 120px;">Organización</th>
+                        <th scope="col" style="width: 120px;">Rol del Sistema</th>
+                        <th scope="col" class="text-center" style="width: 100px;">Estado</th>
+                        <th scope="col" style="width: 120px;">Fecha de Creación</th>
+                        <th scope="col" class="text-center" style="width: 120px;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-10">
+                                <div class="form-check style-check d-flex align-items-center">
+                                    <input class="form-check-input radius-4 border border-neutral-400" type="checkbox" name="checkbox">
+                                </div>
+                                001
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {% load ui_extras %}
+                                <div class="w-32-px h-32-px rounded-circle flex-shrink-0 me-8 d-flex align-items-center justify-content-center fw-bold text-white" style="background-color:#6c5ce7;">
+                                    {{ usuario|user_initials }}
+                                </div>
+                                <span class="text-sm mb-0 fw-normal text-secondary-light">Carlos Martínez Silva</span>
+                            </div>
+                        </td>
+                        <td><span class="text-sm mb-0 fw-normal text-secondary-light">carlos.martinez@sodimac.cl</span></td>
+                        <td>
+                            <span class="bg-primary-50 text-primary-600 border border-primary-200 px-12 py-2 radius-4 fw-medium text-xs">Sodimac</span>
+                        </td>
+                        <td>
+                            <span class="bg-warning-50 text-warning-600 border border-warning-200 px-12 py-2 radius-4 fw-medium text-xs">SUPER_ADMIN</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="bg-success-focus text-success-600 border border-success-main px-16 py-2 radius-4 fw-medium text-xs">Activo</span>
+                        </td>
+                        <td><span class="text-xs text-secondary-light">15 Ene 2024</span></td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center gap-6 justify-content-center">
+                                <button type="button" class="bg-info-focus bg-hover-info-200 text-info-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="majesticons:eye-line" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="lucide:edit" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="remove-item-btn bg-danger-focus bg-hover-danger-200 text-danger-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="fluent:delete-24-regular" class="text-sm"></iconify-icon>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-10">
+                                <div class="form-check style-check d-flex align-items-center">
+                                    <input class="form-check-input radius-4 border border-neutral-400" type="checkbox" name="checkbox">
+                                </div>
+                                002
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="w-32-px h-32-px rounded-circle flex-shrink-0 me-8 d-flex align-items-center justify-content-center fw-bold text-white" style="background-color:#6c5ce7;">
+                                    {{ usuario|user_initials }}
+                                </div>
+                                <span class="text-sm mb-0 fw-normal text-secondary-light">Ana García López</span>
+                            </div>
+                        </td>
+                        <td><span class="text-sm mb-0 fw-normal text-secondary-light">ana.garcia@dimaplac.cl</span></td>
+                        <td>
+                            <span class="bg-info-50 text-info-600 border border-info-200 px-12 py-2 radius-4 fw-medium text-xs">Dimaplac</span>
+                        </td>
+                        <td>
+                            <span class="bg-success-50 text-success-600 border border-success-200 px-12 py-2 radius-4 fw-medium text-xs">ORG_ADMIN</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="bg-success-focus text-success-600 border border-success-main px-16 py-2 radius-4 fw-medium text-xs">Activo</span>
+                        </td>
+                        <td><span class="text-xs text-secondary-light">20 Ene 2024</span></td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center gap-6 justify-content-center">
+                                <button type="button" class="bg-info-focus bg-hover-info-200 text-info-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="majesticons:eye-line" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="lucide:edit" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="remove-item-btn bg-danger-focus bg-hover-danger-200 text-danger-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="fluent:delete-24-regular" class="text-sm"></iconify-icon>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-10">
+                                <div class="form-check style-check d-flex align-items-center">
+                                    <input class="form-check-input radius-4 border border-neutral-400" type="checkbox" name="checkbox">
+                                </div>
+                                003
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <img src="/static/images/user-list/user-list3.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-8 overflow-hidden">
+                                <span class="text-sm mb-0 fw-normal text-secondary-light">Roberto Fernández Cruz</span>
+                            </div>
+                        </td>
+                        <td><span class="text-sm mb-0 fw-normal text-secondary-light">roberto.fernandez@imperial.cl</span></td>
+                        <td>
+                            <span class="bg-secondary-50 text-secondary-600 border border-secondary-200 px-12 py-2 radius-4 fw-medium text-xs">Imperial</span>
+                        </td>
+                        <td>
+                            <span class="bg-info-50 text-info-600 border border-info-200 px-12 py-2 radius-4 fw-medium text-xs">AGENT</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="bg-success-focus text-success-600 border border-success-main px-16 py-2 radius-4 fw-medium text-xs">Activo</span>
+                        </td>
+                        <td><span class="text-xs text-secondary-light">10 Feb 2024</span></td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center gap-6 justify-content-center">
+                                <button type="button" class="bg-info-focus bg-hover-info-200 text-info-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="majesticons:eye-line" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="lucide:edit" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="remove-item-btn bg-danger-focus bg-hover-danger-200 text-danger-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="fluent:delete-24-regular" class="text-sm"></iconify-icon>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-10">
+                                <div class="form-check style-check d-flex align-items-center">
+                                    <input class="form-check-input radius-4 border border-neutral-400" type="checkbox" name="checkbox">
+                                </div>
+                                004
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <img src="/static/images/user-list/user-list4.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-8 overflow-hidden">
+                                <span class="text-sm mb-0 fw-normal text-secondary-light">María Rodríguez Vega</span>
+                            </div>
+                        </td>
+                        <td><span class="text-sm mb-0 fw-normal text-secondary-light">maria.rodriguez@sodimac.cl</span></td>
+                        <td>
+                            <span class="bg-primary-50 text-primary-600 border border-primary-200 px-12 py-2 radius-4 fw-medium text-xs">Sodimac</span>
+                        </td>
+                        <td>
+                            <span class="bg-info-50 text-info-600 border border-info-200 px-12 py-2 radius-4 fw-medium text-xs">AGENT</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="bg-neutral-200 text-neutral-600 border border-neutral-400 px-16 py-2 radius-4 fw-medium text-xs">Inactivo</span>
+                        </td>
+                        <td><span class="text-xs text-secondary-light">08 Feb 2024</span></td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center gap-6 justify-content-center">
+                                <button type="button" class="bg-info-focus bg-hover-info-200 text-info-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="majesticons:eye-line" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="lucide:edit" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="remove-item-btn bg-danger-focus bg-hover-danger-200 text-danger-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="fluent:delete-24-regular" class="text-sm"></iconify-icon>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <div class="d-flex align-items-center gap-10">
+                                <div class="form-check style-check d-flex align-items-center">
+                                    <input class="form-check-input radius-4 border border-neutral-400" type="checkbox" name="checkbox">
+                                </div>
+                                005
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <img src="/static/images/user-list/user-list5.png" alt="" class="w-32-px h-32-px rounded-circle flex-shrink-0 me-8 overflow-hidden">
+                                <span class="text-sm mb-0 fw-normal text-secondary-light">Luis Torres Mendoza</span>
+                            </div>
+                        </td>
+                        <td><span class="text-sm mb-0 fw-normal text-secondary-light">luis.torres@dimaplac.cl</span></td>
+                        <td>
+                            <span class="bg-info-50 text-info-600 border border-info-200 px-12 py-2 radius-4 fw-medium text-xs">Dimaplac</span>
+                        </td>
+                        <td>
+                            <span class="bg-success-50 text-success-600 border border-success-200 px-12 py-2 radius-4 fw-medium text-xs">ORG_ADMIN</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="bg-success-focus text-success-600 border border-success-main px-16 py-2 radius-4 fw-medium text-xs">Activo</span>
+                        </td>
+                        <td><span class="text-xs text-secondary-light">15 Mar 2024</span></td>
+                        <td class="text-center">
+                            <div class="d-flex align-items-center gap-6 justify-content-center">
+                                <button type="button" class="bg-info-focus bg-hover-info-200 text-info-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="majesticons:eye-line" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="bg-success-focus text-success-600 bg-hover-success-200 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="lucide:edit" class="text-sm"></iconify-icon>
+                                </button>
+                                <button type="button" class="remove-item-btn bg-danger-focus bg-hover-danger-200 text-danger-600 fw-medium w-32-px h-32-px d-flex justify-content-center align-items-center rounded-circle">
+                                    <iconify-icon icon="fluent:delete-24-regular" class="text-sm"></iconify-icon>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-24">
+            <span>Mostrando 1 a 5 de 5 usuarios</span>
+            <ul class="pagination d-flex flex-wrap align-items-center gap-2 justify-content-center">
+                <li class="page-item">
+                    <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="javascript:void(0)">
+                        <iconify-icon icon="ep:d-arrow-left"></iconify-icon>
+                    </a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md bg-primary-600 text-white" href="javascript:void(0)">1</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px" href="javascript:void(0)">2</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="javascript:void(0)">
+                        <iconify-icon icon="ep:d-arrow-right"></iconify-icon>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block script %}
+<script>
+    $('.remove-item-btn').on('click', function () {
+        $(this).closest('tr').addClass('d-none')
+    });
+</script>
+{% endblock %}

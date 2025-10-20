@@ -1,0 +1,307 @@
+{% extends 'layout/layout.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-3">
+        <div class="col-12 d-flex align-items-center gap-2">
+            <a href="{% url 'organizaciones_lista' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                <iconify-icon icon="lucide:arrow-left"></iconify-icon>
+                Volver a Organizaciones
+            </a>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-lg-8">
+            <div class="card p-16">
+                <div class="d-flex justify-content-between align-items-center mb-12">
+                    <h5 class="mb-0">{{ organizacion.nombre }} <span class="text-secondary-light fw-normal">({{ organizacion.codigo }})</span></h5>
+                    <div class="d-flex align-items-center gap-2">
+                        {% if organizacion.activo %}
+                            <span class="badge bg-success-100 text-success-700">Activa</span>
+                        {% else %}
+                            <span class="badge bg-neutral-100 text-neutral-700">Inactiva</span>
+                        {% endif %}
+                        <a href="{% url 'optimizador_home' %}" class="btn btn-sm btn-primary d-flex align-items-center gap-1">
+                            <iconify-icon icon="lucide:plus"></iconify-icon>
+                            Agregar proyecto
+                        </a>
+                    </div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="text-sm"><strong>Teléfono:</strong> {{ organizacion.telefono|default:"-" }}</div>
+                        <div class="text-sm"><strong>Email:</strong> {{ organizacion.email|default:"-" }}</div>
+                        <div class="text-sm"><strong>Dirección:</strong> {{ organizacion.direccion|default:"-" }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="text-sm"><strong>Creada:</strong> {{ organizacion.fecha_creacion|date:"d/m/Y H:i" }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card p-16 mt-12">
+                <h6 class="mb-12">Últimas optimizaciones</h6>
+                <div class="table-responsive">
+                    <table class="table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Nombre</th>
+                                <th>Cliente</th>
+                                <th>Estado</th>
+                                <th>Creado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in ultimos_proyectos %}
+                            <tr>
+                                <td>{{ p.codigo }}</td>
+                                <td>{{ p.nombre }}</td>
+                                <td>{{ p.cliente.nombre }}</td>
+                                <td><span class="badge bg-neutral-100 text-neutral-700">{{ p.estado }}</span></td>
+                                <td class="d-flex align-items-center gap-2">
+                                    <span>{{ p.fecha_creacion|date:"d/m/Y H:i" }}</span>
+                                    <a class="btn btn-xs btn-outline-primary" href="{% url 'optimizador_abrir' p.id %}">
+                                        <iconify-icon icon="lucide:edit"></iconify-icon>
+                                        Editar
+                                    </a>
+                                    <a class="btn btn-xs btn-outline-secondary" data-preview data-id="{{ p.id }}" href="#">
+                                        <iconify-icon icon="lucide:eye"></iconify-icon>
+                                        Ver
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-secondary-light">Sin optimizaciones recientes</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card p-16">
+                <h6 class="mb-12">Usuarios</h6>
+                <div class="modal-footer">
+                    <button id="btnForzarOpt" type="button" class="btn btn-outline-warning d-none">Optimizar ahora</button>
+                    <!-- En la barra lateral usamos IDs únicos para no colisionar con los del modal -->
+                    <a id="sidebarPdfLink" class="btn btn-outline-secondary" target="_blank" href="#">Abrir PDF</a>
+                    <a id="sidebarAbrirLink" class="btn btn-primary" href="#">Abrir en Optimizador</a>
+                </div>
+                    </li>
+                    <li class="d-flex justify-content-between py-6 border-bottom">
+                        <span>Agentes</span>
+                        <strong>{{ conteo_roles.agente|default:0 }}</strong>
+                    </li>
+                    <li class="d-flex justify-content-between py-6">
+                        <span>Otros</span>
+                        <strong>{{ conteo_roles.super_admin|default:0 }}</strong>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="card p-16 mt-12">
+                <h6 class="mb-12">Optimización (último año)</h6>
+                <div id="chartDatos" class="w-100" style="height:220px;"></div>
+                <div class="text-sm text-secondary-light mt-8">Total: <strong>{{ total_proyectos }}</strong></div>
+            </div>
+            <div class="card p-16 mt-12">
+                <h6 class="mb-12">Últimas 12 semanas</h6>
+                <div id="chartSemanal" class="w-100" style="height:160px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% comment %} Datos en JSON seguro {% endcomment %}
+{{ series_mensual|json_script:"seriesData" }}
+{{ series_semanal|json_script:"seriesWeek" }}
+
+<script>
+// Render simple area chart with vanilla SVG
+(function(){
+    const el = document.getElementById('seriesData');
+    const data = el ? JSON.parse(el.textContent) : [];
+    const cont = document.getElementById('chartDatos');
+    if (!cont) return;
+    const w = cont.clientWidth || 320, h = cont.clientHeight || 220, p=24;
+    const svgNS='http://www.w3.org/2000/svg';
+    const svg=document.createElementNS(svgNS,'svg'); svg.setAttribute('width', w); svg.setAttribute('height', h);
+
+    if (!data || !data.length){ cont.textContent='Sin datos'; return; }
+    const xs = data.map(d=>d.mes);
+    const ys = data.map(d=>d.total);
+    const maxY = Math.max(...ys, 1);
+    const stepX = (w-2*p)/Math.max(1, xs.length-1);
+    const scaleY = v => h - p - (v/maxY)*(h-2*p);
+
+    // eje y
+    const axisY=document.createElementNS(svgNS,'line'); axisY.setAttribute('x1',p);axisY.setAttribute('y1',p);axisY.setAttribute('x2',p);axisY.setAttribute('y2',h-p);axisY.setAttribute('stroke','#d0d7de'); svg.appendChild(axisY);
+    // eje x
+    const axisX=document.createElementNS(svgNS,'line'); axisX.setAttribute('x1',p);axisX.setAttribute('y1',h-p);axisX.setAttribute('x2',w-p);axisX.setAttribute('y2',h-p);axisX.setAttribute('stroke','#d0d7de'); svg.appendChild(axisX);
+
+    // path
+    let d='';
+    xs.forEach((_,i)=>{
+        const x=p+i*stepX, y=scaleY(ys[i]);
+        d += (i? ' L':'M')+x+','+y;
+    });
+    const path=document.createElementNS(svgNS,'path'); path.setAttribute('d', d); path.setAttribute('fill','none'); path.setAttribute('stroke','#0d6efd'); path.setAttribute('stroke-width','2'); svg.appendChild(path);
+
+    cont.innerHTML=''; cont.appendChild(svg);
+})();
+
+(function(){
+    const el = document.getElementById('seriesWeek');
+    const data = el ? JSON.parse(el.textContent) : [];
+    const cont = document.getElementById('chartSemanal');
+    if (!cont) return;
+    const w = cont.clientWidth || 320, h = cont.clientHeight || 160, p=20;
+    const svgNS='http://www.w3.org/2000/svg';
+    const svg=document.createElementNS(svgNS,'svg'); svg.setAttribute('width', w); svg.setAttribute('height', h);
+    if (!data || !data.length){ cont.textContent='Sin datos'; return; }
+    const xs = data.map(d=>d.semana);
+    const ys = data.map(d=>d.total);
+    const maxY = Math.max(...ys, 1);
+    const stepX = (w-2*p)/Math.max(1, xs.length-1);
+    const scaleY = v => h - p - (v/maxY)*(h-2*p);
+    const axisY=document.createElementNS(svgNS,'line'); axisY.setAttribute('x1',p);axisY.setAttribute('y1',p);axisY.setAttribute('x2',p);axisY.setAttribute('y2',h-p);axisY.setAttribute('stroke','#d0d7de'); svg.appendChild(axisY);
+    const axisX=document.createElementNS(svgNS,'line'); axisX.setAttribute('x1',p);axisX.setAttribute('y1',h-p);axisX.setAttribute('x2',w-p);axisX.setAttribute('y2',h-p);axisX.setAttribute('stroke','#d0d7de'); svg.appendChild(axisX);
+    let d='';
+    xs.forEach((_,i)=>{ const x=p+i*stepX, y=scaleY(ys[i]); d += (i?' L':'M')+x+','+y; });
+    const path=document.createElementNS(svgNS,'path'); path.setAttribute('d', d); path.setAttribute('fill','none'); path.setAttribute('stroke','#20c997'); path.setAttribute('stroke-width','2'); svg.appendChild(path);
+    cont.innerHTML=''; cont.appendChild(svg);
+})();
+</script>
+{% endblock %}
+
+{% block extra_modals %}
+<div class="modal fade" id="previewModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Previsualización de Proyecto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div id="previewContent" class="text-sm">Cargando…</div>
+            </div>
+            <div class="modal-footer">
+                <a id="previewPdfLink" class="btn btn-outline-secondary" target="_blank" href="#">Abrir PDF</a>
+                <a id="previewAbrirLink" class="btn btn-primary" href="#">Abrir en Optimizador</a>
+            </div>
+        </div>
+    </div>
+    </div>
+<script>
+    (function(){
+    const qs = s=>document.querySelector(s);
+    function getCookie(name){
+        const match = document.cookie.match(new RegExp('(^|; )'+name+'=([^;]*)'));
+        return match ? decodeURIComponent(match[2]) : '';
+    }
+    const CSRF = getCookie('csrftoken');
+        document.addEventListener('click', async (e)=>{
+                const a = e.target.closest('a[data-preview]');
+                if(!a) return;
+                e.preventDefault();
+                const id = a.getAttribute('data-id');
+                const url = `{% url 'preview_proyecto_json' 0 %}`.replace('/0/','/'+id+'/');
+                const pdfUrl = `{% url 'exportar_pdf' 0 %}`.replace('/0/','/'+id+'/');
+                const openUrl = `{% url 'optimizador_abrir' 0 %}`.replace('/0/','/'+id+'/');
+                try{
+                        qs('#previewContent').textContent = 'Cargando…';
+                        const r = await fetch(url);
+                        const j = await r.json();
+                        if(!j.success) throw new Error('No se pudo cargar el preview');
+                        const p = j.proyecto||{};
+                        const res = p.resultado||{};
+                        let html = `
+                                <div class="mb-2"><strong>${p.codigo||''}</strong> — ${p.nombre||''}</div>
+                                <div class="text-secondary mb-2">Cliente: ${p.cliente||'-'} | Estado: ${p.estado||'-'} | Fecha: ${p.fecha||'-'}</div>
+                        `;
+                        if(res && res.materiales && res.materiales.length){
+                                html += '<div class="border-top pt-2">Materiales:</div>';
+                                res.materiales.forEach((m,i)=>{
+                                        const tabs = (m.tableros||[]).length;
+                                        const eff = (m.eficiencia||m.eficiencia_promedio||0);
+                                        html += `<div class="py-1">• ${m.material?.nombre||'Material'} — Tableros: ${tabs} — Aprovech.: ${eff}%</div>`;
+                                });
+                        } else if(res && res.tableros){
+                                html += `<div class="border-top pt-2">Tableros: ${(res.tableros||[]).length} — Aprovech.: ${res.eficiencia||0}%</div>`;
+                        } else {
+                                html += '<div class="text-secondary">Sin resultados guardados.</div>';
+                        }
+                        qs('#previewContent').innerHTML = html;
+            // Enlaces del modal
+            const modalPdf = qs('#previewPdfLink');
+            const modalOpen = qs('#previewAbrirLink');
+            modalPdf.setAttribute('href', pdfUrl);
+            modalOpen.setAttribute('href', openUrl);
+            modalPdf.dataset.proyectoId = id;
+            modalOpen.dataset.proyectoId = id;
+            // Enlaces de la barra lateral (si existen)
+            const sidePdf = qs('#sidebarPdfLink');
+            const sideOpen = qs('#sidebarAbrirLink');
+            if (sidePdf){ sidePdf.setAttribute('href', pdfUrl); sidePdf.dataset.proyectoId = id; }
+            if (sideOpen){ sideOpen.setAttribute('href', openUrl); sideOpen.dataset.proyectoId = id; }
+                        const modal = new bootstrap.Modal(qs('#previewModal'));
+                        modal.show();
+                }catch(err){
+                        console.error(err);
+                        alert('No se pudo mostrar la previsualización');
+                }
+        });
+
+    async function forceOptimization(projectId){
+        if(!projectId) return { success:false, message:'Sin id'};
+        const urlForzar = `{% url 'forzar_optimizacion' 0 %}`.replace('/0/','/'+projectId+'/');
+        try{
+            const resp = await fetch(urlForzar, { method:'POST', headers:{ 'X-CSRFToken': CSRF }, credentials:'same-origin' });
+            const data = await resp.json().catch(()=>({success:false, message:'Respuesta inválida'}));
+            return data;
+        }catch(err){
+            console.warn('No se pudo forzar optimización automáticamente', err);
+            return { success:false, message: String(err) };
+        }
+    }
+
+    // Forzar optimización antes de abrir PDF (modal)
+    document.addEventListener('click', async (e)=>{
+        const el = e.target.closest('#previewPdfLink');
+        if(!el) return;
+        e.preventDefault();
+        const href = el.getAttribute('href');
+        const id = el.dataset.proyectoId;
+        const prev = el.textContent; el.textContent = 'Generando…'; el.classList.add('disabled');
+        const res = await forceOptimization(id);
+        el.textContent = prev; el.classList.remove('disabled');
+        const folio = res?.success ? res.resumen?.folio : null;
+        const finalUrl = folio ? (href + (href.includes('?')?'&':'?') + 'folio=' + encodeURIComponent(folio)) : href;
+        if(finalUrl && finalUrl !== '#') window.open(finalUrl, '_blank');
+    });
+
+    // Forzar optimización antes de abrir PDF (sidebar)
+    document.addEventListener('click', async (e)=>{
+        const el = e.target.closest('#sidebarPdfLink');
+        if(!el) return;
+        e.preventDefault();
+        const href = el.getAttribute('href');
+        const id = el.dataset.proyectoId;
+        const prev = el.textContent; el.textContent = 'Generando…'; el.classList.add('disabled');
+        const res = await forceOptimization(id);
+        el.textContent = prev; el.classList.remove('disabled');
+        const folio = res?.success ? res.resumen?.folio : null;
+        const finalUrl = folio ? (href + (href.includes('?')?'&':'?') + 'folio=' + encodeURIComponent(folio)) : href;
+        if(finalUrl && finalUrl !== '#') window.open(finalUrl, '_blank');
+    });
+
+    // Nota: Enlaces JSON eliminados para evitar botonería fuera del optimizador.
+    })();
+</script>
+{% endblock %}

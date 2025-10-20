@@ -1,0 +1,19 @@
+<!-- meta tags and other links -->
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+  {% include "../partials/head.html"%}
+  <body>
+    {% include "../partials/sidebar.html" %}
+
+    <main class="dashboard-main">
+      {% include "../partials/navbar.html" %}
+        <div class="dashboard-main-body">
+                {% block content %} 
+                {% endblock %}
+        </div>
+
+      {% include "../partials/footer.html" %}
+    </main>
+    {% include "../partials/scripts.html" %} {% block script %} {% endblock %}
+  </body>
+</html>

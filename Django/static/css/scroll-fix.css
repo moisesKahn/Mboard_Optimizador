@@ -1,0 +1,187 @@
+/* =================================
+   SCROLL BEHAVIOR FIXES
+   Soluciona el temblor durante scroll
+   ================================= */
+
+/* Mejorar el renderizado del scroll para evitar temblores */
+html {
+    scroll-behavior: smooth;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+}
+
+/* Optimizar elementos con posicion fija/sticky */
+.navbar-header {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+.sidebar {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Evitar repaint innecesario en elementos con transiciones */
+.sidebar-menu .dropdown,
+.sidebar-toggle,
+.sidebar-mobile-toggle,
+*[class*="transition"],
+*[class*="animate"] {
+    will-change: auto;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+}
+
+/* Optimizar scroll en contenedores específicos */
+.scroll-sm {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* Mejorar performance de elementos con z-index */
+*[style*="z-index"],
+.sidebar,
+.navbar-header,
+.modal,
+.dropdown-menu,
+.tooltip,
+.popover {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: auto;
+}
+
+/* Evitar temblor en body durante scroll */
+body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* Optimizar elementos que cambian durante scroll */
+.dashboard-main {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: auto;
+}
+
+/* Evitar reflow en elementos con transiciones CSS */
+*:not(.no-transition) {
+    transition-property: transform, opacity, background-color, color, border-color, box-shadow;
+}
+
+/* Mejorar rendering de elementos flotantes */
+.card,
+.btn,
+.form-control,
+.table {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: auto;
+}
+
+/* Optimizar animaciones y transiciones para evitar temblores */
+@media (prefers-reduced-motion: no-preference) {
+    * {
+        animation-fill-mode: both;
+        animation-duration: 0.3s;
+        animation-timing-function: ease-out;
+    }
+}
+
+/* Para pantallas de alta densidad (Retina) */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    body {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+    }
+}
+
+/* Forzar aceleración por hardware en elementos clave */
+.sidebar,
+.navbar-header,
+.dashboard-main,
+.modal-backdrop,
+.dropdown-menu {
+    -webkit-transform: translate3d(0, 0, 0);
+    transform: translate3d(0, 0, 0);
+    -webkit-perspective: 1000px;
+    perspective: 1000px;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+}
+
+/* Evitar cambios de layout durante scroll */
+img,
+iframe,
+video {
+    max-width: 100%;
+    height: auto;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* Optimizar transiciones específicas que pueden causar temblor */
+.sidebar-menu .dropdown .sidebar-submenu {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: height, opacity;
+}
+
+/* Mejorar scroll behavior en contenedores */
+.table-responsive,
+.overflow-auto,
+.overflow-scroll {
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+}
+
+/* Corregir transición problemática del overlay */
+body::after {
+    transition: width 0.3s ease-out, opacity 0.3s ease-out !important;
+    will-change: width, opacity;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+/* Optimizar elementos durante scroll */
+.is-scrolling body::after {
+    transition: none !important;
+}
+
+/* Mejorar performance de elementos con muchas transiciones */
+*[style*="transition: all"] {
+    transition-property: transform, opacity, background-color, color, border-color, box-shadow !important;
+    transition-duration: 0.3s !important;
+    transition-timing-function: ease-out !important;
+}
+
+/* Prevenir temblores en elementos con hover */
+.btn,
+.card,
+.dropdown-item,
+.nav-link,
+.sidebar-menu a {
+    transition-property: background-color, color, border-color, transform !important;
+    transition-timing-function: ease-out !important;
+}
+
+/* Optimizar elementos que cambian de tamaño */
+.sidebar.active,
+.dashboard-main.active {
+    transition-property: transform, margin, padding !important;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1) !important;
+}

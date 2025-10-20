@@ -1,0 +1,152 @@
+{% extends '../layout/layout.html' %} 
+
+{% block content %}
+
+
+<div class="card h-100 p-0 radius-12">
+    <div class="card-body p-24">
+        <div class="row justify-content-center">
+            <div class="col-xxl-6 col-xl-8 col-lg-10">
+                <div class="card border">
+                    <div class="card-body">
+                        <form method="post">
+                            {% csrf_token %}
+                            
+                            <!-- Información básica del usuario -->
+                            <div class="mb-20">
+                                <label for="{{ user_form.username.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Nombre de Usuario <span class="text-danger-600">*</span></label>
+                                {{ user_form.username }}
+                                <small class="text-muted">Nombre único para iniciar sesión</small>
+                                {% if user_form.username.errors %}
+                                    <div class="text-danger-600 text-sm">{{ user_form.username.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-20">
+                                <label for="{{ user_form.first_name.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Nombre <span class="text-danger-600">*</span></label>
+                                {{ user_form.first_name }}
+                                <small class="text-muted">Nombre del usuario</small>
+                                {% if user_form.first_name.errors %}
+                                    <div class="text-danger-600 text-sm">{{ user_form.first_name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-20">
+                                <label for="{{ user_form.last_name.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Apellido <span class="text-danger-600">*</span></label>
+                                {{ user_form.last_name }}
+                                <small class="text-muted">Apellido del usuario</small>
+                                {% if user_form.last_name.errors %}
+                                    <div class="text-danger-600 text-sm">{{ user_form.last_name.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-20">
+                                <label for="{{ user_form.email.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Correo Electrónico <span class="text-danger-600">*</span></label>
+                                {{ user_form.email }}
+                                <small class="text-muted">Email único para iniciar sesión</small>
+                                {% if user_form.email.errors %}
+                                    <div class="text-danger-600 text-sm">{{ user_form.email.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Contraseña obligatoria en creación -->
+                            <div class="mb-20">
+                                <label for="{{ user_form.password.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Contraseña <span class="text-danger-600">*</span></label>
+                                {{ user_form.password }}
+                                {% if user_form.password.errors %}
+                                    <div class="text-danger-600 text-sm">{{ user_form.password.errors.0 }}</div>
+                                {% endif %}
+                                <small class="text-muted">Obligatoria. Mínimo 8 caracteres.</small>
+                            </div>
+                            <div class="mb-20">
+                                <label for="{{ user_form.confirm_password.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Confirmar Contraseña <span class="text-danger-600">*</span></label>
+                                {{ user_form.confirm_password }}
+                                {% if user_form.confirm_password.errors %}
+                                    <div class="text-danger-600 text-sm">{{ user_form.confirm_password.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <!-- Información del perfil -->
+                            <div class="mb-20">
+                                <label for="{{ perfil_form.organizacion.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Organización <span class="text-danger-600">*</span></label>
+                                {{ perfil_form.organizacion }}
+                                <small class="text-muted">Seleccione la organización del usuario</small>
+                                {% if perfil_form.organizacion.errors %}
+                                    <div class="text-danger-600 text-sm">{{ perfil_form.organizacion.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="mb-20">
+                                <label for="{{ perfil_form.rol.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Rol del Sistema <span class="text-danger-600">*</span></label>
+                                {{ perfil_form.rol }}
+                                <small class="text-muted">Nivel de acceso en el sistema</small>
+                                {% if perfil_form.rol.errors %}
+                                    <div class="text-danger-600 text-sm">{{ perfil_form.rol.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-20">
+                                <label for="{{ perfil_form.telefono.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Teléfono</label>
+                                {{ perfil_form.telefono }}
+                                <small class="text-muted">Número de teléfono del usuario</small>
+                                {% if perfil_form.telefono.errors %}
+                                    <div class="text-danger-600 text-sm">{{ perfil_form.telefono.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="mb-20">
+                                <label for="{{ user_form.is_active.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Estado</label>
+                                <div class="form-check">
+                                    {{ user_form.is_active }}
+                                    <label class="form-check-label" for="{{ user_form.is_active.id_for_label }}">
+                                        Usuario activo
+                                    </label>
+                                </div>
+                                <small class="text-muted">Marque para activar el usuario</small>
+                                {% if user_form.is_active.errors %}
+                                    <div class="text-danger-600 text-sm">{{ user_form.is_active.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            
+                            <!-- Mostrar errores generales del formulario -->
+                            {% if user_form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {{ user_form.non_field_errors.0 }}
+                                </div>
+                            {% endif %}
+                            
+                            {% if perfil_form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {{ perfil_form.non_field_errors.0 }}
+                                </div>
+                            {% endif %}
+                            
+                            <!-- Mostrar mensajes -->
+                            {% if messages %}
+                                {% for message in messages %}
+                                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                            
+                            <div class="d-flex align-items-center justify-content-center gap-3">
+                                <a href="{% url 'usersList' %}" class="border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-56 py-11 radius-8 text-decoration-none">
+                                    Cancelar
+                                </a>
+                                <button type="submit" class="btn btn-primary border border-primary-600 text-md px-56 py-12 radius-8">
+                                    Crear Usuario
+                                </button>
+                            </div>
+                        </form>
+
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock content %}

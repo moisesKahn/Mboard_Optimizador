@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test JavaScript Ultra Básico</title>
+    <meta charset="utf-8">
+</head>
+<body>
+    <h1>🧪 TEST JAVASCRIPT ULTRA BÁSICO</h1>
+    
+    <p>Si ves este texto, HTML funciona.</p>
+    
+    <button onclick="alert('JavaScript funciona!')">CLICK AQUÍ</button>
+    
+    <br><br>
+    
+    <button onclick="testBasico()">Test Función</button>
+    
+    <div id="resultado"></div>
+    
+    <script>
+    // Test inmediato al cargar
+    console.log('Script cargado');
+    
+    function testBasico() {
+        document.getElementById('resultado').innerHTML = '✅ JavaScript SÍ funciona!';
+        console.log('Función ejecutada');
+    }
+    
+    // Test automático
+    setTimeout(function() {
+        console.log('Timeout ejecutado');
+        document.getElementById('resultado').innerHTML = '⏰ Auto-test ejecutado';
+    }, 2000);
+    </script>
+</body>
+</html>

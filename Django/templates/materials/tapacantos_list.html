@@ -1,0 +1,201 @@
+{% extends '../layout/layout.html' %} 
+
+{% block content %}
+
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">Lista de Tapacantos</h6>
+    <div class="d-flex align-items-center gap-2">
+        <a href="{% url 'add_tapacanto' %}" class="btn btn-sm btn-primary-600 radius-8 d-flex align-items-center gap-1">
+            <iconify-icon icon="solar:plus-outline" class="text-xl"></iconify-icon>
+            Agregar Tapacanto
+        </a>
+        <input type="file" id="importFileTapacantos" accept=".csv,.xlsx" class="d-none">
+        <button type="button" class="btn btn-sm btn-success-600 radius-8 d-flex align-items-center gap-1" onclick="document.getElementById('importFileTapacantos').click()">
+            <iconify-icon icon="solar:import-outline" class="text-xl"></iconify-icon>
+            Importar Tapacantos
+        </button>
+    </div>
+</div>
+
+<div class="card basic-data-table">
+    <div class="card-header">
+        <h5 class="card-title mb-0">Gestión de Tapacantos</h5>
+        <div class="mt-3">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="position-relative">
+                        <input type="text" id="searchTapacantos" class="form-control pe-5" placeholder="Buscar por código, nombre, color..." value="{{ search }}">
+                        <button type="button" id="clearSearchTapacantos" class="btn btn-sm position-absolute end-0 top-50 translate-middle-y me-2 d-none" style="border: none; background: none; color: #999; padding: 0; width: 20px; height: 20px;">
+                            <iconify-icon icon="solar:close-circle-bold" class="text-lg"></iconify-icon>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-3 d-flex align-items-center gap-2">
+                    <span id="resultsCountTapacantos" class="text-muted small">{{ total }} resultado{% if total != 1 %}s{% endif %}</span>
+                    <select name="page_size" id="pageSizeTapacantos" class="form-select form-select-sm w-auto">
+                        {% for size in page_sizes %}
+                            <option value="{{ size }}" {% if page_size|stringformat:'s' == size|stringformat:'s' %}selected{% endif %}>{{ size }}/pág</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card-body">
+        <table class="table bordered-table mb-0" id="dataTable" data-page-length='10'>
+            <thead>
+                <tr>
+                    <th scope="col">Código</th>
+                    <th scope="col">Nombre</th>
+                    <th scope="col">Color</th>
+                    <th scope="col">Ancho</th>
+                    <th scope="col">Espesor</th>
+                    <th scope="col">Valor por metro</th>
+                    <th scope="col">Acción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tapacanto in tapacantos %}
+                <tr>
+                    <td>{{ tapacanto.codigo }}</td>
+                    <td>{{ tapacanto.nombre }}</td>
+                    <td>{{ tapacanto.color }}</td>
+                    <td>{{ tapacanto.ancho }} mm</td>
+                    <td>{{ tapacanto.espesor }} mm</td>
+                    <td>${{ tapacanto.precio_metro|floatformat:0 }}</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-10">
+                            <button type="button" class="bg-info-focus text-info-main bg-hover-info-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle">
+                                <iconify-icon icon="solar:eye-outline" class="menu-icon"></iconify-icon>
+                            </button>
+                            <a href="{% url 'edit_tapacanto' tapacanto.id %}" class="bg-success-focus text-success-main bg-hover-success-200 fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle text-decoration-none">
+                                <iconify-icon icon="lucide:edit" class="menu-icon"></iconify-icon>
+                            </a>
+                            <button type="button" class="remove-item-btn bg-danger-focus bg-hover-danger-200 text-danger-main fw-medium w-40-px h-40-px d-flex justify-content-center align-items-center rounded-circle" data-id="{{ tapacanto.id }}" data-nombre="{{ tapacanto.nombre }}" onclick="confirmDelete(this)">
+                                <iconify-icon icon="fluent:delete-24-regular" class="menu-icon"></iconify-icon>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" class="text-center py-4">
+                        <div class="text-muted">
+                            <iconify-icon icon="solar:box-outline" class="text-4xl mb-2"></iconify-icon>
+                            <p>No hay tapacantos disponibles</p>
+                            <a href="{% url 'add_tapacanto' %}" class="btn btn-sm btn-primary">Agregar Primer Tapacanto</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+            <span>Página {{ page }} de {{ total_pages }}</span>
+            <div class="btn-group" role="group" aria-label="Pagination">
+                {% with qs=request.GET.urlencode %}
+                    {% if page > 1 %}
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page=1">« Primero</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page={{ page|add:-1 }}">‹ Anterior</a>
+                    {% else %}
+                        <span class="btn btn-outline-secondary btn-sm disabled">« Primero</span>
+                        <span class="btn btn-outline-secondary btn-sm disabled">‹ Anterior</span>
+                    {% endif %}
+                    {% if page < total_pages %}
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page={{ page|add:1 }}">Siguiente ›</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="?{% if qs %}{{ qs }}&{% endif %}page={{ total_pages }}">Último »</a>
+                    {% else %}
+                        <span class="btn btn-outline-secondary btn-sm disabled">Siguiente ›</span>
+                        <span class="btn btn-outline-secondary btn-sm disabled">Último »</span>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function confirmDelete(button) {
+    const id = button.getAttribute('data-id');
+    const nombre = button.getAttribute('data-nombre');
+    
+    if (confirm(`¿Está seguro de que desea eliminar el tapacanto "${nombre}" (ID: ${id})?\n\nEsta acción no se puede deshacer.`)) {
+        // Realizar eliminación vía AJAX
+        fetch(`/materiales/tapacantos/eliminar/${id}/`, {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                alert('Tapacanto eliminado correctamente.');
+                location.reload(); // Recargar la página para actualizar la lista
+            } else {
+                alert('Error al eliminar el tapacanto: ' + data.message);
+            }
+        })
+        .catch(error => {
+            alert('Error al eliminar el tapacanto.');
+            console.error('Error:', error);
+        });
+    }
+}
+
+// Importación CSV/XLSX de tapacantos (valor por metro)
+document.addEventListener('DOMContentLoaded', () => {
+    const input = document.getElementById('importFileTapacantos');
+    if (!input) return;
+    const pageSizeSelect = document.getElementById('pageSizeTapacantos');
+    if (pageSizeSelect) {
+        pageSizeSelect.addEventListener('change', function() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('page_size', this.value);
+            url.searchParams.set('page', '1');
+            window.location.href = url.toString();
+        });
+    }
+        input.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!['csv'].includes(ext)) { alert('Por ahora se admite CSV (separador coma).'); return; }
+        const text = await file.text();
+        // Formato esperado CSV con encabezados: codigo,nombre,color,ancho_mm,espesor_mm,valor_por_metro[,stock_metros]
+        const rows = text.split(/\r?\n/).filter(r => r.trim().length);
+        const header = rows.shift();
+        const cols = header.split(',').map(h => h.trim().toLowerCase());
+        const required = ['codigo','nombre','color','ancho_mm','espesor_mm','valor_por_metro'];
+        const missing = required.filter(k => !cols.includes(k));
+        if (missing.length) { alert('Faltan columnas en CSV: ' + missing.join(', ')); return; }
+        const idx = Object.fromEntries(cols.map((c,i)=>[c,i]));
+        const errores = [];
+        const items = rows.map((r, line) => {
+                const parts = r.split(',');
+                const ancho = parseFloat(parts[idx['ancho_mm']]||'0');
+                const espesor = parseFloat(parts[idx['espesor_mm']]||'0');
+                const valor = parseFloat(parts[idx['valor_por_metro']]||'0');
+            const stock = cols.includes('stock_metros') ? parseFloat(parts[idx['stock_metros']]||'0') : 0;
+                if (!(ancho>0 && espesor>0 && valor>=0 && stock>=0)) {
+                        errores.push(`Línea ${line+2}: valores inválidos`);
+                }
+                return { codigo: parts[idx['codigo']], nombre: parts[idx['nombre']], color: parts[idx['color']], ancho, espesor, precio_metro: valor, stock_metros: stock };
+        });
+        if (errores.length) { alert('No se puede importar:\n' + errores.join('\n')); return; }
+        const res = await fetch(`{% url 'importar_tapacantos_csv' %}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }, body: text });
+        const data = await res.json();
+        if (data.success) {
+            alert(`Importación exitosa. Creados: ${data.creados}, Actualizados: ${data.actualizados}`);
+            location.reload();
+        } else {
+            alert('Errores en importación:\n' + (data.errores ? data.errores.join('\n') : data.message));
+        }
+    });
+});
+</script>
+
+{% csrf_token %}
+
+{% endblock %}

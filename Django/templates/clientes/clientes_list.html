@@ -1,0 +1,232 @@
+{% extends 'layout/layout.html' %}
+{% load static %}
+
+{% block meta_title %}{{ title }}{% endblock %}
+
+{% block content %}
+
+<div class="dashboard-main-body">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+        <h6 class="fw-semibold mb-0">{{ title }}</h6>
+        <ul class="d-flex align-items-center gap-2">
+            <li class="fw-medium">
+                <a href="{% url 'index' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                    <iconify-icon icon="solar:home-smile-angle-outline" class="icon text-lg"></iconify-icon>
+                    Inicio
+                </a>
+            </li>
+            <li>-</li>
+            <li class="fw-medium">{{ subTitle }}</li>
+        </ul>
+    </div>
+
+    <div class="card h-100 p-0 radius-12">
+        <div class="card-header border-bottom bg-base py-16 px-24 d-flex align-items-center flex-wrap gap-3 justify-content-between">
+            <div class="d-flex align-items-center flex-wrap gap-3">
+                <span class="text-md fw-medium text-secondary-light mb-0">Lista de Clientes</span>
+            </div>
+            <div class="d-flex align-items-center flex-wrap gap-3">
+                <!-- Buscador + page_size -->
+                <form method="GET" class="d-flex align-items-center gap-2 position-relative">
+                    <label class="mb-0 text-sm text-secondary-light">Mostrar</label>
+                    <select name="page_size" class="form-select form-select-sm w-auto ps-12 py-6 radius-8 h-40-px" onchange="this.form.submit()">
+                        {% for n in page_sizes %}
+                        <option value="{{ n }}" {% if page_size == n %}selected{% endif %}>{{ n }}</option>
+                        {% endfor %}
+                    </select>
+                    <input type="hidden" name="page" value="1" />
+                    <input type="text" name="search" value="{{ search }}" 
+                           class="form-control radius-8 h-40-px me-16" 
+                           placeholder="Buscar por RUT, nombre, organización o email...">
+                    <iconify-icon icon="ion:search-outline" class="position-absolute top-50 translate-middle-y me-12"></iconify-icon>
+                </form>
+                <!-- Botón agregar -->
+                <a href="{% url 'clientes_agregar' %}" class="btn btn-primary text-sm btn-sm px-12 py-12 radius-8 d-flex align-items-center gap-2">
+                    <iconify-icon icon="ic:baseline-plus" class="icon text-xl line-height-1"></iconify-icon>
+                    Agregar Cliente
+                </a>
+            </div>
+        </div>
+
+        <div class="card-body p-24">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="table-responsive scroll-sm">
+                <table class="table bordered-table sm-table mb-0">
+                    <thead>
+                        <tr>
+                            <th scope="col">Cliente</th>
+                            <th scope="col">RUT</th>
+                            <th scope="col">Organización</th>
+                            <th scope="col">Contacto</th>
+                            <th scope="col">Estado</th>
+                            <th scope="col" class="text-center">Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cliente in clientes %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-grow-1">
+                                            <span class="text-md mb-0 fw-medium text-primary-light">{{ cliente.nombre }}</span>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    <span class="text-md mb-0 fw-normal text-secondary-light">{{ cliente.rut }}</span>
+                                </td>
+                                <td>
+                                    <span class="text-md mb-0 fw-normal text-secondary-light">{{ cliente.organizacion.nombre|default:"Sin organización" }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex flex-column">
+                                        <span class="text-sm mb-0 fw-normal text-secondary-light">{{ cliente.email|default:"Sin email" }}</span>
+                                        <span class="text-sm mb-0 fw-normal text-secondary-light">{{ cliente.telefono|default:"Sin teléfono" }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if cliente.activo %}
+                                        <span class="bg-success-focus text-success-main px-16 py-6 rounded-pill fw-semibold text-sm">
+                                            <i class="ri-checkbox-circle-line"></i> Activo
+                                        </span>
+                                    {% else %}
+                                        <span class="bg-danger-focus text-danger-main px-16 py-6 rounded-pill fw-semibold text-sm">
+                                            <i class="ri-close-circle-line"></i> Inactivo
+                                        </span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <div class="d-flex align-items-center gap-10 justify-content-center">
+                                        <a href="{% url 'clientes_editar' cliente.id %}" 
+                                           class="bg-success-focus text-success-main w-32-px h-32-px rounded-circle d-inline-flex align-items-center justify-content-center"
+                                           title="Editar cliente">
+                                            <iconify-icon icon="lucide:edit"></iconify-icon>
+                                        </a>
+                                        {% if cliente.activo %}
+                    <button type="button" 
+                        class="bg-danger-focus text-danger-main w-32-px h-32-px rounded-circle d-inline-flex align-items-center justify-content-center"
+                        data-id="{{ cliente.id }}" data-nombre="{{ cliente.nombre|escape }}"
+                        onclick="eliminarCliente(this.dataset.id, this.dataset.nombre)"
+                        title="Desactivar cliente">
+                                            <iconify-icon icon="mingcute:delete-2-line"></iconify-icon>
+                                        </button>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4">
+                                    <div class="d-flex flex-column align-items-center gap-3">
+                                        <iconify-icon icon="solar:users-group-rounded-outline" class="text-secondary-light" style="font-size: 48px;"></iconify-icon>
+                                        <span class="text-secondary-light">No se encontraron clientes</span>
+                                        {% if search %}
+                                            <a href="{% url 'clientes_lista' %}" class="btn btn-sm btn-outline-primary">Ver todos los clientes</a>
+                                        {% else %}
+                                            <a href="{% url 'clientes_agregar' %}" class="btn btn-sm btn-primary">Agregar primer cliente</a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-24">
+    <span>Mostrando {{ clientes|length }} de {{ total }} cliente{{ total|pluralize:"s" }} • Página {{ page }} de {{ total_pages }}</span>
+    <ul class="pagination d-flex flex-wrap align-items-center gap-2 justify-content-center">
+        {% with prev=page|add:-1 next=page|add:1 near_last=total_pages|add:-1 %}
+        <li class="page-item {% if page <= 1 %}disabled{% endif %}">
+            <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="?page={{ prev|default:1 }}&page_size={{ page_size }}&search={{ search }}">
+                <iconify-icon icon="ep:d-arrow-left"></iconify-icon>
+            </a>
+        </li>
+        <li class="page-item"><a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px" href="?page=1&page_size={{ page_size }}&search={{ search }}">1</a></li>
+        {% if total_pages > 1 %}
+            {% if page > 2 %}<li class="page-item"><span class="page-link border-0">…</span></li>{% endif %}
+            <li class="page-item active"><a class="page-link bg-primary-600 text-white border-0" href="#">{{ page }}</a></li>
+            {% if page < near_last %}<li class="page-item"><span class="page-link border-0">…</span></li>{% endif %}
+            <li class="page-item"><a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px" href="?page={{ total_pages }}&page_size={{ page_size }}&search={{ search }}">{{ total_pages }}</a></li>
+        {% endif %}
+        <li class="page-item {% if page >= total_pages %}disabled{% endif %}">
+            <a class="page-link bg-neutral-200 text-secondary-light fw-semibold radius-8 border-0 d-flex align-items-center justify-content-center h-32-px w-32-px text-md" href="?page={{ next|default:total_pages }}&page_size={{ page_size }}&search={{ search }}">
+                <iconify-icon icon="ep:d-arrow-right"></iconify-icon>
+            </a>
+        </li>
+    {% endwith %}
+    </ul>
+</div>
+
+<!-- Modal de confirmación de eliminación -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Confirmar eliminación</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Estás seguro de que deseas desactivar al cliente <strong id="clienteNombre"></strong>?</p>
+                <p class="text-muted">El cliente será marcado como inactivo y no aparecerá en las búsquedas activas.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="confirmarEliminar">Desactivar Cliente</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let clienteIdToDelete = null;
+
+function eliminarCliente(clienteId, clienteNombre) {
+    clienteIdToDelete = clienteId;
+    document.getElementById('clienteNombre').textContent = clienteNombre;
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    modal.show();
+}
+
+document.getElementById('confirmarEliminar').addEventListener('click', function() {
+    if (clienteIdToDelete) {
+        fetch(`{% url 'clientes_eliminar' 0 %}`.replace('0', clienteIdToDelete), {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                'Content-Type': 'application/json',
+            },
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                location.reload();
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error al procesar la solicitud');
+        });
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('deleteModal'));
+        modal.hide();
+    }
+});
+</script>
+
+{% csrf_token %}
+
+{% endblock %}

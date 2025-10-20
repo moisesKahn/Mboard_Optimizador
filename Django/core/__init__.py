@@ -1,0 +1,1 @@
+# Aplicación core - Modelos principales del sistema Optimizador

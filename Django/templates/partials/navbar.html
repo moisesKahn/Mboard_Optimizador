@@ -1,0 +1,367 @@
+{% load ui_extras %}
+<div class="navbar-header">
+    <div class="row align-items-center justify-content-between">
+        <div class="col-auto">
+            <div class="d-flex flex-wrap align-items-center gap-4">
+                <button type="button" class="sidebar-toggle">
+                    <iconify-icon icon="heroicons:bars-3-solid" class="icon text-2xl non-active"></iconify-icon>
+                    <iconify-icon icon="iconoir:arrow-right" class="icon text-2xl active"></iconify-icon>
+                </button>
+                <button type="button" class="sidebar-mobile-toggle">
+                    <iconify-icon icon="heroicons:bars-3-solid" class="icon"></iconify-icon>
+                </button>
+                <div class="navbar-search position-relative">
+                    <input type="text" id="globalSearch" name="search" placeholder="Buscar proyectos, clientes, usuarios..." autocomplete="off">
+                    <iconify-icon icon="ion:search-outline" class="icon"></iconify-icon>
+                    <div id="searchResults" class="position-absolute bg-white rounded shadow-sm border d-none" style="top: 100%; left: 0; right: 0; z-index: 1000; max-height: 400px; overflow-y: auto;">
+                        <!-- Resultados de búsqueda aparecerán aquí -->
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-auto">
+            <div class="d-flex flex-wrap align-items-center gap-3">
+                <button type="button" data-theme-toggle class="w-40-px h-40-px bg-neutral-200 rounded-circle d-flex justify-content-center align-items-center d-none"></button>
+                <div class="dropdown d-none">
+                    <button class="has-indicator w-40-px h-40-px bg-neutral-200 rounded-circle d-flex justify-content-center align-items-center" type="button" data-bs-toggle="dropdown">
+                        <img src="/static/images/lang-flag.png" alt="image" class="w-24 h-24 object-fit-cover rounded-circle">
+                    </button>
+                    <div class="dropdown-menu to-top dropdown-menu-sm">
+                        <div class="py-12 px-16 radius-8 bg-primary-50 mb-16 d-flex align-items-center justify-content-between gap-2">
+                            <div>
+                                <h6 class="text-lg text-primary-light fw-semibold mb-0">Elige tu idioma</h6>
+                            </div>
+                        </div>
+
+                        <div class="max-h-400-px overflow-y-auto scroll-sm pe-8">
+                            <div class="form-check style-check d-flex align-items-center justify-content-between mb-16">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="english">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag1.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">Inglés</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="english">
+                            </div>
+
+                            <div class="form-check style-check d-flex align-items-center justify-content-between mb-16">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="japan">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag2.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">Japonés</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="japan">
+                            </div>
+
+                            <div class="form-check style-check d-flex align-items-center justify-content-between mb-16">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="france">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag3.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">Francés</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="france">
+                            </div>
+
+                            <div class="form-check style-check d-flex align-items-center justify-content-between mb-16">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="germany">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag4.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">Alemán</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="germany">
+                            </div>
+
+                            <div class="form-check style-check d-flex align-items-center justify-content-between mb-16">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="korea">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag5.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">South Korea</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="korea">
+                            </div>
+
+                            <div class="form-check style-check d-flex align-items-center justify-content-between mb-16">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="bangladesh">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag6.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">Bangladesh</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="bangladesh">
+                            </div>
+
+                            <div class="form-check style-check d-flex align-items-center justify-content-between mb-16">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="india">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag7.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">India</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="india">
+                            </div>
+                            <div class="form-check style-check d-flex align-items-center justify-content-between">
+                                <label class="form-check-label line-height-1 fw-medium text-secondary-light" for="canada">
+                                    <span class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                        <img src="/static/images/flags/flag8.png" alt="" class="w-36-px h-36-px bg-success-subtle text-success-main rounded-circle flex-shrink-0">
+                                        <span class="text-md fw-semibold mb-0">Canada</span>
+                                    </span>
+                                </label>
+                                <input class="form-check-input" type="radio" name="crypto" id="canada">
+                            </div>
+                        </div>
+                    </div>
+                </div><!-- Language dropdown end -->
+
+                <div class="dropdown">
+                    <button id="btnMessages" class="position-relative w-40-px h-40-px bg-neutral-200 rounded-circle d-flex justify-content-center align-items-center" type="button" data-bs-toggle="dropdown">
+                        <iconify-icon icon="mage:email" class="text-primary-light text-xl"></iconify-icon>
+                        <span id="messagesBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger d-none">0</span>
+                    </button>
+                    <div id="messagesDropdown" class="dropdown-menu to-top dropdown-menu-lg p-0">
+                        <div class="p-3 border-bottom d-flex align-items-center justify-content-between">
+                            <strong>Mensajes</strong>
+                            <a href="{% url 'chat' %}" class="text-primary-600 text-sm">Abrir chat</a>
+                        </div>
+                        <div class="px-3 py-2 border-bottom d-flex align-items-center justify-content-between gap-2">
+                            <div class="d-flex align-items-center gap-2">
+                                <iconify-icon icon="mdi:volume-high" id="soundIcon" class="text-primary"></iconify-icon>
+                                <span class="small">Sonido</span>
+                            </div>
+                            <div class="form-check form-switch m-0">
+                                <input class="form-check-input" type="checkbox" role="switch" id="toggleChatSound">
+                            </div>
+                        </div>
+                        <div id="messagesList" class="max-h-400-px overflow-y-auto scroll-sm pe-4">
+                            <div class="p-4 text-center text-muted" id="noMessages">No tienes mensajes nuevos</div>
+                        </div>
+                    </div>
+                </div><!-- Message dropdown end -->
+
+                <div class="dropdown d-none">
+                    <button class="has-indicator w-40-px h-40-px bg-neutral-200 rounded-circle d-flex justify-content-center align-items-center" type="button" data-bs-toggle="dropdown">
+                        <iconify-icon icon="iconoir:bell" class="text-primary-light text-xl"></iconify-icon>
+                    </button>
+                    <div class="dropdown-menu to-top dropdown-menu-lg p-0">
+                        <div class="m-16 py-12 px-16 radius-8 bg-primary-50 mb-16 d-flex align-items-center justify-content-between gap-2">
+                            <div>
+                                <h6 class="text-lg text-primary-light fw-semibold mb-0">Notifications</h6>
+                            </div>
+                            <span class="text-primary-600 fw-semibold text-lg w-40-px h-40-px rounded-circle bg-base d-flex justify-content-center align-items-center">05</span>
+                        </div>
+
+                        <div class="max-h-400-px overflow-y-auto scroll-sm pe-4">
+                            <a href="javascript:void(0)" class="px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between">
+                                <div class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                    <span class="w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0">
+                                        <iconify-icon icon="bitcoin-icons:verify-outline" class="icon text-xxl"></iconify-icon>
+                                    </span>
+                                    <div>
+                                        <h6 class="text-md fw-semibold mb-4">Congratulations</h6>
+                                        <p class="mb-0 text-sm text-secondary-light text-w-200-px">Your profile has been Verified. Your profile has been Verified</p>
+                                    </div>
+                                </div>
+                                <span class="text-sm text-secondary-light flex-shrink-0">23 Mins ago</span>
+                            </a>
+
+                            <a href="javascript:void(0)" class="px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between bg-neutral-50">
+                                <div class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                    <span class="w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0">
+                                        <img src="/static/images/notification/profile-1.png" alt="">
+                                    </span>
+                                    <div>
+                                        <h6 class="text-md fw-semibold mb-4">Ronald Richards</h6>
+                                        <p class="mb-0 text-sm text-secondary-light text-w-200-px">You can stitch between artboards</p>
+                                    </div>
+                                </div>
+                                <span class="text-sm text-secondary-light flex-shrink-0">23 Mins ago</span>
+                            </a>
+
+                            <a href="javascript:void(0)" class="px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between">
+                                <div class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                    <span class="w-44-px h-44-px bg-info-subtle text-info-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0">
+                                        AM
+                                    </span>
+                                    <div>
+                                        <h6 class="text-md fw-semibold mb-4">Arlene McCoy</h6>
+                                        <p class="mb-0 text-sm text-secondary-light text-w-200-px">Invite you to prototyping</p>
+                                    </div>
+                                </div>
+                                <span class="text-sm text-secondary-light flex-shrink-0">23 Mins ago</span>
+                            </a>
+
+                            <a href="javascript:void(0)" class="px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between bg-neutral-50">
+                                <div class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                    <span class="w-44-px h-44-px bg-success-subtle text-success-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0">
+                                        <img src="/static/images/notification/profile-2.png" alt="">
+                                    </span>
+                                    <div>
+                                        <h6 class="text-md fw-semibold mb-4">Annette Black</h6>
+                                        <p class="mb-0 text-sm text-secondary-light text-w-200-px">Invite you to prototyping</p>
+                                    </div>
+                                </div>
+                                <span class="text-sm text-secondary-light flex-shrink-0">23 Mins ago</span>
+                            </a>
+
+                            <a href="javascript:void(0)" class="px-24 py-12 d-flex align-items-start gap-3 mb-2 justify-content-between">
+                                <div class="text-black hover-bg-transparent hover-text-primary d-flex align-items-center gap-3">
+                                    <span class="w-44-px h-44-px bg-info-subtle text-info-main rounded-circle d-flex justify-content-center align-items-center flex-shrink-0">
+                                        DR
+                                    </span>
+                                    <div>
+                                        <h6 class="text-md fw-semibold mb-4">Darlene Robertson</h6>
+                                        <p class="mb-0 text-sm text-secondary-light text-w-200-px">Invite you to prototyping</p>
+                                    </div>
+                                </div>
+                                <span class="text-sm text-secondary-light flex-shrink-0">23 Mins ago</span>
+                            </a>
+                        </div>
+
+                        <div class="text-center py-12 px-16">
+                            <a href="javascript:void(0)" class="text-primary-600 fw-semibold text-md">See All Notification</a>
+                        </div>
+
+                    </div>
+                </div><!-- Notification dropdown end -->
+
+                <div class="dropdown">
+                    <button class="d-flex justify-content-center align-items-center rounded-circle" type="button" data-bs-toggle="dropdown">
+                        <div class="w-40-px h-40-px rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
+                             style="background-color:#6c5ce7;">
+                            {{ user|user_initials }}
+                        </div>
+                    </button>
+                    <div class="dropdown-menu to-top dropdown-menu-sm">
+                        <div class="py-12 px-16 radius-8 bg-primary-50 mb-16 d-flex align-items-center justify-content-between gap-2">
+                            <div>
+                                <h6 class="text-lg text-primary-light fw-semibold mb-2">
+                                    {{ user.get_full_name|default:user.username }}
+                                </h6>
+                                <span class="text-secondary-light fw-medium text-sm">
+                                    {% if user.usuarioperfiloptimizador.rol == 'super_admin' %}
+                                        Super Administrador
+                                    {% elif user.usuarioperfiloptimizador.rol == 'org_admin' %}
+                                        Admin de Organización
+                                    {% elif user.usuarioperfiloptimizador.rol == 'agente' %}
+                                        Agente
+                                    {% else %}
+                                        Usuario
+                                    {% endif %}
+                                    {% if user.usuarioperfiloptimizador.organizacion %}
+                                        - {{ user.usuarioperfiloptimizador.organizacion.nombre }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <button type="button" class="hover-text-danger">
+                                <iconify-icon icon="radix-icons:cross-1" class="icon text-xl"></iconify-icon>
+                            </button>
+                        </div>
+                        <ul class="to-top-list">
+                            <li>
+                                <a class="dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-primary d-flex align-items-center gap-3" href="{% url 'viewProfile' %}">
+                                    <iconify-icon icon="fluent:person-32-regular" class="icon text-xl"></iconify-icon> Perfil
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-primary d-flex align-items-center gap-3" href="{% if user.is_authenticated %}{% url 'editOwnProfile' %}{% else %}{% url 'signin' %}{% endif %}">
+                                    <iconify-icon icon="solar:user-linear" class="icon text-xl"></iconify-icon> Editar Perfil
+                                </a>
+                            </li>
+                            <li>
+                                <a class="dropdown-item text-black px-0 py-8 hover-bg-transparent hover-text-danger d-flex align-items-center gap-3" href="{% url 'logout' %}">
+                                    <iconify-icon icon="lucide:power" class="icon text-xl"></iconify-icon> Cerrar Sesión
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div><!-- Profile dropdown end -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('globalSearch');
+    const searchResults = document.getElementById('searchResults');
+    let searchTimeout;
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        
+        clearTimeout(searchTimeout);
+        
+        if (query.length < 2) {
+            searchResults.classList.add('d-none');
+            return;
+        }
+
+        searchTimeout = setTimeout(() => {
+            fetch(`/search/?q=${encodeURIComponent(query)}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayResults(data.results);
+                })
+                .catch(error => {
+                    console.error('Error en búsqueda:', error);
+                });
+        }, 300);
+    });
+
+    function displayResults(results) {
+        if (results.length === 0) {
+            searchResults.innerHTML = '<div class="p-3 text-muted">No se encontraron resultados</div>';
+        } else {
+            let html = '';
+            results.forEach(result => {
+                html += `
+                    <a href="${result.url}" class="d-block p-3 text-decoration-none border-bottom hover-bg-light">
+                        <div class="d-flex align-items-center gap-2">
+                            <iconify-icon icon="${result.icon}" class="text-primary"></iconify-icon>
+                            <div>
+                                <div class="fw-medium text-dark">${result.title}</div>
+                                <div class="text-muted small">${result.subtitle}</div>
+                            </div>
+                        </div>
+                    </a>
+                `;
+            });
+            searchResults.innerHTML = html;
+        }
+        searchResults.classList.remove('d-none');
+    }
+
+    // Ocultar resultados al hacer clic fuera
+    document.addEventListener('click', function(e) {
+        if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+            searchResults.classList.add('d-none');
+        }
+    });
+});
+
+// Modal para cambio de contraseña
+function showChangePasswordModal() {
+    // Por ahora solo mostrar un alert, se puede implementar un modal después
+    alert('Funcionalidad de cambio de contraseña - En desarrollo');
+}
+
+// Toggle de sonido del chat (persistente en localStorage)
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.getElementById('toggleChatSound');
+    const icon = document.getElementById('soundIcon');
+    if (!toggle || !icon) return;
+    // estado inicial: true si no existe, respeta 'false'
+    const pref = localStorage.getItem('chatSoundEnabled');
+    const enabled = pref !== 'false';
+    toggle.checked = enabled;
+    icon.setAttribute('icon', enabled ? 'mdi:volume-high' : 'mdi:volume-off');
+    toggle.addEventListener('change', () => {
+        const isOn = toggle.checked;
+        localStorage.setItem('chatSoundEnabled', isOn ? 'true' : 'false');
+        icon.setAttribute('icon', isOn ? 'mdi:volume-high' : 'mdi:volume-off');
+    });
+});
+</script>
