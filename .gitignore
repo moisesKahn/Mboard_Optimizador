@@ -54,3 +54,4 @@ Django/media/
 **/__pycache__/
 **/*.sqlite3
 **/backup_optimizador_*/
+**/backup_optimizador_*.zip
