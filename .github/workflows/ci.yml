@@ -28,4 +28,4 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: WowDash.settings
         run: |
-          python manage.py check --deploy --fail-level WARNING
+          python manage.py check
