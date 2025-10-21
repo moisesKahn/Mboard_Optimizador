@@ -1,0 +1,4 @@
+codigo,nombre,color,ancho,espesor,precio_metro,stock_metros,proveedor,organizacion_codigo
+TAP-BLA,Tapacanto Blanco,Blanco,22,0.45,350,500,Supplier SA,ORG_GENERAL
+TAP-CEN,Tapacanto Ceniza,Gris Ceniza,22,0.45,380,300,Tapacantos XYZ,ORG_GENERAL
+TAP-ROB,Tapacanto Roble,Roble,22,0.45,420,250,Molduras LT,ORG_GENERAL

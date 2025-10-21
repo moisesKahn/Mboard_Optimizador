@@ -12,7 +12,14 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
+
+# Cargar variables desde .env si existe (solo local); en producción Render usa env vars del servicio
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env')
+except Exception:
+    pass
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -84,17 +91,21 @@ WSGI_APPLICATION = 'WowDash.wsgi.application'
 
 DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
-    # Espera formato postgres://USER:PASSWORD@HOST:PORT/NAME
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': urlparse(DATABASE_URL).path.lstrip('/'),
-            'USER': urlparse(DATABASE_URL).username,
-            'PASSWORD': urlparse(DATABASE_URL).password,
-            'HOST': urlparse(DATABASE_URL).hostname,
-            'PORT': str(urlparse(DATABASE_URL).port or ''),
-        }
+    # Espera formato postgres://USER:PASSWORD@HOST:PORT/NAME?sslmode=require
+    parsed = urlparse(DATABASE_URL)
+    query = parse_qs(parsed.query)
+    db_conf = {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': parsed.path.lstrip('/'),
+        'USER': parsed.username,
+        'PASSWORD': parsed.password,
+        'HOST': parsed.hostname,
+        'PORT': str(parsed.port or ''),
     }
+    # Pasar opciones como sslmode a psycopg2
+    if 'sslmode' in query:
+        db_conf['OPTIONS'] = {'sslmode': query['sslmode'][0]}
+    DATABASES = {'default': db_conf}
 else:
     # Desarrollo local por defecto: SQLite (usa el db.sqlite3 existente)
     DATABASES = {

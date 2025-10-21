@@ -44,6 +44,8 @@ dist/
 *.local
 *.bak
 *.tmp
+**/.env
+**/.env.local
 
 # Cache
 .cache/

@@ -37,6 +37,28 @@ class Command(BaseCommand):
             help="Apps o modelos a excluir en dumpdata (puede repetirse).",
         )
         parser.add_argument(
+            "--excludes",
+            dest="excludes_override",
+            action="append",
+            default=None,
+            help="Lista de exclusiones que reemplaza a las exclusiones por defecto (puede repetirse).",
+        )
+        parser.add_argument(
+            "--include-all",
+            action="store_true",
+            help="Ignora exclusiones y migra absolutamente todo (incluye contenttypes, permisos, sesiones, logs)",
+        )
+        parser.add_argument(
+            "--only",
+            dest="only_models",
+            action="append",
+            default=None,
+            help=(
+                "Lista de modelos app_label.Model a incluir explícitamente. "
+                "Si se especifica, sólo se migran esos modelos (puede repetirse)."
+            ),
+        )
+        parser.add_argument(
             "--dry-run",
             action="store_true",
             help="Solo valida conexión y genera dump temporal sin cargar en target.",
@@ -45,6 +67,11 @@ class Command(BaseCommand):
             "--skip-load",
             action="store_true",
             help="No realiza dump/loaddata; solo aplica migraciones y ajusta secuencias en target.",
+        )
+        parser.add_argument(
+            "--flush-target",
+            action="store_true",
+            help="Hace flush en la BD target antes de cargar datos para evitar duplicados.",
         )
 
     def handle(self, *args, **options):
@@ -102,19 +129,36 @@ class Command(BaseCommand):
         call_command("migrate", database="target", interactive=False, verbosity=1)
         self.stdout.write(self.style.SUCCESS("Migraciones aplicadas en target"))
 
+        # Si se solicita, limpiar la BD de destino antes de cargar datos
+        if options.get("flush_target") and not options.get("dry_run") and not options.get("skip_load"):
+            self.stdout.write(self.style.WARNING("Realizando flush en la BD target (eliminará todos los datos administrados) ..."))
+            call_command("flush", database="target", interactive=False, verbosity=1)
+            self.stdout.write(self.style.SUCCESS("Flush en target completado"))
+
         if not options["skip_load"]:
             # Generar dump desde default
-            excludes = options["exclude"]
-            self.stdout.write(f"Excluyendo: {', '.join(excludes)}")
+            if options.get("include_all"):
+                excludes = []
+            else:
+                excludes = options["excludes_override"] if options.get("excludes_override") else options["exclude"]
+            only_models = options.get("only_models") or []
+            if excludes:
+                self.stdout.write(f"Excluyendo: {', '.join(excludes)}")
+            if only_models:
+                self.stdout.write(f"Incluyendo sólo modelos: {', '.join(only_models)}")
             buf = io.StringIO()
-            call_command(
-                "dumpdata",
+            dump_kwargs = dict(
                 natural_foreign=True,
                 natural_primary=True,
                 exclude=excludes,
                 stdout=buf,
                 indent=2,
             )
+            # Si se especificó sólo modelos, se pasan como args posicionales
+            if only_models:
+                call_command("dumpdata", *only_models, **dump_kwargs)
+            else:
+                call_command("dumpdata", **dump_kwargs)
             data = buf.getvalue()
             if not data.strip().startswith("["):
                 self.stderr.write(self.style.ERROR("Dump inesperado o vacío."))
