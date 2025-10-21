@@ -1,10 +1,10 @@
 target-version = "py311"
 line-length = 120
 
-# Solo errores de sintaxis y parseo graves
+[lint]
 select = [
-  "E9",   # SyntaxError
-  "F63",  # Missing __future__ annotations (forward ref issues)
-  "F7",   # Invalid __future__ import
-  "F82",  # Star import used but not defined
+  "E9",  # SyntaxError
+  "F63", # Pyflakes rules
+  "F7",
+  "F82",
 ]
