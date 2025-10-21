@@ -3,8 +3,8 @@ services:
     name: mboard-optimizador
     env: python
     autoDeploy: true
-    buildCommand: pip install -r requirements.txt && cd Django && python manage.py collectstatic --noinput
-    startCommand: cd Django && gunicorn WowDash.wsgi --workers=3 --bind 0.0.0.0:$PORT
+  buildCommand: pip install -r requirements.txt && cd Django && python manage.py collectstatic --noinput
+  startCommand: gunicorn wsgi:application --workers=3 --bind 0.0.0.0:$PORT
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: WowDash.settings
