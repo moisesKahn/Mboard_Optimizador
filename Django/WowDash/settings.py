@@ -99,9 +99,11 @@ if database_url:
         'HOST': parsed.hostname,
         'PORT': str(parsed.port or ''),
     }
-    # Pasar opciones como sslmode a psycopg2
+    # Pasar opciones como sslmode a psycopg2; si no viene, forzar 'require' en producción
     if 'sslmode' in query:
         db_conf['OPTIONS'] = {'sslmode': query['sslmode'][0]}
+    elif not DEBUG:
+        db_conf['OPTIONS'] = {'sslmode': 'require'}
     DATABASES = {'default': db_conf}
 else:
     # Si existen variables individuales de conexión, usar PostgreSQL
