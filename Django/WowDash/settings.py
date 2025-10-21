@@ -87,9 +87,9 @@ WSGI_APPLICATION = 'WowDash.wsgi.application'
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
 database_url = os.getenv('DATABASE_URL')
-if DATABASE_URL:
+if database_url:
     # Espera formato postgres://USER:PASSWORD@HOST:PORT/NAME?sslmode=require
-    parsed = urlparse(DATABASE_URL)
+    parsed = urlparse(database_url)
     query = parse_qs(parsed.query)
     db_conf = {
         'ENGINE': 'django.db.backends.postgresql',
