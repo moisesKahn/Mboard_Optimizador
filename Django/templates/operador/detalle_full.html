@@ -30,17 +30,17 @@
       <div class="op-toolbar">
         <a href="{% url 'operador_home' %}" class="op-btn">← Volver</a>
         <div class="vr mx-2"></div>
-        <strong>{{ proyecto.codigo }}</strong>
-        <span>· {{ proyecto.nombre }}</span>
+  <strong>{{ proyecto.id }}</strong>
+  <span>· {{ proyecto.nombre }}</span>
         <span class="chip">{{ proyecto.cliente.nombre }}</span>
         <span class="chip">{{ proyecto.get_estado_display }}</span>
         <div class="vr mx-2"></div>
         <label class="me-1 small text-muted">Tablero</label>
         <select id="selTablero" class="form-select form-select-sm" style="width:auto;"></select>
         <div class="vr mx-2"></div>
-        <button id="btnZoomOut" class="op-btn" type="button">-</button>
-        <button id="btnZoomReset" class="op-btn" type="button">100%</button>
-        <button id="btnZoomIn" class="op-btn" type="button">+</button>
+  <button id="btnZoomOut" class="op-btn" type="button" title="Alejar">-</button>
+  <button id="btnZoomReset" class="op-btn" type="button" title="Restablecer a 100%">100%</button>
+  <button id="btnZoomIn" class="op-btn" type="button" title="Acercar">+</button>
         <button id="btnToggleSidebar" class="op-btn ms-auto" type="button" title="Ocultar/mostrar panel">Panel ▸</button>
         <div class="small text-muted ms-2">Atajos: + / - / 0 · ← → cambia tablero · S stats</div>
       </div>
@@ -97,6 +97,8 @@
   svg.setAttribute('width','100%'); svg.setAttribute('height','100%');
   // Cursor: por defecto, según zoom
   svg.style.cursor = 'default';
+  // Evitar gestos de pinch nativos que hagan zoom del viewport del navegador en móviles
+  svg.setAttribute('touch-action','none');
   // Margen superior deseado en modo ajuste: responsivo al alto del host (6% del alto), con límites
   const FIT_PAD_MIN = 32, FIT_PAD_MAX = 80;
   function getFitPad(){
@@ -122,6 +124,8 @@
       const g = document.createElementNS(svgNS, 'g');
       svg.appendChild(g); host.appendChild(svg);
   let scale = 1, baseScale = 1, dx = 0, dy = 0; let dragging=false, lx=0, ly=0;
+  // Soporte pinch-to-zoom
+  let pinch = {active:false, d0:0, s0:1, cx:0, cy:0};
   // Forzar centrado exacto en el siguiente apply (usado tras cambios de tamaño)
   let forceCenterNext = false;
   // Bounds del TABLERO (no de todo el <g>), para centrar/clamp sin considerar textos externos
@@ -136,6 +140,8 @@
         if(dragging) { svg.style.cursor = 'grabbing'; return; }
         svg.style.cursor = atBaseZoom() ? 'default' : 'grab';
       }
+      function zoomPercent(){ return Math.round((scale/baseScale)*100); }
+      function updateZoomUI(){ const btn = document.getElementById('btnZoomReset'); if(btn){ btn.textContent = `${zoomPercent()}%`; } }
       function clamp(board){
         const {w:vw, h:vh} = vbSize();
         // Límites de pan del TABLERO (para no salirnos del área útil)
@@ -163,6 +169,7 @@
         if(!isFinite(scale) || scale <= 0) scale = 1;
         g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
         updateCursor();
+        updateZoomUI();
       }
 
       function stateColor(st){
@@ -442,7 +449,7 @@
       }
 
       // Interacción
-      svg.addEventListener('wheel',(e)=>{ e.preventDefault(); const d = e.deltaY<0?1.1:0.9; const prev=scale; const board = tableros[idx]||{}; scale = Math.max(baseScale, Math.min(8, scale*d));
+  svg.addEventListener('wheel',(e)=>{ e.preventDefault(); const d = e.deltaY<0?1.1:0.9; const prev=scale; const board = tableros[idx]||{}; scale = Math.max(baseScale, Math.min(8, scale*d));
         // Zoom anclado al centro del viewport
         const rect=host.getBoundingClientRect(); const cx = rect.width/2, cy = rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse());
         dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev);
@@ -457,6 +464,38 @@
   document.getElementById('btnZoomIn').addEventListener('click',()=>{ scale=Math.min(8,scale*1.2); const board=tableros[idx]||{}; const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); const prev=scale/1.2; dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
   document.getElementById('btnZoomOut').addEventListener('click',()=>{ const board=tableros[idx]||{}; const prev=scale; scale=Math.max(baseScale,scale/1.2); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
   document.getElementById('btnZoomReset').addEventListener('click',()=>{ fit(tableros[idx]||{}); updateCursor(); });
+
+  // Gestos táctiles: pan con 1 dedo (si zoom > base), pinch con 2 dedos para zoom
+  svg.addEventListener('touchstart',(e)=>{
+    if(e.touches.length===1){
+      if(atBaseZoom()) return; // no pan al zoom base
+      dragging=true; lx=e.touches[0].clientX; ly=e.touches[0].clientY;
+    } else if(e.touches.length===2){
+      pinch.active=true;
+      const t1=e.touches[0], t2=e.touches[1];
+      pinch.d0 = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      pinch.s0 = scale;
+      pinch.cx = (t1.clientX + t2.clientX)/2; pinch.cy = (t1.clientY + t2.clientY)/2;
+    }
+  }, {passive:false});
+  svg.addEventListener('touchmove',(e)=>{
+    if(pinch.active && e.touches.length===2){
+      e.preventDefault();
+      const t1=e.touches[0], t2=e.touches[1];
+      const d = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const prev=scale;
+      scale = Math.max(baseScale, Math.min(8, pinch.s0 * (d / Math.max(1, pinch.d0))));
+      const pt=svg.createSVGPoint(); pt.x=pinch.cx; pt.y=pinch.cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse());
+      dx = svgPt.x - (svgPt.x - dx) * (scale/prev);
+      dy = svgPt.y - (svgPt.y - dy) * (scale/prev);
+      apply(tableros[idx]||{});
+    } else if(dragging && e.touches.length===1){
+      e.preventDefault();
+      const tx=e.touches[0].clientX, ty=e.touches[0].clientY;
+      dx += (tx - lx); dy += (ty - ly); lx=tx; ly=ty; apply(tableros[idx]||{});
+    }
+  }, {passive:false});
+  svg.addEventListener('touchend',()=>{ if(pinch.active && event.touches && event.touches.length<2) pinch.active=false; dragging=false; updateCursor(); }, {passive:true});
   // Observa cambios reales de tamaño del host, más fiable que window.resize
   let lastHostSize = {w:0,h:0};
   function preserveWhenReady(board, tries=10){
@@ -492,6 +531,7 @@
 
       // Inicialización
       renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{});
+      updateZoomUI();
     })();
     </script>
 
