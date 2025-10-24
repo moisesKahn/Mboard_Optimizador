@@ -30,7 +30,7 @@
       <div class="op-toolbar">
         <a href="{% url 'operador_home' %}" class="op-btn">← Volver</a>
         <div class="vr mx-2"></div>
-  <strong>{{ proyecto.id }}</strong>
+  <strong>{{ proyecto.public_id|default:proyecto.id }}</strong>
   <span>· {{ proyecto.nombre }}</span>
         <div class="vr mx-2"></div>
         <label class="me-1 small text-muted">Tablero</label>
