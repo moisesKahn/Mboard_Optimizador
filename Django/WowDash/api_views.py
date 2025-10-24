@@ -389,3 +389,149 @@ def operador_pieza_estado_api(request: HttpRequest, proyecto_id: int, pieza_id: 
 
     return JsonResponse({'success': True})
 
+
+@login_required
+@require_http_methods(["PATCH"])
+def operador_proyecto_estado_api(request: HttpRequest, proyecto_id: int):
+    """PATCH /api/operador/proyectos/<id>/estado
+    Body: { estado: 'en_proceso'|'completado'|... }
+    Actualiza el estado del proyecto con validación de scope.
+    """
+    ctx = get_auth_context(request)
+    base_qs = Proyecto.objects
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        base_qs = base_qs.filter(organizacion_id=ctx.get('organization_id'))
+    p = get_object_or_404(base_qs, id=proyecto_id)
+    if ctx.get('role') == 'operador' and p.operador_id != request.user.id:
+        return JsonResponse({'success': False, 'message': 'Forbidden'}, status=403)
+    try:
+        payload = _json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Payload inválido'}, status=400)
+    estado = (payload.get('estado') or '').strip()
+    # Validar contra choices
+    valid_estados = {choice[0] for choice in Proyecto.ESTADOS}
+    if estado not in valid_estados:
+        return JsonResponse({'success': False, 'message': 'Estado inválido'}, status=400)
+    p.estado = estado
+    p.save(update_fields=['estado'])
+    try:
+        AuditLog.objects.create(
+            actor=request.user,
+            organizacion=p.organizacion,
+            verb='UPDATE',
+            target_model='Proyecto',
+            target_id=str(p.id),
+            target_repr=p.codigo,
+            changes={'estado': estado},
+        )
+    except Exception:
+        pass
+    return JsonResponse({'success': True})
+
+
+@login_required
+@require_http_methods(["POST"])
+def operador_proyecto_marcar_todas_cortadas_api(request: HttpRequest, proyecto_id: int):
+    """POST /api/operador/proyectos/<id>/piezas/marcar-todas
+    Body: { estado: 'cortada' }  (por ahora solo soporta 'cortada')
+    Marca TODAS las piezas del resultado como 'cortada' y persiste el JSON.
+    """
+    ctx = get_auth_context(request)
+    base_qs = Proyecto.objects
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        base_qs = base_qs.filter(organizacion_id=ctx.get('organization_id'))
+    p = get_object_or_404(base_qs, id=proyecto_id)
+    if ctx.get('role') == 'operador' and p.operador_id != request.user.id:
+        return JsonResponse({'success': False, 'message': 'Forbidden'}, status=403)
+    try:
+        payload = _json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        payload = {}
+    estado = (payload.get('estado') or 'cortada').strip()
+    if estado != 'cortada':
+        return JsonResponse({'success': False, 'message': 'Solo se permite marcar como cortada.'}, status=400)
+    res = p.resultado_optimizacion
+    if not res:
+        return JsonResponse({'success': False, 'message': 'Proyecto sin resultado'}, status=404)
+    try:
+        resd = _json.loads(res) if isinstance(res, str) else res
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Resultado inválido'}, status=500)
+    materiales = resd.get('materiales') if isinstance(resd.get('materiales'), list) else [resd]
+    count = 0
+    for mat in materiales:
+        for t in (mat.get('tableros') or []):
+            for pi in (t.get('piezas') or []):
+                if pi.get('estado') != 'cortada':
+                    pi['estado'] = 'cortada'
+                    count += 1
+    # Persistir
+    if 'materiales' in resd:
+        p.resultado_optimizacion = _json.dumps(resd, ensure_ascii=False)
+    else:
+        p.resultado_optimizacion = _json.dumps(materiales[0], ensure_ascii=False)
+    p.save(update_fields=['resultado_optimizacion'])
+    try:
+        AuditLog.objects.create(
+            actor=request.user,
+            organizacion=p.organizacion,
+            verb='EDIT',
+            target_model='Proyecto',
+            target_id=str(p.id),
+            target_repr=p.codigo,
+            changes={'bulk_piezas': 'cortada', 'count': count},
+        )
+    except Exception:
+        pass
+    return JsonResponse({'success': True, 'updated': count})
+
+
+@login_required
+@require_http_methods(["POST"])
+def operador_proyecto_completar_api(request: HttpRequest, proyecto_id: int):
+    """POST /api/operador/proyectos/<id>/completar
+    Valida que todas las piezas estén 'cortada' y marca el proyecto como 'completado'.
+    """
+    ctx = get_auth_context(request)
+    base_qs = Proyecto.objects
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        base_qs = base_qs.filter(organizacion_id=ctx.get('organization_id'))
+    p = get_object_or_404(base_qs, id=proyecto_id)
+    if ctx.get('role') == 'operador' and p.operador_id != request.user.id:
+        return JsonResponse({'success': False, 'message': 'Forbidden'}, status=403)
+    res = p.resultado_optimizacion
+    if not res:
+        return JsonResponse({'success': False, 'message': 'Proyecto sin resultado'}, status=404)
+    try:
+        resd = _json.loads(res) if isinstance(res, str) else res
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Resultado inválido'}, status=500)
+    materiales = resd.get('materiales') if isinstance(resd.get('materiales'), list) else [resd]
+    missing = 0
+    total = 0
+    for mat in materiales:
+        for t in (mat.get('tableros') or []):
+            for pi in (t.get('piezas') or []):
+                total += 1
+                if pi.get('estado') != 'cortada':
+                    missing += 1
+    if missing > 0:
+        return JsonResponse({'success': False, 'message': f'Faltan {missing} pieza(s) por cortar de {total}.'}, status=400)
+    # Ok: completar
+    p.estado = 'completado'
+    p.save(update_fields=['estado'])
+    try:
+        AuditLog.objects.create(
+            actor=request.user,
+            organizacion=p.organizacion,
+            verb='UPDATE',
+            target_model='Proyecto',
+            target_id=str(p.id),
+            target_repr=p.codigo,
+            changes={'estado': 'completado'},
+        )
+    except Exception:
+        pass
+    return JsonResponse({'success': True})
+

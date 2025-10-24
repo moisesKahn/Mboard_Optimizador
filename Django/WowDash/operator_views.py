@@ -1,5 +1,6 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.http import JsonResponse, HttpRequest
 from django.db.models import Q
 from core.models import Proyecto
@@ -51,6 +52,7 @@ def operador_home(request: HttpRequest):
 
 
 @login_required
+@ensure_csrf_cookie
 def operador_proyecto(request: HttpRequest, proyecto_id: int):
     """Detalle de un proyecto para operación/corte."""
     ctx = get_auth_context(request)

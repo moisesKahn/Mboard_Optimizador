@@ -2,6 +2,8 @@
 <!DOCTYPE html>
 <html lang="es" data-theme="light">
   {% include "partials/head.html" %}
+  <!-- Fuerza seteo de cookie CSRF y expone token vía meta -->
+  <meta name="csrf-token" content="{{ csrf_token }}" />
   <style>
     html, body { height: 100%; }
     body { overflow: hidden; }
@@ -24,6 +26,8 @@
     /* Ocultar/mostrar sidebar */
     .op-wrapper.sidebar-hidden { grid-template-columns: 1fr 0; }
     .op-wrapper.sidebar-hidden .op-sidebar { display: none; }
+    /* Transición suave de color en piezas para sensación de fluidez */
+    g[data-pieza] rect { transition: fill .15s ease, fill-opacity .15s ease; }
   </style>
   <body>
     <div class="op-wrapper">
@@ -33,14 +37,20 @@
   <strong>{{ proyecto.public_id|default:proyecto.id }}</strong>
   <span>· {{ proyecto.nombre }}</span>
         <div class="vr mx-2"></div>
-        <label class="me-1 small text-muted">Tablero</label>
-        <select id="selTablero" class="form-select form-select-sm" style="width:auto;"></select>
-        <div class="vr mx-2"></div>
-  <button id="btnZoomOut" class="op-btn" type="button" title="Alejar">-</button>
-  <button id="btnZoomReset" class="op-btn" type="button" title="Restablecer a 100%">100%</button>
-  <button id="btnZoomIn" class="op-btn" type="button" title="Acercar">+</button>
-  <span id="zoomPct" class="chip">100%</span>
-  <button id="btnToggleSidebar" class="op-btn ms-auto" type="button" title="Ocultar/mostrar panel">Panel ▸</button>
+    <label class="me-1 small text-muted">Tablero</label>
+    <select id="selTablero" class="form-select form-select-sm" style="width:auto;"></select>
+    <div class="vr mx-2"></div>
+    <!-- Controles de zoom: [-] [porcentaje] [+] -->
+    <button id="btnZoomOut" class="op-btn" type="button" title="Alejar">-</button>
+    <span id="zoomPct" class="chip" title="Nivel de zoom">100%</span>
+    <button id="btnZoomIn" class="op-btn" type="button" title="Acercar">+</button>
+    <!-- Botón cuadrar: restablecer vista al inicio, centrado y tablero completo -->
+  <button id="btnZoomReset" class="op-btn" type="button" title="Ajustar vista (centrar y refrescar visualizador)">Ajustar vista</button>
+    <div class="vr mx-2"></div>
+    <!-- Acciones del operador -->
+    <button id="btnMarcarTodas" class="op-btn" type="button" title="Marcar todas las piezas como cortadas">Marcar todas cortadas</button>
+    <button id="btnCompletar" class="op-btn" type="button" title="Completar proyecto y volver a la lista" style="display:none;">Completar proyecto</button>
+    <button id="btnToggleSidebar" class="op-btn ms-auto" type="button" title="Ocultar/mostrar panel">Panel ▸</button>
   <div class="small text-muted ms-2">Atajos: + / - / 0 · ← → cambia tablero</div>
       </div>
       <div class="op-canvas" id="canvasHost">
@@ -78,12 +88,16 @@
         const v = document.cookie.split('; ').find(r=>r.startsWith(name+'='));
         return v ? decodeURIComponent(v.split('=')[1]) : '';
       }
+      function getCsrf(){
+        return getCookie('csrftoken') || (document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '');
+      }
 
-      const resp = await fetch(`/api/operador/proyectos/${proyectoId}`);
+  const resp = await fetch(`/api/operador/proyectos/${proyectoId}`, {credentials:'same-origin'});
       if(!resp.ok){ host.innerHTML = '<div class="w-100 h-100 d-flex align-items-center justify-content-center text-danger">No hay resultado.</div>'; return; }
       const data = await resp.json();
       const tableros = data.tableros||[];
       const meta = data.meta||{};
+  const proyectoMeta = data.proyecto||{};
 
       stMaterial.textContent = meta.material || '—';
       selTab.innerHTML = tableros.map((t,i)=>`<option value="${i}">Tablero ${t.num}</option>`).join('');
@@ -128,6 +142,8 @@
       const g = document.createElementNS(svgNS, 'g');
       svg.appendChild(g); host.appendChild(svg);
   let scale = 1, baseScale = 1, dx = 0, dy = 0; let dragging=false, lx=0, ly=0;
+  // Animación de cámara
+  let animFrame = 0;
   // Soporte pinch-to-zoom
   let pinch = {active:false, d0:0, s0:1, cx:0, cy:0};
   // Forzar centrado exacto en el siguiente apply (usado tras cambios de tamaño)
@@ -257,6 +273,36 @@
       }
       function fit(board){ recenter(board, false); }
 
+          function computeFitTransform(board){
+            // Calcula transform objetivo para fit sin aplicarlo inmediatamente
+            recalcBase(board);
+            const sc = baseScale;
+            const {w:vw, h:vh} = vbSize();
+            const bw = boardBounds.width;
+            const pad = getFitPad();
+            const tx = (vw - bw*sc)/2 - boardBounds.x*sc;
+            const ty = pad - boardBounds.y*sc;
+            return {scale: sc, dx: tx, dy: ty};
+          }
+
+          function animateTo(board, target, ms=180){
+            if(animFrame) cancelAnimationFrame(animFrame);
+            const s0 = scale, x0 = dx, y0 = dy;
+            const s1 = target.scale, x1 = target.dx, y1 = target.dy;
+            const t0 = performance.now();
+            const easeOutCubic = (t)=> 1 - Math.pow(1 - t, 3);
+            function step(t){
+              const p = Math.min(1, (t - t0) / ms);
+              const e = easeOutCubic(p);
+              scale = s0 + (s1 - s0) * e;
+              dx = x0 + (x1 - x0) * e;
+              dy = y0 + (y1 - y0) * e;
+              apply(board);
+              if(p < 1) animFrame = requestAnimationFrame(step);
+            }
+            animFrame = requestAnimationFrame(step);
+          }
+
           // Preserva el punto central del contenido y el nivel de zoom relativo
           // al cambiar el tamaño del contenedor (resize ventana o toggle del panel)
           function preserveViewOnContainerChange(board){
@@ -306,7 +352,7 @@
           sel.addEventListener('change', async (e)=>{
             const pid=e.target.getAttribute('data-pieza'); const estado=e.target.value;
             try{
-              const r = await fetch(`/api/operador/proyectos/${proyectoId}/piezas/${encodeURIComponent(pid)}`,{method:'PATCH', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({estado})});
+              const r = await fetch(`/api/operador/proyectos/${proyectoId}/piezas/${encodeURIComponent(pid)}`,{method:'PATCH', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()}, body: JSON.stringify({estado})});
               if(!r.ok) throw new Error('err');
               const dot = list.querySelector(`[data-row="${pid}"] span.rounded-circle`); if(dot) dot.style.background = stateColor(estado);
               const rect = document.getElementById(`piece-${pid}`); if(rect) rect.setAttribute('fill', stateColor(estado));
@@ -326,6 +372,36 @@
   // Medidas del tablero por FUERA del tablero
   const topTxt = document.createElementNS(svgNS,'text'); topTxt.setAttribute('x', String(w/2)); topTxt.setAttribute('y', String(-12)); topTxt.setAttribute('text-anchor','middle'); topTxt.setAttribute('font-size', fs(24)); topTxt.setAttribute('fill','#444'); topTxt.textContent = `${w} mm`; g.appendChild(topTxt);
   const leftTxt = document.createElementNS(svgNS,'text'); leftTxt.setAttribute('x', String(-12)); leftTxt.setAttribute('y', String(h/2)); leftTxt.setAttribute('text-anchor','middle'); leftTxt.setAttribute('font-size', fs(24)); leftTxt.setAttribute('fill','#444'); leftTxt.setAttribute('transform', `rotate(-90 -12 ${h/2})`); leftTxt.textContent = `${h} mm`; g.appendChild(leftTxt);
+  // Sombreado de márgenes (fuera del área útil) para resaltar banda a recortar
+  try{
+    const mx = Number(meta.margen_x);
+    const my = Number(meta.margen_y);
+    if(Number.isFinite(mx) && Number.isFinite(my) && (mx>0 || my>0)){
+      const overColor = '#FFC107';
+      const overOpacity = 0.18;
+      const addRect = (x,y,wid,hei) => {
+        if(wid>0 && hei>0){
+          const r = document.createElementNS(svgNS,'rect');
+          r.setAttribute('x', String(x));
+          r.setAttribute('y', String(y));
+          r.setAttribute('width', String(wid));
+          r.setAttribute('height', String(hei));
+          r.setAttribute('fill', overColor);
+          r.setAttribute('fill-opacity', String(overOpacity));
+          r.setAttribute('stroke','none');
+          g.appendChild(r);
+        }
+      };
+      // top
+      addRect(0, 0, w, Math.max(0, my));
+      // bottom
+      addRect(0, Math.max(0, h - my), w, Math.max(0, my));
+      // left
+      addRect(0, Math.max(0, my), Math.max(0, mx), Math.max(0, h - 2*my));
+      // right
+      addRect(Math.max(0, w - mx), Math.max(0, my), Math.max(0, mx), Math.max(0, h - 2*my));
+    }
+  }catch(_e){}
   // piezas
         for(const p of (board.piezas||[])){
           const group = document.createElementNS(svgNS,'g');
@@ -401,12 +477,26 @@
             row?.classList.remove('list-highlight');
           });
 
-          // Click: mostrar modal de pieza ampliada sin alterar el zoom general
+          // Click: flujo pieza -> en_corte con zoom a la pieza, segundo click -> cortada y volver a vista normal
           group.addEventListener('click',()=>{
-            const row=list.querySelector(`[data-row="${p.pieza_id}"]`); row?.scrollIntoView({block:'nearest'}); row?.classList.add('list-highlight'); setTimeout(()=>row?.classList.remove('list-highlight'),700);
-            showPieceModal(p);
+            focusOrTogglePiece(p);
           });
           g.appendChild(group);
+        }
+        // Margen útil en amarillo (si hay márgenes)
+        const mx = Number(meta.margen_x);
+        const my = Number(meta.margen_y);
+        if(Number.isFinite(mx) && Number.isFinite(my) && (mx>0 || my>0)){
+          const usable = document.createElementNS(svgNS,'rect');
+          usable.setAttribute('x', String(mx));
+          usable.setAttribute('y', String(my));
+          usable.setAttribute('width', String(Math.max(w-2*mx,0)));
+          usable.setAttribute('height', String(Math.max(h-2*my,0)));
+          usable.setAttribute('fill','none');
+          usable.setAttribute('stroke','#FFC107');
+          usable.setAttribute('stroke-width','2');
+          usable.setAttribute('stroke-dasharray','6 4');
+          g.appendChild(usable);
         }
         // cortes: si vienen, usarlos; si no, inferir
         const cortes = Array.isArray(board.cortes)&&board.cortes.length? board.cortes : null;
@@ -427,33 +517,68 @@
         fit(board);
       }
 
-      function showPieceModal(p){
-        const backdrop = document.createElement('div'); backdrop.className = 'piece-modal-backdrop';
-        const modal = document.createElement('div'); modal.className = 'piece-modal';
-        const hdr = document.createElement('div'); hdr.className = 'hdr'; hdr.innerHTML = `<div><strong>${p.nombre||p.pieza_id}</strong></div><button class="btn-close" aria-label="Cerrar">×</button>`;
-        const cnt = document.createElement('div'); cnt.className = 'cnt';
-        const w = p.ancho||0, h = p.largo||0; const svg2 = document.createElementNS(svgNS,'svg'); svg2.setAttribute('width','100%'); svg2.setAttribute('height','420');
-        const inner = document.createElementNS(svgNS,'g');
-        svg2.appendChild(inner);
-        cnt.appendChild(svg2);
-        modal.appendChild(hdr); modal.appendChild(cnt); backdrop.appendChild(modal); document.body.appendChild(backdrop);
-        // fit pieza dentro del modal con padding
-        const PAD=40; const vw = 720, vh = 380; const sc = Math.min((vw-PAD*2)/w, (vh-PAD*2)/h);
-        inner.setAttribute('transform', `translate(${(vw - w*sc)/2}, ${(vh - h*sc)/2}) scale(${sc})`);
-        const r = document.createElementNS(svgNS,'rect'); r.setAttribute('x','0'); r.setAttribute('y','0'); r.setAttribute('width',String(w)); r.setAttribute('height',String(h)); r.setAttribute('fill','#f8f9fa'); r.setAttribute('stroke','#222'); r.setAttribute('stroke-width','2'); inner.appendChild(r);
-        // nombre grande
-        const tname = document.createElementNS(svgNS,'text'); tname.setAttribute('x', String(w/2)); tname.setAttribute('y', String(h/2)); tname.setAttribute('text-anchor','middle'); tname.setAttribute('dominant-baseline','middle'); tname.setAttribute('font-size','28'); tname.setAttribute('font-weight','bold'); tname.textContent = p.nombre||p.pieza_id; inner.appendChild(tname);
-        // medidas
-        const tw = document.createElementNS(svgNS,'text'); tw.setAttribute('x', String(w/2)); tw.setAttribute('y', String(18)); tw.setAttribute('text-anchor','middle'); tw.setAttribute('font-size','18'); tw.textContent = `${w} mm`; inner.appendChild(tw);
-        const tl = document.createElementNS(svgNS,'text'); const cx = w-10, cy = h/2; tl.setAttribute('x', String(cx)); tl.setAttribute('y', String(cy)); tl.setAttribute('text-anchor','middle'); tl.setAttribute('font-size','18'); tl.setAttribute('transform', `rotate(-90 ${cx} ${cy})`); tl.textContent = `${h} mm`; inner.appendChild(tl);
-        // tapacantos
-        const ttc = document.createElementNS(svgNS,'text'); ttc.setAttribute('x', String(w/2)); ttc.setAttribute('y', String(h-12)); ttc.setAttribute('text-anchor','middle'); ttc.setAttribute('font-size','16'); ttc.textContent = `TC: ${tapsLabel(p.tapacantos)}`; inner.appendChild(ttc);
-        // eventos cierre
-        function close(){ document.body.removeChild(backdrop); }
-        hdr.querySelector('.btn-close').addEventListener('click', close);
-        backdrop.addEventListener('click', close);
-        modal.addEventListener('click', (e)=> e.stopPropagation());
-        window.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); window.removeEventListener('keydown', esc); } });
+      // Estado de zoom focal de pieza
+      let focusedPiece = null; // pieza_id o null
+      const pendingByPiece = new Map();
+      async function setPieceState(piezaId, estado){
+        // Persistencia asíncrona; no bloquea la UI
+        try{
+          const r = await fetch(`/api/operador/proyectos/${proyectoId}/piezas/${encodeURIComponent(piezaId)}`,{method:'PATCH', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()}, body: JSON.stringify({estado})});
+          if(!r.ok) throw new Error(await r.text());
+        }catch(err){
+          // Fallback: marcar error en consola y permitir reintento manual (no revertimos para mantener fluidez)
+          console.error('Persistencia de pieza falló:', err);
+          alert('No se pudo guardar la pieza. Intenta nuevamente.');
+        } finally {
+          pendingByPiece.delete(piezaId);
+        }
+      }
+      function updatePieceUI(pid, estado){
+        const dot = list.querySelector(`[data-row="${pid}"] span.rounded-circle`); if(dot) dot.style.background = stateColor(estado);
+        const sel = list.querySelector(`select[data-pieza="${pid}"]`); if(sel) sel.value = estado;
+        const rect = document.getElementById(`piece-${pid}`); if(rect) rect.setAttribute('fill', stateColor(estado));
+      }
+      function pieceZoom(board, p){
+        const {w:vw, h:vh} = vbSize();
+        const PAD = 40;
+        const pw = p.ancho||1, ph = p.largo||1;
+        // Escala para encajar la pieza con padding
+        const sc = Math.min((vw - PAD*2)/pw, (vh - PAD*2)/ph);
+        const targetScale = Math.max(sc, baseScale*MIN_ZOOM_FACTOR);
+        // Centrar pieza
+        const cx = p.x + pw/2, cy = p.y + ph/2;
+        const targetDx = vw/2 - cx*targetScale;
+        const targetDy = vh/2 - cy*targetScale;
+        animateTo(board, {scale: targetScale, dx: targetDx, dy: targetDy}, 200);
+      }
+      function pieceUnzoom(board){
+        const t = computeFitTransform(board);
+        animateTo(board, t, 200);
+      }
+      async function focusOrTogglePiece(p){
+        const board = tableros[idx]||{};
+        const pid = p.pieza_id;
+        const row=list.querySelector(`[data-row="${pid}"]`);
+        row?.scrollIntoView({block:'nearest'});
+        row?.classList.add('list-highlight'); setTimeout(()=>row?.classList.remove('list-highlight'),700);
+        if(pendingByPiece.get(pid)) return; // evitar spam
+        if(focusedPiece !== pid){
+          // Optimista: actualizar UI inmediato y animar zoom
+          p.estado = 'en_corte';
+          updatePieceUI(pid, 'en_corte');
+          focusedPiece = pid;
+          pieceZoom(board, p);
+          pendingByPiece.set(pid, true);
+          setPieceState(pid, 'en_corte');
+        } else {
+          // Segundo click: marcar cortada y volver
+          p.estado = 'cortada';
+          updatePieceUI(pid, 'cortada');
+          focusedPiece = null;
+          pieceUnzoom(board);
+          pendingByPiece.set(pid, true);
+          setPieceState(pid, 'cortada');
+        }
       }
 
       function updateStats(board){
@@ -485,7 +610,15 @@
   window.addEventListener('mousemove',(e)=>{ if(!dragging) return; dx += (e.clientX-lx); dy += (e.clientY-ly); lx=e.clientX; ly=e.clientY; apply(tableros[idx]||{}); });
   document.getElementById('btnZoomIn').addEventListener('click',()=>{ scale=Math.min(8,scale*1.2); const board=tableros[idx]||{}; const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); const prev=scale/1.2; dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
   document.getElementById('btnZoomOut').addEventListener('click',()=>{ const board=tableros[idx]||{}; const prev=scale; scale=Math.max(baseScale*MIN_ZOOM_FACTOR,scale/1.2); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
-  document.getElementById('btnZoomReset').addEventListener('click',()=>{ fit(tableros[idx]||{}); updateCursor(); });
+  document.getElementById('btnZoomReset').addEventListener('click',()=>{
+    // Ajustar vista: refresca el visualizador del tablero actual, centrando y re-ajustando sin recargar toda la página
+    const board = tableros[idx]||{};
+    renderBoard(board);
+    renderList(board);
+    updateStats(board);
+    updateCompletarVisibility();
+    updateCursor();
+  });
 
   // Gestos táctiles: pan con 1 dedo (si zoom > base), pinch con 2 dedos para zoom
   svg.addEventListener('touchstart',(e)=>{
@@ -548,12 +681,58 @@
         setTimeout(()=>preserveWhenReady(tableros[idx]||{}), 60);
         setTimeout(()=>preserveWhenReady(tableros[idx]||{}), 140);
       });
-      selTab.addEventListener('change',()=>{ idx=parseInt(selTab.value,10)||0; renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{}); });
+      function updateCompletarVisibility(){
+        const btn = document.getElementById('btnCompletar');
+        if(!btn) return;
+        const isLast = (idx === Math.max(0, tableros.length - 1));
+        btn.style.display = isLast ? 'inline-block' : 'none';
+      }
+      selTab.addEventListener('change',()=>{ idx=parseInt(selTab.value,10)||0; renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{}); updateCompletarVisibility(); });
   window.addEventListener('keydown',(e)=>{ const board=tableros[idx]||{}; if(e.key==='+'){ const prev=scale; scale=Math.min(8,scale*1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='-'){ const prev=scale; scale=Math.max(baseScale*MIN_ZOOM_FACTOR,scale/1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='0'){ fit(board); } else if(e.key==='ArrowRight'){ idx=Math.min(tableros.length-1, idx+1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='ArrowLeft'){ idx=Math.max(0, idx-1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='s' || e.key==='S'){ const box=document.getElementById('statsBox'); box.style.display = (box.style.display==='none')? 'block' : 'none'; } });
 
       // Inicialización
       renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{});
       updateZoomUI();
+      updateCompletarVisibility();
+
+      // Al iniciar edición, marcar proyecto EN PROCESO si no está completado
+      try{
+        if(proyectoMeta && proyectoMeta.estado !== 'completado' && proyectoMeta.estado !== 'en_proceso'){
+          await fetch(`/api/operador/proyectos/${proyectoId}/estado`,{method:'PATCH', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()}, body: JSON.stringify({estado:'en_proceso'})});
+        }
+      }catch(_e){}
+
+      // Handler: marcar todas como cortadas
+      document.getElementById('btnMarcarTodas').addEventListener('click', async ()=>{
+        if(!confirm('¿Marcar todas las piezas de este proyecto como CORTADAS?')) return;
+        try{
+          const r = await fetch(`/api/operador/proyectos/${proyectoId}/piezas/marcar-todas`, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()}, body: JSON.stringify({estado:'cortada'})});
+          let jr = {};
+          try { jr = await r.clone().json(); } catch(_) { try { jr = {message: await r.text()}; } catch(__) { jr = {}; } }
+          if(!r.ok){ alert(jr && jr.message ? jr.message : 'No se pudo marcar.'); return; }
+          // Refrescar UI local: setear a cortada
+          for(const t of tableros){ for(const p of (t.piezas||[])){ p.estado = 'cortada'; } }
+          renderList(tableros[idx]||{});
+          // Colorear rects actuales
+          (tableros[idx]?.piezas||[]).forEach(p=>{ const rect=document.getElementById(`piece-${p.pieza_id}`); if(rect) rect.setAttribute('fill', stateColor('cortada')); });
+          alert('Todas las piezas marcadas como cortadas.');
+        }catch(_e){ alert('Error al marcar todas como cortadas.'); }
+      });
+
+      // Handler: completar proyecto (sólo en último tablero visible)
+      document.getElementById('btnCompletar').addEventListener('click', async ()=>{
+        try{
+          const r = await fetch(`/api/operador/proyectos/${proyectoId}/completar`, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()}});
+          const jr = await r.json().catch(()=>({}));
+          if(!r.ok){
+            const msg = jr && jr.message ? jr.message : 'No se pudo completar el proyecto.';
+            alert(msg);
+            return;
+          }
+          // Volver a la lista del operador
+          window.location.href = '{% url "operador_home" %}';
+        }catch(_e){ alert('Error al completar el proyecto.'); }
+      });
     })();
     </script>
 
