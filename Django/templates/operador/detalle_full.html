@@ -95,6 +95,8 @@
       const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('width','100%'); svg.setAttribute('height','100%');
+  // Cursor: por defecto, según zoom
+  svg.style.cursor = 'default';
   // Margen superior deseado en modo ajuste: responsivo al alto del host (6% del alto), con límites
   const FIT_PAD_MIN = 32, FIT_PAD_MAX = 80;
   function getFitPad(){
@@ -130,6 +132,10 @@
   let fitBounds = {x:0,y:0,width:1,height:1};
   function atBaseZoom(){ return baseScale>0 ? (Math.abs(scale-baseScale) <= baseScale*1e-3) : (Math.abs(scale-baseScale) < 1e-6); }
   function vbSize(){ const vb=(svg.getAttribute('viewBox')||'0 0 100 100').split(/\s+/); return {w: parseFloat(vb[2]||'100'), h: parseFloat(vb[3]||'100')}; }
+      function updateCursor(){
+        if(dragging) { svg.style.cursor = 'grabbing'; return; }
+        svg.style.cursor = atBaseZoom() ? 'default' : 'grab';
+      }
       function clamp(board){
         const {w:vw, h:vh} = vbSize();
         // Límites de pan del TABLERO (para no salirnos del área útil)
@@ -156,6 +162,7 @@
         clamp(board||{});
         if(!isFinite(scale) || scale <= 0) scale = 1;
         g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
+        updateCursor();
       }
 
       function stateColor(st){
@@ -445,11 +452,11 @@
     if(atBaseZoom()) { dragging=false; svg.style.cursor='default'; return; }
     dragging=true; lx=e.clientX; ly=e.clientY; svg.style.cursor='grabbing';
   });
-  window.addEventListener('mouseup',()=>{ dragging=false; svg.style.cursor='default'; });
+  window.addEventListener('mouseup',()=>{ dragging=false; updateCursor(); });
   window.addEventListener('mousemove',(e)=>{ if(!dragging) return; dx += (e.clientX-lx); dy += (e.clientY-ly); lx=e.clientX; ly=e.clientY; apply(tableros[idx]||{}); });
   document.getElementById('btnZoomIn').addEventListener('click',()=>{ scale=Math.min(8,scale*1.2); const board=tableros[idx]||{}; const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); const prev=scale/1.2; dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
   document.getElementById('btnZoomOut').addEventListener('click',()=>{ const board=tableros[idx]||{}; const prev=scale; scale=Math.max(baseScale,scale/1.2); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
-  document.getElementById('btnZoomReset').addEventListener('click',()=>{ fit(tableros[idx]||{}); });
+  document.getElementById('btnZoomReset').addEventListener('click',()=>{ fit(tableros[idx]||{}); updateCursor(); });
   // Observa cambios reales de tamaño del host, más fiable que window.resize
   let lastHostSize = {w:0,h:0};
   function preserveWhenReady(board, tries=10){
@@ -475,8 +482,10 @@
         const isHidden = wrap.classList.toggle('sidebar-hidden');
         btn.textContent = isHidden ? 'Panel ◂' : 'Panel ▸';
         // Re-centrar manteniendo escala al cambiar el ancho disponible
-        // Esperar a que la grilla recalcule el layout
+        // Esperar a que la grilla recalcule el layout; lanzar varias veces para garantizar el estado final
         requestAnimationFrame(()=>preserveWhenReady(tableros[idx]||{}));
+        setTimeout(()=>preserveWhenReady(tableros[idx]||{}), 60);
+        setTimeout(()=>preserveWhenReady(tableros[idx]||{}), 140);
       });
       selTab.addEventListener('change',()=>{ idx=parseInt(selTab.value,10)||0; renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{}); });
   window.addEventListener('keydown',(e)=>{ const board=tableros[idx]||{}; if(e.key==='+'){ const prev=scale; scale=Math.min(8,scale*1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='-'){ const prev=scale; scale=Math.max(baseScale,scale/1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='0'){ fit(board); } else if(e.key==='ArrowRight'){ idx=Math.min(tableros.length-1, idx+1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='ArrowLeft'){ idx=Math.max(0, idx-1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='s' || e.key==='S'){ const box=document.getElementById('statsBox'); box.style.display = (box.style.display==='none')? 'block' : 'none'; } });
