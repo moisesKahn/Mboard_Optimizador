@@ -39,6 +39,7 @@
   <button id="btnZoomOut" class="op-btn" type="button" title="Alejar">-</button>
   <button id="btnZoomReset" class="op-btn" type="button" title="Restablecer a 100%">100%</button>
   <button id="btnZoomIn" class="op-btn" type="button" title="Acercar">+</button>
+  <span id="zoomPct" class="chip">100%</span>
   <button id="btnToggleSidebar" class="op-btn ms-auto" type="button" title="Ocultar/mostrar panel">Panel ▸</button>
   <div class="small text-muted ms-2">Atajos: + / - / 0 · ← → cambia tablero</div>
       </div>
@@ -99,6 +100,9 @@
   svg.setAttribute('touch-action','none');
   // Margen superior deseado en modo ajuste: responsivo al alto del host (6% del alto), con límites
   const FIT_PAD_MIN = 32, FIT_PAD_MAX = 80;
+  // Escala tipográfica global del visor (85% de la actual)
+  const FONT_SCALE = 0.85;
+  function fs(px){ return String(Math.round(px*FONT_SCALE)); }
   function getFitPad(){
     const r = host.getBoundingClientRect();
     const h = (r && r.height) ? r.height : vbSize().h;
@@ -138,8 +142,8 @@
         if(dragging) { svg.style.cursor = 'grabbing'; return; }
         svg.style.cursor = atBaseZoom() ? 'default' : 'grab';
       }
-      function zoomPercent(){ return Math.round((scale/baseScale)*100); }
-      function updateZoomUI(){ const btn = document.getElementById('btnZoomReset'); if(btn){ btn.textContent = `${zoomPercent()}%`; } }
+  function zoomPercent(){ return Math.round((scale/baseScale)*100); }
+  function updateZoomUI(){ const sp = document.getElementById('zoomPct'); if(sp){ sp.textContent = `${zoomPercent()}%`; } }
       function ensureBoardInView(){
         // Solo garantizamos vista completa cuando estamos en el zoom base (fit).
         if(!atBaseZoom()) return;
@@ -317,8 +321,8 @@
         boardBounds = {x:0, y:0, width:w, height:h};
         // medidas del tablero
   // Medidas del tablero por FUERA del tablero
-  const topTxt = document.createElementNS(svgNS,'text'); topTxt.setAttribute('x', String(w/2)); topTxt.setAttribute('y', String(-12)); topTxt.setAttribute('text-anchor','middle'); topTxt.setAttribute('font-size','24'); topTxt.setAttribute('fill','#444'); topTxt.textContent = `${w} mm`; g.appendChild(topTxt);
-  const leftTxt = document.createElementNS(svgNS,'text'); leftTxt.setAttribute('x', String(-12)); leftTxt.setAttribute('y', String(h/2)); leftTxt.setAttribute('text-anchor','middle'); leftTxt.setAttribute('font-size','24'); leftTxt.setAttribute('fill','#444'); leftTxt.setAttribute('transform', `rotate(-90 -12 ${h/2})`); leftTxt.textContent = `${h} mm`; g.appendChild(leftTxt);
+  const topTxt = document.createElementNS(svgNS,'text'); topTxt.setAttribute('x', String(w/2)); topTxt.setAttribute('y', String(-12)); topTxt.setAttribute('text-anchor','middle'); topTxt.setAttribute('font-size', fs(24)); topTxt.setAttribute('fill','#444'); topTxt.textContent = `${w} mm`; g.appendChild(topTxt);
+  const leftTxt = document.createElementNS(svgNS,'text'); leftTxt.setAttribute('x', String(-12)); leftTxt.setAttribute('y', String(h/2)); leftTxt.setAttribute('text-anchor','middle'); leftTxt.setAttribute('font-size', fs(24)); leftTxt.setAttribute('fill','#444'); leftTxt.setAttribute('transform', `rotate(-90 -12 ${h/2})`); leftTxt.textContent = `${h} mm`; g.appendChild(leftTxt);
   // piezas
         for(const p of (board.piezas||[])){
           const group = document.createElementNS(svgNS,'g');
@@ -343,7 +347,7 @@
             nameText.setAttribute('y', String(y + ph/2));
             nameText.setAttribute('text-anchor','middle');
             nameText.setAttribute('dominant-baseline','middle');
-            nameText.setAttribute('font-size','30');
+            nameText.setAttribute('font-size', fs(30));
             nameText.setAttribute('font-weight','bold');
             nameText.setAttribute('fill','#111');
             nameText.textContent = p.nombre || p.pieza_id;
@@ -354,7 +358,7 @@
             wText.setAttribute('x', String(x + pw/2));
             wText.setAttribute('y', String(y + padding + 22));
             wText.setAttribute('text-anchor','middle');
-            wText.setAttribute('font-size','20');
+            wText.setAttribute('font-size', fs(20));
             wText.setAttribute('fill','#111');
             wText.textContent = `${p.ancho} mm`;
             group.appendChild(wText);
@@ -365,7 +369,7 @@
             lText.setAttribute('x', String(cx));
             lText.setAttribute('y', String(cy));
             lText.setAttribute('text-anchor','middle');
-            lText.setAttribute('font-size','20');
+            lText.setAttribute('font-size', fs(20));
             lText.setAttribute('fill','#111');
             lText.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
             lText.textContent = `${p.largo} mm`;
@@ -376,7 +380,7 @@
             tcText.setAttribute('x', String(x + pw/2));
             tcText.setAttribute('y', String(y + ph - padding - 6));
             tcText.setAttribute('text-anchor','middle');
-            tcText.setAttribute('font-size','18');
+            tcText.setAttribute('font-size', fs(18));
             tcText.setAttribute('fill','#111');
             tcText.textContent = `TC: ${tapsLabel(p.tapacantos)}`;
             group.appendChild(tcText);
