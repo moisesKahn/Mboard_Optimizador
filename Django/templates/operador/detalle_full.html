@@ -32,8 +32,6 @@
         <div class="vr mx-2"></div>
   <strong>{{ proyecto.id }}</strong>
   <span>· {{ proyecto.nombre }}</span>
-        <span class="chip">{{ proyecto.cliente.nombre }}</span>
-        <span class="chip">{{ proyecto.get_estado_display }}</span>
         <div class="vr mx-2"></div>
         <label class="me-1 small text-muted">Tablero</label>
         <select id="selTablero" class="form-select form-select-sm" style="width:auto;"></select>
@@ -41,8 +39,8 @@
   <button id="btnZoomOut" class="op-btn" type="button" title="Alejar">-</button>
   <button id="btnZoomReset" class="op-btn" type="button" title="Restablecer a 100%">100%</button>
   <button id="btnZoomIn" class="op-btn" type="button" title="Acercar">+</button>
-        <button id="btnToggleSidebar" class="op-btn ms-auto" type="button" title="Ocultar/mostrar panel">Panel ▸</button>
-        <div class="small text-muted ms-2">Atajos: + / - / 0 · ← → cambia tablero · S stats</div>
+  <button id="btnToggleSidebar" class="op-btn ms-auto" type="button" title="Ocultar/mostrar panel">Panel ▸</button>
+  <div class="small text-muted ms-2">Atajos: + / - / 0 · ← → cambia tablero</div>
       </div>
       <div class="op-canvas" id="canvasHost">
         <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">Cargando diseño…</div>
@@ -142,6 +140,23 @@
       }
       function zoomPercent(){ return Math.round((scale/baseScale)*100); }
       function updateZoomUI(){ const btn = document.getElementById('btnZoomReset'); if(btn){ btn.textContent = `${zoomPercent()}%`; } }
+      function ensureBoardInView(){
+        const {w:vw, h:vh} = vbSize();
+        const bx = dx + boardBounds.x*scale;
+        const by = dy + boardBounds.y*scale;
+        const bw = boardBounds.width*scale;
+        const bh = boardBounds.height*scale;
+        const padTol = 2; // tolerancia mínima de borde
+        const out = (bx < -padTol) || (by < -padTol) || (bx + bw > vw + padTol) || (by + bh > vh + padTol);
+        if(out){
+          // fuerza a FIT con margen superior apropiado
+          const {w:vw2} = vbSize();
+          scale = baseScale;
+          const pad = getFitPad();
+          dx = (vw2 - boardBounds.width*scale)/2 - boardBounds.x*scale;
+          dy = pad - boardBounds.y*scale;
+        }
+      }
       function clamp(board){
         const {w:vw, h:vh} = vbSize();
         // Límites de pan del TABLERO (para no salirnos del área útil)
@@ -167,6 +182,7 @@
       function apply(board){
         clamp(board||{});
         if(!isFinite(scale) || scale <= 0) scale = 1;
+        ensureBoardInView();
         g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
         updateCursor();
         updateZoomUI();
