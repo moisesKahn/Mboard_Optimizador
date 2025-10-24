@@ -1,7 +1,19 @@
-{% extends '../layout/layout.html' %} 
+{% extends "layout/layout.html" %}
 
 {% block content %}
-
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
+    <h6 class="fw-semibold mb-0">Crear Usuario</h6>
+    <ul class="d-flex align-items-center gap-2">
+        <li class="fw-medium">
+            <a href="{% url 'usersList' %}" class="d-flex align-items-center gap-1 hover-text-primary">
+                <iconify-icon icon="solar:users-group-rounded-outline" class="icon text-lg"></iconify-icon>
+                Usuarios
+            </a>
+        </li>
+        <li>-</li>
+        <li class="fw-medium">Agregar Usuario</li>
+    </ul>
+</div>
 
 <div class="card h-100 p-0 radius-12">
     <div class="card-body p-24">
@@ -9,139 +21,75 @@
             <div class="col-xxl-6 col-xl-8 col-lg-10">
                 <div class="card border">
                     <div class="card-body">
-                        <form method="post">
+                        <h6 class="text-md text-primary-light mb-16">Crear Nuevo Usuario</h6>
+                        {% if messages %}
+                            {% for message in messages %}
+                                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+
+                        <form method="post" id="formAddUser">
                             {% csrf_token %}
-                            
-                            <!-- Información básica del usuario -->
-                            <div class="mb-20">
-                                <label for="{{ user_form.username.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Nombre de Usuario <span class="text-danger-600">*</span></label>
-                                {{ user_form.username }}
-                                <small class="text-muted">Nombre único para iniciar sesión</small>
-                                {% if user_form.username.errors %}
-                                    <div class="text-danger-600 text-sm">{{ user_form.username.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="mb-20">
-                                <label for="{{ user_form.first_name.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Nombre <span class="text-danger-600">*</span></label>
-                                {{ user_form.first_name }}
-                                <small class="text-muted">Nombre del usuario</small>
-                                {% if user_form.first_name.errors %}
-                                    <div class="text-danger-600 text-sm">{{ user_form.first_name.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="mb-20">
-                                <label for="{{ user_form.last_name.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Apellido <span class="text-danger-600">*</span></label>
-                                {{ user_form.last_name }}
-                                <small class="text-muted">Apellido del usuario</small>
-                                {% if user_form.last_name.errors %}
-                                    <div class="text-danger-600 text-sm">{{ user_form.last_name.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="mb-20">
-                                <label for="{{ user_form.email.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Correo Electrónico <span class="text-danger-600">*</span></label>
-                                {{ user_form.email }}
-                                <small class="text-muted">Email único para iniciar sesión</small>
-                                {% if user_form.email.errors %}
-                                    <div class="text-danger-600 text-sm">{{ user_form.email.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <!-- Contraseña obligatoria en creación -->
-                            <div class="mb-20">
-                                <label for="{{ user_form.password.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Contraseña <span class="text-danger-600">*</span></label>
-                                {{ user_form.password }}
-                                {% if user_form.password.errors %}
-                                    <div class="text-danger-600 text-sm">{{ user_form.password.errors.0 }}</div>
-                                {% endif %}
-                                <small class="text-muted">Obligatoria. Mínimo 8 caracteres.</small>
-                            </div>
-                            <div class="mb-20">
-                                <label for="{{ user_form.confirm_password.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Confirmar Contraseña <span class="text-danger-600">*</span></label>
-                                {{ user_form.confirm_password }}
-                                {% if user_form.confirm_password.errors %}
-                                    <div class="text-danger-600 text-sm">{{ user_form.confirm_password.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <!-- Información del perfil -->
-                            <div class="mb-20">
-                                <label for="{{ perfil_form.organizacion.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Organización <span class="text-danger-600">*</span></label>
-                                {{ perfil_form.organizacion }}
-                                <small class="text-muted">Seleccione la organización del usuario</small>
-                                {% if perfil_form.organizacion.errors %}
-                                    <div class="text-danger-600 text-sm">{{ perfil_form.organizacion.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            <div class="mb-20">
-                                <label for="{{ perfil_form.rol.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Rol del Sistema <span class="text-danger-600">*</span></label>
-                                {{ perfil_form.rol }}
-                                <small class="text-muted">Nivel de acceso en el sistema</small>
-                                {% if perfil_form.rol.errors %}
-                                    <div class="text-danger-600 text-sm">{{ perfil_form.rol.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="mb-20">
-                                <label for="{{ perfil_form.telefono.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Teléfono</label>
-                                {{ perfil_form.telefono }}
-                                <small class="text-muted">Número de teléfono del usuario</small>
-                                {% if perfil_form.telefono.errors %}
-                                    <div class="text-danger-600 text-sm">{{ perfil_form.telefono.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            <div class="mb-20">
-                                <label for="{{ user_form.is_active.id_for_label }}" class="form-label fw-semibold text-primary-light text-sm mb-8">Estado</label>
-                                <div class="form-check">
-                                    {{ user_form.is_active }}
-                                    <label class="form-check-label" for="{{ user_form.is_active.id_for_label }}">
-                                        Usuario activo
-                                    </label>
+                            <div class="row gy-3">
+                                <div class="col-sm-6">
+                                    <label class="form-label">Organización <span class="text-danger">*</span></label>
+                                    {{ perfil_form.organizacion }}
+                                    {% if perfil_form.organizacion.errors %}<div class="text-danger mt-1">{{ perfil_form.organizacion.errors.0 }}</div>{% endif %}
                                 </div>
-                                <small class="text-muted">Marque para activar el usuario</small>
-                                {% if user_form.is_active.errors %}
-                                    <div class="text-danger-600 text-sm">{{ user_form.is_active.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            
-                            
-                            <!-- Mostrar errores generales del formulario -->
-                            {% if user_form.non_field_errors %}
-                                <div class="alert alert-danger">
-                                    {{ user_form.non_field_errors.0 }}
+
+                                <div class="col-sm-6">
+                                    <label class="form-label">Rol del Sistema <span class="text-danger">*</span></label>
+                                    {{ perfil_form.rol }}
+                                    {% if perfil_form.rol.errors %}<div class="text-danger mt-1">{{ perfil_form.rol.errors.0 }}</div>{% endif %}
                                 </div>
-                            {% endif %}
-                            
-                            {% if perfil_form.non_field_errors %}
-                                <div class="alert alert-danger">
-                                    {{ perfil_form.non_field_errors.0 }}
+
+                                <div class="col-sm-6">
+                                    <label class="form-label">Nombre <span class="text-danger">*</span></label>
+                                    {{ user_form.first_name }}
+                                    {% if user_form.first_name.errors %}<div class="text-danger mt-1">{{ user_form.first_name.errors.0 }}</div>{% endif %}
                                 </div>
-                            {% endif %}
-                            
-                            <!-- Mostrar mensajes -->
-                            {% if messages %}
-                                {% for message in messages %}
-                                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
-                                        {{ message }}
-                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                                    </div>
-                                {% endfor %}
-                            {% endif %}
-                            
-                            <div class="d-flex align-items-center justify-content-center gap-3">
-                                <a href="{% url 'usersList' %}" class="border border-danger-600 bg-hover-danger-200 text-danger-600 text-md px-56 py-11 radius-8 text-decoration-none">
-                                    Cancelar
-                                </a>
-                                <button type="submit" class="btn btn-primary border border-primary-600 text-md px-56 py-12 radius-8">
-                                    Crear Usuario
-                                </button>
+
+                                <div class="col-sm-6">
+                                    <label class="form-label">Apellido <span class="text-danger">*</span></label>
+                                    {{ user_form.last_name }}
+                                    {% if user_form.last_name.errors %}<div class="text-danger mt-1">{{ user_form.last_name.errors.0 }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-sm-6">
+                                    <label class="form-label">Nombre de Usuario <span class="text-danger">*</span></label>
+                                    {{ user_form.username }}
+                                    {% if user_form.username.errors %}<div class="text-danger mt-1">{{ user_form.username.errors.0 }}</div>{% endif %}
+                                    <small class="text-secondary-light">Se generará automáticamente al elegir organización y nombre</small>
+                                </div>
+
+                                <div class="col-sm-6">
+                                    <label class="form-label">Correo Electrónico <span class="text-danger">*</span></label>
+                                    {{ user_form.email }}
+                                    {% if user_form.email.errors %}<div class="text-danger mt-1">{{ user_form.email.errors.0 }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-sm-6">
+                                    <label class="form-label">Contraseña</label>
+                                    {{ user_form.password }}
+                                    {% if user_form.password.errors %}<div class="text-danger mt-1">{{ user_form.password.errors.0 }}</div>{% endif %}
+                                    <small class="text-secondary-light">Se autocompletará como usuario + <code>123*</code>. El usuario deberá cambiarla al ingresar.</small>
+                                </div>
+
+                                <div class="col-sm-6">
+                                    <label class="form-label">Confirmar Contraseña</label>
+                                    {{ user_form.confirm_password }}
+                                    {% if user_form.confirm_password.errors %}<div class="text-danger mt-1">{{ user_form.confirm_password.errors.0 }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12 d-flex align-items-center gap-3">
+                                    <button type="submit" class="btn btn-primary border border-primary-600 text-md px-56 py-12 radius-8">Crear Usuario</button>
+                                    <a href="{% url 'usersList' %}" class="btn btn-outline-primary border border-primary-600 text-md px-56 py-12 radius-8">Cancelar</a>
+                                </div>
                             </div>
                         </form>
-
-                        
                     </div>
                 </div>
             </div>
@@ -149,4 +97,50 @@
     </div>
 </div>
 
-{% endblock content %}
+{% endblock %}
+
+{% block script %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Helper para obtener texto del option seleccionado (Django usa __str__ del objeto)
+    function getOrgCodeFromOption(select) {
+        const opt = select.options[select.selectedIndex];
+        if (!opt) return '';
+        // se espera formato 'Nombre (CODE)' o 'Nombre (CODE)'
+        const txt = opt.text || '';
+        const m = txt.match(/\(([^)]+)\)\s*$/);
+        if (m && m[1]) return m[1];
+        // fallback: tomar primera palabra
+        return txt.split(' ')[0] || '';
+    }
+
+    const orgSelect = document.querySelector('#id_organizacion');
+    const firstName = document.querySelector('#id_first_name');
+    const lastName = document.querySelector('#id_last_name');
+    const usernameInput = document.querySelector('#id_username');
+    const pwdInput = document.querySelector('#id_password');
+    const confirmPwd = document.querySelector('#id_confirm_password');
+
+    function generateCredentials() {
+        try {
+            const orgCode = orgSelect ? getOrgCodeFromOption(orgSelect).trim() : '';
+            const fn = firstName ? firstName.value.trim() : '';
+            const ln = lastName ? lastName.value.trim() : '';
+            if (!orgCode || !fn || !ln) return;
+            const uname = `${orgCode}_${fn.charAt(0).toUpperCase()}${ln.replace(/\s+/g,'')}`;
+            if (usernameInput) usernameInput.value = uname;
+            const pwd = `${uname}123*`;
+            if (pwdInput) pwdInput.value = pwd;
+            if (confirmPwd) confirmPwd.value = pwd;
+        } catch(e) {
+            // no romper
+            console.error(e);
+        }
+    }
+
+    if (orgSelect) orgSelect.addEventListener('change', generateCredentials);
+    if (firstName) firstName.addEventListener('input', generateCredentials);
+    if (lastName) lastName.addEventListener('input', generateCredentials);
+});
+</script>
+{% endblock %}

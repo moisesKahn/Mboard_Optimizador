@@ -276,6 +276,19 @@ def viewProfile(request):
         except User.DoesNotExist:
             pass
 
+    # Determinar si el viewer puede editar el perfil objetivo (se usa en la plantilla para enlazar al edit correcto)
+    can_edit_target = False
+    try:
+        viewer_perfil = getattr(request.user, 'usuarioperfiloptimizador', None)
+        other_perfil = getattr(target_user, 'usuarioperfiloptimizador', None)
+        if viewer_perfil:
+            if viewer_perfil.rol == 'super_admin':
+                can_edit_target = True
+            elif viewer_perfil.rol == 'org_admin' and other_perfil and viewer_perfil.organizacion_id == getattr(other_perfil, 'organizacion_id', None):
+                can_edit_target = True
+    except Exception:
+        can_edit_target = False
+
     # Perfil
     try:
         perfil = target_user.usuarioperfiloptimizador
@@ -313,6 +326,7 @@ def viewProfile(request):
         "ultimos_clientes": ultimos_clientes,
         "auditoria": auditoria,
         "viendo_otro": target_user != request.user,
+        "can_edit_target": can_edit_target,
     }
     return render(request, "users/viewProfile.html", context)
 

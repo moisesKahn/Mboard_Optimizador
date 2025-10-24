@@ -182,3 +182,210 @@ def analytics_optimizations(request: HttpRequest):
         } for row in agg
     ]
     return JsonResponse({'success': True, 'events': events})
+
+
+# =====================
+# Operador APIs
+# =====================
+from django.views.decorators.http import require_http_methods
+import json as _json
+
+
+def _is_operator_or_admin(ctx):
+    role = ctx.get('role')
+    return bool(role in ('operador', 'org_admin', 'super_admin') or ctx.get('organization_is_general') or ctx.get('is_support'))
+
+
+@login_required
+@require_http_methods(["GET"])
+def operador_proyectos_api(request: HttpRequest):
+    """GET /api/operador/proyectos: lista proyectos visibles para el operador/admin.
+    Filtros: estado, search
+    """
+    ctx = get_auth_context(request)
+    if not _is_operator_or_admin(ctx):
+        return JsonResponse({'success': False, 'message': 'Forbidden'}, status=403)
+    estado = request.GET.get('estado') or ''
+    search = request.GET.get('search') or ''
+
+    qs = Proyecto.objects.select_related('cliente')
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        qs = qs.filter(organizacion_id=ctx.get('organization_id'))
+    if ctx.get('role') == 'operador':
+        qs = qs.filter(operador=request.user)
+    if estado:
+        qs = qs.filter(estado=estado)
+    if search:
+        from django.db.models import Q
+        qs = qs.filter(Q(codigo__icontains=search) | Q(nombre__icontains=search) | Q(cliente__nombre__icontains=search))
+    data = [
+        {
+            'id': p.id,
+            'public_id': p.public_id,
+            'codigo': p.codigo,
+            'nombre': p.nombre,
+            'cliente': getattr(p.cliente, 'nombre', None),
+            'estado': p.estado,
+            'creado': p.fecha_creacion.strftime('%Y-%m-%d %H:%M'),
+        } for p in qs.order_by('-fecha_creacion')[:300]
+    ]
+    return JsonResponse({'success': True, 'proyectos': data})
+
+
+@login_required
+@require_http_methods(["GET"])
+def operador_proyecto_detalle_api(request: HttpRequest, proyecto_id: int):
+    """GET /api/operador/proyectos/<id>: retorna diseño optimizado normalizado para UI Operador."""
+    ctx = get_auth_context(request)
+    base_qs = Proyecto.objects.select_related('cliente')
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        base_qs = base_qs.filter(organizacion_id=ctx.get('organization_id'))
+    p = get_object_or_404(base_qs, id=proyecto_id)
+    if ctx.get('role') == 'operador' and p.operador_id != request.user.id:
+        return JsonResponse({'success': False, 'message': 'Forbidden'}, status=403)
+
+    # Parsear resultado
+    res = p.resultado_optimizacion
+    if not res:
+        return JsonResponse({'success': False, 'message': 'Proyecto sin resultado'}, status=404)
+    try:
+        resd = _json.loads(res) if isinstance(res, str) else res
+    except Exception:
+        resd = res if isinstance(res, dict) else None
+    if not isinstance(resd, (dict,)):
+        return JsonResponse({'success': False, 'message': 'Resultado inválido'}, status=500)
+
+    # Soporte: resultado puede ser un único material (raíz) o materiales[]
+    materiales = resd.get('materiales') if isinstance(resd.get('materiales'), list) else [resd]
+    # Elegimos primer material para simplificar respuesta (v1)
+    mat = materiales[0] if materiales else {}
+    # Metadatos útiles para visualizador
+    try:
+        kerf = (mat.get('config') or {}).get('kerf', mat.get('desperdicio_sierra'))
+    except Exception:
+        kerf = None
+    try:
+        margen_x = (mat.get('margenes') or {}).get('margen_x', (mat.get('config') or {}).get('margen_x'))
+        margen_y = (mat.get('margenes') or {}).get('margen_y', (mat.get('config') or {}).get('margen_y'))
+    except Exception:
+        margen_x = margen_y = None
+    material_nombre = (mat.get('material') or {}).get('nombre') or None
+    tableros = mat.get('tableros') or []
+    normalized_tableros = []
+    for t_idx, t in enumerate(tableros, start=1):
+        piezas = []
+        for i, pi in enumerate(t.get('piezas') or [], start=1):
+            pieza_id = f"t{t_idx}p{i}"
+            pieza = {
+                'pieza_id': pieza_id,
+                'tablero_num': t_idx,
+                'nombre': pi.get('nombre') or pi.get('id_unico') or f"P{i}",
+                'x': pi.get('x'), 'y': pi.get('y'),
+                'ancho': pi.get('ancho'), 'largo': pi.get('largo'),
+                'rotada': bool(pi.get('rotada')),
+                'estado': pi.get('estado') or 'pendiente',
+                'tapacantos': pi.get('tapacantos') or {},
+            }
+            piezas.append(pieza)
+        normalized_tableros.append({
+            'num': t_idx,
+            'ancho_mm': t.get('ancho') or mat.get('tablero_ancho_original') or mat.get('tablero_ancho_efectivo'),
+            'largo_mm': t.get('largo') or mat.get('tablero_largo_original') or mat.get('tablero_largo_efectivo'),
+            'piezas': piezas,
+            'eficiencia': t.get('eficiencia_tablero'),
+            'cortes': t.get('cortes') or [],  # opcional (vacío si no disponible)
+        })
+    return JsonResponse({
+        'success': True,
+        'proyecto': {
+            'id': p.id,
+            'public_id': p.public_id,
+            'codigo': p.codigo,
+            'nombre': p.nombre,
+            'cliente': getattr(p.cliente, 'nombre', None),
+            'estado': p.estado,
+        },
+        'tableros': normalized_tableros,
+        'meta': {
+            'material': material_nombre,
+            'kerf': kerf,
+            'margen_x': margen_x,
+            'margen_y': margen_y,
+        }
+    })
+
+
+@login_required
+@require_http_methods(["PATCH"])
+def operador_pieza_estado_api(request: HttpRequest, proyecto_id: int, pieza_id: str):
+    """PATCH /api/operador/proyectos/<id>/piezas/<pieza_id>
+    Body: { estado: 'pendiente'|'en_corte'|'cortada'|'descartada' }
+    Persiste el estado dentro del JSON de resultado.
+    """
+    ctx = get_auth_context(request)
+    base_qs = Proyecto.objects
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        base_qs = base_qs.filter(organizacion_id=ctx.get('organization_id'))
+    p = get_object_or_404(base_qs, id=proyecto_id)
+    if ctx.get('role') == 'operador' and p.operador_id != request.user.id:
+        return JsonResponse({'success': False, 'message': 'Forbidden'}, status=403)
+
+    try:
+        payload = _json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Payload inválido'}, status=400)
+    estado = (payload.get('estado') or '').strip()
+    if estado not in ('pendiente','en_corte','cortada','descartada'):
+        return JsonResponse({'success': False, 'message': 'Estado inválido'}, status=400)
+
+    res = p.resultado_optimizacion
+    if not res:
+        return JsonResponse({'success': False, 'message': 'Proyecto sin resultado'}, status=404)
+    try:
+        resd = _json.loads(res) if isinstance(res, str) else res
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Resultado inválido'}, status=500)
+
+    materiales = resd.get('materiales') if isinstance(resd.get('materiales'), list) else [resd]
+    updated = False
+    for mat in materiales:
+        tableros = mat.get('tableros') or []
+        for t_idx, t in enumerate(tableros, start=1):
+            piezas = t.get('piezas') or []
+            for i, pi in enumerate(piezas, start=1):
+                pid = f"t{t_idx}p{i}"
+                if pid == pieza_id:
+                    pi['estado'] = estado
+                    updated = True
+                    break
+            if updated:
+                break
+        if updated:
+            break
+
+    if not updated:
+        return JsonResponse({'success': False, 'message': 'Pieza no encontrada'}, status=404)
+
+    # Persistir
+    if 'materiales' in resd:
+        p.resultado_optimizacion = _json.dumps(resd, ensure_ascii=False)
+    else:
+        p.resultado_optimizacion = _json.dumps(materiales[0], ensure_ascii=False)
+    p.save(update_fields=['resultado_optimizacion'])
+
+    # Auditoría
+    try:
+        AuditLog.objects.create(
+            actor=request.user,
+            organizacion=p.organizacion,
+            verb='EDIT',
+            target_model='Proyecto',
+            target_id=str(p.id),
+            target_repr=p.codigo,
+            changes={'pieza_id': pieza_id, 'estado': estado},
+        )
+    except Exception:
+        pass
+
+    return JsonResponse({'success': True})
+

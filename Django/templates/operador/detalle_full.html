@@ -1,0 +1,491 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+  {% include "partials/head.html" %}
+  <style>
+    html, body { height: 100%; }
+    body { overflow: hidden; }
+    .op-wrapper { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr 360px; grid-template-rows: auto 1fr; grid-template-areas: 'toolbar toolbar' 'canvas sidebar'; }
+    .op-toolbar { grid-area: toolbar; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-bottom: 1px solid #eee; }
+    .op-canvas { grid-area: canvas; position: relative; background: #fafafa; }
+    .op-sidebar { grid-area: sidebar; display: flex; flex-direction: column; border-left: 1px solid #eee; background: #fff; }
+    .op-stats { padding: 10px 12px; border-bottom: 1px solid #eee; }
+    .op-list { padding: 0 12px 12px 12px; overflow: auto; }
+    .op-btn { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 6px 10px; }
+    .op-btn:active { transform: translateY(1px); }
+    .chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; margin-right:6px; background:#f1f3f5; }
+    .piece-highlight rect { filter: drop-shadow(0 0 0.5px rgba(0,0,0,.4)); stroke-width: 2; }
+    .list-highlight { background: #fffbe6; }
+    .piece-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index: 20; }
+    .piece-modal { background: #fff; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.3); width: min(90vw, 760px); max-width: 760px; }
+    .piece-modal .hdr { display:flex; align-items:center; justify-content:space-between; padding: 10px 14px; border-bottom: 1px solid #eee; }
+    .piece-modal .cnt { padding: 10px; }
+    .piece-modal .btn-close { border:none; background:transparent; font-size:22px; line-height:1; cursor:pointer; }
+    /* Ocultar/mostrar sidebar */
+    .op-wrapper.sidebar-hidden { grid-template-columns: 1fr 0; }
+    .op-wrapper.sidebar-hidden .op-sidebar { display: none; }
+  </style>
+  <body>
+    <div class="op-wrapper">
+      <div class="op-toolbar">
+        <a href="{% url 'operador_home' %}" class="op-btn">← Volver</a>
+        <div class="vr mx-2"></div>
+        <strong>{{ proyecto.codigo }}</strong>
+        <span>· {{ proyecto.nombre }}</span>
+        <span class="chip">{{ proyecto.cliente.nombre }}</span>
+        <span class="chip">{{ proyecto.get_estado_display }}</span>
+        <div class="vr mx-2"></div>
+        <label class="me-1 small text-muted">Tablero</label>
+        <select id="selTablero" class="form-select form-select-sm" style="width:auto;"></select>
+        <div class="vr mx-2"></div>
+        <button id="btnZoomOut" class="op-btn" type="button">-</button>
+        <button id="btnZoomReset" class="op-btn" type="button">100%</button>
+        <button id="btnZoomIn" class="op-btn" type="button">+</button>
+        <button id="btnToggleSidebar" class="op-btn ms-auto" type="button" title="Ocultar/mostrar panel">Panel ▸</button>
+        <div class="small text-muted ms-2">Atajos: + / - / 0 · ← → cambia tablero · S stats</div>
+      </div>
+      <div class="op-canvas" id="canvasHost">
+        <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">Cargando diseño…</div>
+      </div>
+      <div class="op-sidebar">
+        <div class="op-stats small" id="statsBox">
+          <div><strong>Material:</strong> <span id="stMaterial">—</span></div>
+          <div><strong>Tablero:</strong> <span id="stSize">—</span> · <span id="stEff">—</span> de aprovechamiento</div>
+          <div><strong>Útil (márgenes):</strong> <span id="stUtil">—</span> (<span id="stMargins">mx=?, my=?</span>)</div>
+          <div><strong>Piezas:</strong> <span id="stPieces">—</span> · <strong>Cortes:</strong> V:<span id="stCutV">0</span> H:<span id="stCutH">0</span></div>
+          <div><strong>Tapacanto ML:</strong> <span id="stML">—</span></div>
+        </div>
+        <div class="op-list" id="listaPiezas"></div>
+      </div>
+    </div>
+
+    <script>
+    (async function(){
+      const proyectoId = parseInt('{{ proyecto.id }}', 10);
+      const host = document.getElementById('canvasHost');
+      const selTab = document.getElementById('selTablero');
+      const list = document.getElementById('listaPiezas');
+      const stMaterial = document.getElementById('stMaterial');
+      const stSize = document.getElementById('stSize');
+      const stEff = document.getElementById('stEff');
+      const stUtil = document.getElementById('stUtil');
+      const stMargins = document.getElementById('stMargins');
+      const stPieces = document.getElementById('stPieces');
+      const stCutV = document.getElementById('stCutV');
+      const stCutH = document.getElementById('stCutH');
+      const stML = document.getElementById('stML');
+
+      function getCookie(name){
+        const v = document.cookie.split('; ').find(r=>r.startsWith(name+'='));
+        return v ? decodeURIComponent(v.split('=')[1]) : '';
+      }
+
+      const resp = await fetch(`/api/operador/proyectos/${proyectoId}`);
+      if(!resp.ok){ host.innerHTML = '<div class="w-100 h-100 d-flex align-items-center justify-content-center text-danger">No hay resultado.</div>'; return; }
+      const data = await resp.json();
+      const tableros = data.tableros||[];
+      const meta = data.meta||{};
+
+      stMaterial.textContent = meta.material || '—';
+      selTab.innerHTML = tableros.map((t,i)=>`<option value="${i}">Tablero ${t.num}</option>`).join('');
+      let idx = 0;
+
+      // SVG setup
+      host.innerHTML = '';
+      const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width','100%'); svg.setAttribute('height','100%');
+  // Margen superior deseado en modo ajuste: responsivo al alto del host (6% del alto), con límites
+  const FIT_PAD_MIN = 32, FIT_PAD_MAX = 80;
+  function getFitPad(){
+    const r = host.getBoundingClientRect();
+    const h = (r && r.height) ? r.height : vbSize().h;
+    const pad = Math.round(h * 0.06); // 6% del alto
+    return Math.max(FIT_PAD_MIN, Math.min(FIT_PAD_MAX, pad));
+  }
+  const ALWAYS_CENTER = false; // permitir movimiento libre de la cámara por arrastre
+  function setViewBoxToHost(){
+    // Usar medidas reales del host; si está minimizado/oculto, no tocar el viewBox
+    const w0 = host.clientWidth || host.getBoundingClientRect().width;
+    const h0 = host.clientHeight || host.getBoundingClientRect().height;
+    if(!w0 || !h0 || w0 < 10 || h0 < 10){
+      return false; // no modificar mientras no haya tamaño válido
+    }
+    const w = Math.floor(w0);
+    const h = Math.floor(h0);
+    svg.setAttribute('viewBox',`0 0 ${w} ${h}`);
+    return true;
+  }
+  setViewBoxToHost();
+      const g = document.createElementNS(svgNS, 'g');
+      svg.appendChild(g); host.appendChild(svg);
+  let scale = 1, baseScale = 1, dx = 0, dy = 0; let dragging=false, lx=0, ly=0;
+  // Forzar centrado exacto en el siguiente apply (usado tras cambios de tamaño)
+  let forceCenterNext = false;
+  // Bounds del TABLERO (no de todo el <g>), para centrar/clamp sin considerar textos externos
+  let boardBounds = {x:0,y:0,width:1,height:1};
+  // BBox completo del grupo (incluye textos y cortes)
+  let contentBounds = {x:0,y:0,width:1,height:1};
+  // BBox a usar para el ajuste (fit) y centrado visual: incluye etiquetas externas
+  let fitBounds = {x:0,y:0,width:1,height:1};
+  function atBaseZoom(){ return baseScale>0 ? (Math.abs(scale-baseScale) <= baseScale*1e-3) : (Math.abs(scale-baseScale) < 1e-6); }
+  function vbSize(){ const vb=(svg.getAttribute('viewBox')||'0 0 100 100').split(/\s+/); return {w: parseFloat(vb[2]||'100'), h: parseFloat(vb[3]||'100')}; }
+      function clamp(board){
+        const {w:vw, h:vh} = vbSize();
+        // Límites de pan del TABLERO (para no salirnos del área útil)
+        const bxB = boardBounds.x, byB = boardBounds.y, bwB = boardBounds.width, bhB = boardBounds.height;
+        const dxMin = vw - (bxB + bwB) * scale;
+        const dxMax = -bxB * scale;
+        const dyMin = vh - (byB + bhB) * scale;
+        const dyMax = -byB * scale;
+        // ¿Forzamos centrado puntual? (por resize/reset)
+        const atBase = atBaseZoom();
+        if(forceCenterNext || atBase){
+          // Centrar horizontalmente y fijar margen superior mínimo
+          const bw = boardBounds.width;
+          const pad = getFitPad();
+          dx = (vw - bw*scale)/2 - boardBounds.x*scale;
+          dy = pad - boardBounds.y*scale;
+          if(forceCenterNext) forceCenterNext = false;
+        } else {
+          dx = Math.max(dxMin, Math.min(dxMax, dx));
+          dy = Math.max(dyMin, Math.min(dyMax, dy));
+        }
+      }
+      function apply(board){
+        clamp(board||{});
+        if(!isFinite(scale) || scale <= 0) scale = 1;
+        g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
+      }
+
+      function stateColor(st){
+        // Colores requeridos: cortada verde vivo, pendiente gris; otros estados mantienen diferenciación
+        return st==='cortada' ? '#28A745' : st==='pendiente' ? '#6C757D' : st==='en_corte' ? '#0D6EFD' : st==='descartada' ? '#DC3545' : '#6C757D';
+      }
+
+      function mlTapacanto(board){
+        let mm = 0; for(const p of (board.piezas||[])){
+          const tc = p.tapacantos||{};
+          if(tc.arriba) mm += (p.ancho||0);
+          if(tc.abajo) mm += (p.ancho||0);
+          if(tc.derecha) mm += (p.largo||0);
+          if(tc.izquierda) mm += (p.largo||0);
+        }
+        return (mm/1000).toFixed(2) + ' m';
+      }
+
+      function tapsLabel(tc){
+        if(!tc) return '—';
+        const parts = [];
+        if(tc.arriba) parts.push('A');
+        if(tc.derecha) parts.push('D');
+        if(tc.abajo) parts.push('B');
+        if(tc.izquierda) parts.push('I');
+        return parts.length? parts.join(',') : '—';
+      }
+
+      function inferCutLines(board){
+        const xs = new Set(), ys = new Set();
+        for(const p of (board.piezas||[])){
+          const x1 = (p.x||0), x2=(p.x||0)+(p.ancho||0);
+          const y1 = (p.y||0), y2=(p.y||0)+(p.largo||0);
+          xs.add(x1); xs.add(x2); ys.add(y1); ys.add(y2);
+        }
+        const v = Array.from(xs).sort((a,b)=>a-b); const h = Array.from(ys).sort((a,b)=>a-b);
+        return {v:harden(v), h:harden(h)};
+        function harden(arr){ const out=[]; let prev=null; const EPS=0.01; for(const x of arr){ if(prev===null || Math.abs(x-prev)>EPS){ out.push(x); prev=x; } } return out; }
+      }
+
+      function recalcBase(board){
+        const PAD=48; const {w:vw, h:vh} = vbSize();
+        // Recalcular bbox completo para referencia, pero el ajuste base usa SOLO el tablero
+        contentBounds = g.getBBox();
+        fitBounds = contentBounds;
+        const bw = Math.max(1, boardBounds.width || (board.ancho_mm||1));
+        const bh = Math.max(1, boardBounds.height || (board.largo_mm||1));
+        const availW = Math.max(50, vw - PAD*2);
+        const availH = Math.max(50, vh - PAD*2);
+        baseScale = Math.min(availW/bw, availH/bh);
+        if(!isFinite(baseScale) || baseScale <= 0) baseScale = 0.01; // fallback seguro
+      }
+      function recenter(board, keepScale=true){
+        recalcBase(board);
+        if(!keepScale) scale = baseScale; else scale = Math.max(scale, baseScale);
+        const {w:vw, h:vh} = vbSize();
+        // Centrar horizontalmente y mantener un margen superior mínimo
+  const bw = boardBounds.width;
+  const pad = getFitPad();
+  dx = (vw - bw*scale)/2 - boardBounds.x*scale;
+  dy = pad - boardBounds.y*scale;
+        apply(board);
+      }
+      function fit(board){ recenter(board, false); }
+
+          // Preserva el punto central del contenido y el nivel de zoom relativo
+          // al cambiar el tamaño del contenedor (resize ventana o toggle del panel)
+          function preserveViewOnContainerChange(board){
+            // Ajustar viewBox al tamaño del host y recalcular escala base del TABLERO
+            setViewBoxToHost();
+            recalcBase(board);
+            // Forzar FIT y re-centrado con margen superior mínimo en el próximo apply
+            scale = baseScale;
+            forceCenterNext = true;
+            apply(board);
+          }
+
+      function renderList(board){
+        const piezas = board.piezas||[];
+        if(!piezas.length){ list.innerHTML = '<div class="text-muted">Sin piezas.</div>'; return; }
+        list.innerHTML = piezas.map(p=>{
+          const st=p.estado||'pendiente';
+          return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom small" data-row="${p.pieza_id}">
+            <div>
+              <div><strong>${p.nombre||p.pieza_id}</strong></div>
+              <div class="text-muted">${p.ancho}×${p.largo} mm · (${p.x},${p.y})</div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background:${stateColor(st)}"></span>
+              <select class="form-select form-select-sm" style="min-width:130px" data-pieza="${p.pieza_id}">
+                <option value="pendiente" ${st==='pendiente'?'selected':''}>Pendiente</option>
+                <option value="en_corte" ${st==='en_corte'?'selected':''}>En corte</option>
+                <option value="cortada" ${st==='cortada'?'selected':''}>Cortada</option>
+                <option value="descartada" ${st==='descartada'?'selected':''}>Descartada</option>
+              </select>
+            </div>
+          </div>`
+        }).join('');
+        // hover de lista a pieza
+        list.querySelectorAll('[data-row]').forEach(row=>{
+          const pid=row.getAttribute('data-row');
+          row.addEventListener('mouseenter',()=>{
+            const grp = g.querySelector(`g[data-pieza="${CSS.escape(pid)}"]`); grp?.classList.add('piece-highlight');
+            row.classList.add('list-highlight');
+          });
+          row.addEventListener('mouseleave',()=>{
+            const grp = g.querySelector(`g[data-pieza="${CSS.escape(pid)}"]`); grp?.classList.remove('piece-highlight');
+            row.classList.remove('list-highlight');
+          });
+        });
+        list.querySelectorAll('select[data-pieza]').forEach(sel=>{
+          sel.addEventListener('change', async (e)=>{
+            const pid=e.target.getAttribute('data-pieza'); const estado=e.target.value;
+            try{
+              const r = await fetch(`/api/operador/proyectos/${proyectoId}/piezas/${encodeURIComponent(pid)}`,{method:'PATCH', headers:{'Content-Type':'application/json','X-CSRFToken':getCookie('csrftoken')}, body: JSON.stringify({estado})});
+              if(!r.ok) throw new Error('err');
+              const dot = list.querySelector(`[data-row="${pid}"] span.rounded-circle`); if(dot) dot.style.background = stateColor(estado);
+              const rect = document.getElementById(`piece-${pid}`); if(rect) rect.setAttribute('fill', stateColor(estado));
+            }catch(err){ alert('No se pudo guardar el estado.'); }
+          });
+        });
+      }
+
+      function renderBoard(board){
+        while(g.firstChild) g.removeChild(g.firstChild);
+        // tablero
+        const w=board.ancho_mm||2440, h=board.largo_mm||1830;
+        const tb = document.createElementNS(svgNS,'rect'); tb.setAttribute('x','0'); tb.setAttribute('y','0'); tb.setAttribute('width',String(w)); tb.setAttribute('height',String(h)); tb.setAttribute('fill','#fff'); tb.setAttribute('stroke','#333'); tb.setAttribute('stroke-width','2'); g.appendChild(tb);
+        // Actualizar límites del tablero para centrar/clamp correctos
+        boardBounds = {x:0, y:0, width:w, height:h};
+        // medidas del tablero
+  // Medidas del tablero por FUERA del tablero
+  const topTxt = document.createElementNS(svgNS,'text'); topTxt.setAttribute('x', String(w/2)); topTxt.setAttribute('y', String(-12)); topTxt.setAttribute('text-anchor','middle'); topTxt.setAttribute('font-size','24'); topTxt.setAttribute('fill','#444'); topTxt.textContent = `${w} mm`; g.appendChild(topTxt);
+  const leftTxt = document.createElementNS(svgNS,'text'); leftTxt.setAttribute('x', String(-12)); leftTxt.setAttribute('y', String(h/2)); leftTxt.setAttribute('text-anchor','middle'); leftTxt.setAttribute('font-size','24'); leftTxt.setAttribute('fill','#444'); leftTxt.setAttribute('transform', `rotate(-90 -12 ${h/2})`); leftTxt.textContent = `${h} mm`; g.appendChild(leftTxt);
+  // piezas
+        for(const p of (board.piezas||[])){
+          const group = document.createElementNS(svgNS,'g');
+          group.setAttribute('data-pieza', p.pieza_id);
+          group.style.cursor = 'pointer';
+          const x = (p.x||0), y=(p.y||0), pw=(p.ancho||0), ph=(p.largo||0);
+
+          const rc=document.createElementNS(svgNS,'rect');
+          rc.setAttribute('id',`piece-${p.pieza_id}`);
+          rc.setAttribute('x',String(x)); rc.setAttribute('y',String(y)); rc.setAttribute('width',String(pw)); rc.setAttribute('height',String(ph));
+          rc.setAttribute('fill',stateColor(p.estado||'pendiente'));
+          rc.setAttribute('fill-opacity','0.35');
+          rc.setAttribute('stroke','#222'); rc.setAttribute('stroke-width','1.2');
+          group.appendChild(rc);
+
+          // Etiquetas dentro de la pieza
+          const padding = 6;
+          const canShow = (pw >= 60 && ph >= 40);
+          if(canShow){
+            const nameText = document.createElementNS(svgNS,'text');
+            nameText.setAttribute('x', String(x + pw/2));
+            nameText.setAttribute('y', String(y + ph/2));
+            nameText.setAttribute('text-anchor','middle');
+            nameText.setAttribute('dominant-baseline','middle');
+            nameText.setAttribute('font-size','30');
+            nameText.setAttribute('font-weight','bold');
+            nameText.setAttribute('fill','#111');
+            nameText.textContent = p.nombre || p.pieza_id;
+            group.appendChild(nameText);
+
+            // ancho: en la parte superior centrado
+            const wText = document.createElementNS(svgNS,'text');
+            wText.setAttribute('x', String(x + pw/2));
+            wText.setAttribute('y', String(y + padding + 22));
+            wText.setAttribute('text-anchor','middle');
+            wText.setAttribute('font-size','20');
+            wText.setAttribute('fill','#111');
+            wText.textContent = `${p.ancho} mm`;
+            group.appendChild(wText);
+
+            // largo: en el lado derecho, vertical
+            const lText = document.createElementNS(svgNS,'text');
+            const cx = x + pw - 6, cy = y + ph/2;
+            lText.setAttribute('x', String(cx));
+            lText.setAttribute('y', String(cy));
+            lText.setAttribute('text-anchor','middle');
+            lText.setAttribute('font-size','20');
+            lText.setAttribute('fill','#111');
+            lText.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+            lText.textContent = `${p.largo} mm`;
+            group.appendChild(lText);
+
+            // tapacanto abreviado
+            const tcText = document.createElementNS(svgNS,'text');
+            tcText.setAttribute('x', String(x + pw/2));
+            tcText.setAttribute('y', String(y + ph - padding - 6));
+            tcText.setAttribute('text-anchor','middle');
+            tcText.setAttribute('font-size','18');
+            tcText.setAttribute('fill','#111');
+            tcText.textContent = `TC: ${tapsLabel(p.tapacantos)}`;
+            group.appendChild(tcText);
+          }
+
+          // hover resaltado cruzado
+          group.addEventListener('mouseenter',()=>{
+            group.classList.add('piece-highlight');
+            const row=list.querySelector(`[data-row="${p.pieza_id}"]`);
+            row?.classList.add('list-highlight');
+          });
+          group.addEventListener('mouseleave',()=>{
+            group.classList.remove('piece-highlight');
+            const row=list.querySelector(`[data-row="${p.pieza_id}"]`);
+            row?.classList.remove('list-highlight');
+          });
+
+          // Click: mostrar modal de pieza ampliada sin alterar el zoom general
+          group.addEventListener('click',()=>{
+            const row=list.querySelector(`[data-row="${p.pieza_id}"]`); row?.scrollIntoView({block:'nearest'}); row?.classList.add('list-highlight'); setTimeout(()=>row?.classList.remove('list-highlight'),700);
+            showPieceModal(p);
+          });
+          g.appendChild(group);
+        }
+        // cortes: si vienen, usarlos; si no, inferir
+        const cortes = Array.isArray(board.cortes)&&board.cortes.length? board.cortes : null;
+        if(cortes){
+          for(const c of cortes){
+            const ln=document.createElementNS(svgNS,'line');
+            if(c.tipo==='vertical'){
+              ln.setAttribute('x1',String(c.posicion)); ln.setAttribute('x2',String(c.posicion)); ln.setAttribute('y1','0'); ln.setAttribute('y2',String(h));
+            } else if(c.tipo==='horizontal'){
+              ln.setAttribute('x1','0'); ln.setAttribute('x2',String(w)); ln.setAttribute('y1',String(c.posicion)); ln.setAttribute('y2',String(c.posicion));
+            } else { continue; }
+            ln.setAttribute('stroke','#666'); ln.setAttribute('stroke-width','1.6'); ln.setAttribute('stroke-dasharray','6 5');
+            g.appendChild(ln);
+          }
+        }
+        // Bounding box completo (incluye textos/cortes) y vista inicial centrada
+        contentBounds = g.getBBox();
+        fit(board);
+      }
+
+      function showPieceModal(p){
+        const backdrop = document.createElement('div'); backdrop.className = 'piece-modal-backdrop';
+        const modal = document.createElement('div'); modal.className = 'piece-modal';
+        const hdr = document.createElement('div'); hdr.className = 'hdr'; hdr.innerHTML = `<div><strong>${p.nombre||p.pieza_id}</strong></div><button class="btn-close" aria-label="Cerrar">×</button>`;
+        const cnt = document.createElement('div'); cnt.className = 'cnt';
+        const w = p.ancho||0, h = p.largo||0; const svg2 = document.createElementNS(svgNS,'svg'); svg2.setAttribute('width','100%'); svg2.setAttribute('height','420');
+        const inner = document.createElementNS(svgNS,'g');
+        svg2.appendChild(inner);
+        cnt.appendChild(svg2);
+        modal.appendChild(hdr); modal.appendChild(cnt); backdrop.appendChild(modal); document.body.appendChild(backdrop);
+        // fit pieza dentro del modal con padding
+        const PAD=40; const vw = 720, vh = 380; const sc = Math.min((vw-PAD*2)/w, (vh-PAD*2)/h);
+        inner.setAttribute('transform', `translate(${(vw - w*sc)/2}, ${(vh - h*sc)/2}) scale(${sc})`);
+        const r = document.createElementNS(svgNS,'rect'); r.setAttribute('x','0'); r.setAttribute('y','0'); r.setAttribute('width',String(w)); r.setAttribute('height',String(h)); r.setAttribute('fill','#f8f9fa'); r.setAttribute('stroke','#222'); r.setAttribute('stroke-width','2'); inner.appendChild(r);
+        // nombre grande
+        const tname = document.createElementNS(svgNS,'text'); tname.setAttribute('x', String(w/2)); tname.setAttribute('y', String(h/2)); tname.setAttribute('text-anchor','middle'); tname.setAttribute('dominant-baseline','middle'); tname.setAttribute('font-size','28'); tname.setAttribute('font-weight','bold'); tname.textContent = p.nombre||p.pieza_id; inner.appendChild(tname);
+        // medidas
+        const tw = document.createElementNS(svgNS,'text'); tw.setAttribute('x', String(w/2)); tw.setAttribute('y', String(18)); tw.setAttribute('text-anchor','middle'); tw.setAttribute('font-size','18'); tw.textContent = `${w} mm`; inner.appendChild(tw);
+        const tl = document.createElementNS(svgNS,'text'); const cx = w-10, cy = h/2; tl.setAttribute('x', String(cx)); tl.setAttribute('y', String(cy)); tl.setAttribute('text-anchor','middle'); tl.setAttribute('font-size','18'); tl.setAttribute('transform', `rotate(-90 ${cx} ${cy})`); tl.textContent = `${h} mm`; inner.appendChild(tl);
+        // tapacantos
+        const ttc = document.createElementNS(svgNS,'text'); ttc.setAttribute('x', String(w/2)); ttc.setAttribute('y', String(h-12)); ttc.setAttribute('text-anchor','middle'); ttc.setAttribute('font-size','16'); ttc.textContent = `TC: ${tapsLabel(p.tapacantos)}`; inner.appendChild(ttc);
+        // eventos cierre
+        function close(){ document.body.removeChild(backdrop); }
+        hdr.querySelector('.btn-close').addEventListener('click', close);
+        backdrop.addEventListener('click', close);
+        modal.addEventListener('click', (e)=> e.stopPropagation());
+        window.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ close(); window.removeEventListener('keydown', esc); } });
+      }
+
+      function updateStats(board){
+        const w=board.ancho_mm||0, h=board.largo_mm||0; stSize.textContent = `${w}×${h} mm`;
+        const mx = meta.margen_x ?? '?', my= meta.margen_y ?? '?'; stMargins.textContent = `mx=${mx}, my=${my}`;
+        // útil (si se conocen márgenes)
+        if(Number.isFinite(mx) && Number.isFinite(my)) stUtil.textContent = `${Math.max(w-2*mx,0)}×${Math.max(h-2*my,0)} mm`; else stUtil.textContent = '—';
+        // eficiencia tablero si existe
+        const eff = (board.eficiencia!=null)? Number(board.eficiencia).toFixed(1)+'%' : '—'; stEff.textContent = eff;
+        stPieces.textContent = (board.piezas||[]).length;
+        // cortes
+        let v=0,hc=0; if(Array.isArray(board.cortes)&&board.cortes.length){ v = board.cortes.filter(c=>c.tipo==='vertical').length; hc = board.cortes.filter(c=>c.tipo==='horizontal').length; } else { const inf = inferCutLines(board); v = Math.max(inf.v.length-2,0); hc = Math.max(inf.h.length-2,0); }
+        stCutV.textContent = String(v); stCutH.textContent = String(hc);
+        stML.textContent = mlTapacanto(board);
+      }
+
+      // Interacción
+      svg.addEventListener('wheel',(e)=>{ e.preventDefault(); const d = e.deltaY<0?1.1:0.9; const prev=scale; const board = tableros[idx]||{}; scale = Math.max(baseScale, Math.min(8, scale*d));
+        // Zoom anclado al centro del viewport
+        const rect=host.getBoundingClientRect(); const cx = rect.width/2, cy = rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse());
+        dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev);
+        apply(board);
+      },{passive:false});
+  svg.addEventListener('mousedown',(e)=>{
+    if(atBaseZoom()) { dragging=false; svg.style.cursor='default'; return; }
+    dragging=true; lx=e.clientX; ly=e.clientY; svg.style.cursor='grabbing';
+  });
+  window.addEventListener('mouseup',()=>{ dragging=false; svg.style.cursor='default'; });
+  window.addEventListener('mousemove',(e)=>{ if(!dragging) return; dx += (e.clientX-lx); dy += (e.clientY-ly); lx=e.clientX; ly=e.clientY; apply(tableros[idx]||{}); });
+  document.getElementById('btnZoomIn').addEventListener('click',()=>{ scale=Math.min(8,scale*1.2); const board=tableros[idx]||{}; const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); const prev=scale/1.2; dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
+  document.getElementById('btnZoomOut').addEventListener('click',()=>{ const board=tableros[idx]||{}; const prev=scale; scale=Math.max(baseScale,scale/1.2); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
+  document.getElementById('btnZoomReset').addEventListener('click',()=>{ fit(tableros[idx]||{}); });
+  // Observa cambios reales de tamaño del host, más fiable que window.resize
+  let lastHostSize = {w:0,h:0};
+  function preserveWhenReady(board, tries=10){
+    const r = host.getBoundingClientRect();
+    if((r.width<10 || r.height<10) && tries>0){ setTimeout(()=>preserveWhenReady(board, tries-1), 60); return; }
+  preserveViewOnContainerChange(board);
+  }
+  const ro = new ResizeObserver(entries=>{
+    for(const e of entries){
+      const cr = e.contentRect;
+      if(Math.abs(cr.width - lastHostSize.w) > 1 || Math.abs(cr.height - lastHostSize.h) > 1){
+        lastHostSize = {w:cr.width, h:cr.height};
+        preserveWhenReady(tableros[idx]||{});
+      }
+    }
+  });
+  ro.observe(host);
+  // Fallback por si el navegador no soporta ResizeObserver (no debería ser el caso)
+  window.addEventListener('resize', ()=>{ preserveWhenReady(tableros[idx]||{}); });
+      document.getElementById('btnToggleSidebar').addEventListener('click',()=>{
+        const wrap = document.querySelector('.op-wrapper');
+        const btn = document.getElementById('btnToggleSidebar');
+        const isHidden = wrap.classList.toggle('sidebar-hidden');
+        btn.textContent = isHidden ? 'Panel ◂' : 'Panel ▸';
+        // Re-centrar manteniendo escala al cambiar el ancho disponible
+        // Esperar a que la grilla recalcule el layout
+        requestAnimationFrame(()=>preserveWhenReady(tableros[idx]||{}));
+      });
+      selTab.addEventListener('change',()=>{ idx=parseInt(selTab.value,10)||0; renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{}); });
+  window.addEventListener('keydown',(e)=>{ const board=tableros[idx]||{}; if(e.key==='+'){ const prev=scale; scale=Math.min(8,scale*1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='-'){ const prev=scale; scale=Math.max(baseScale,scale/1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='0'){ fit(board); } else if(e.key==='ArrowRight'){ idx=Math.min(tableros.length-1, idx+1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='ArrowLeft'){ idx=Math.max(0, idx-1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='s' || e.key==='S'){ const box=document.getElementById('statsBox'); box.style.display = (box.style.display==='none')? 'block' : 'none'; } });
+
+      // Inicialización
+      renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{});
+    })();
+    </script>
+
+    {% include "partials/scripts.html" %}
+  </body>
+  </html>

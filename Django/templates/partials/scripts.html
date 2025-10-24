@@ -30,7 +30,9 @@
 <script>
 // Polling simple de notificaciones de chat (no invasivo)
 (function(){
-	const pollIntervalMs = 5000; // 5s
+	// En la página de chat usamos un intervalo menor; en otras, un poco mayor
+	const onChatPage = !!document.getElementById('mensajes-container');
+	const pollIntervalMs = onChatPage ? 2000 : 4000;
 	const badge = document.getElementById('messagesBadge');
 	const list = document.getElementById('messagesList');
 	const empty = document.getElementById('noMessages');
@@ -43,7 +45,6 @@
 		const pref = localStorage.getItem('chatSoundEnabled');
 		if (pref === 'false') return false;
 		// Evitar sonido cuando se está en la página de chat activa (viendo mensajes)
-		const onChatPage = !!document.getElementById('mensajes-container');
 		return !onChatPage;
 	}
 

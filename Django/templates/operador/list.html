@@ -1,0 +1,58 @@
+{% extends 'layout/layout.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-md-3">
+    <form method="get" class="d-flex gap-2">
+      <input type="text" class="form-control" name="search" value="{{ search }}" placeholder="Buscar por código, nombre o cliente">
+      <select class="form-select" name="estado">
+        <option value="">Todos</option>
+        <option value="borrador" {% if estado == 'borrador' %}selected{% endif %}>Borrador</option>
+        <option value="en_proceso" {% if estado == 'en_proceso' %}selected{% endif %}>En Proceso</option>
+        <option value="optimizado" {% if estado == 'optimizado' %}selected{% endif %}>Optimizado</option>
+        <option value="aprobado" {% if estado == 'aprobado' %}selected{% endif %}>Aprobado</option>
+        <option value="produccion" {% if estado == 'produccion' %}selected{% endif %}>En Producción</option>
+        <option value="completado" {% if estado == 'completado' %}selected{% endif %}>Completado</option>
+        <option value="cancelado" {% if estado == 'cancelado' %}selected{% endif %}>Cancelado</option>
+      </select>
+      <button class="btn btn-primary" type="submit">Filtrar</button>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>ID del proyecto</th>
+            <th>Nombre</th>
+            <th>Cliente</th>
+            <th>Estado</th>
+            <th>Creado</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in proyectos %}
+          <tr>
+            <td>{{ p.public_id|default:p.id }}</td>
+            <td>{{ p.nombre }}</td>
+            <td>{{ p.cliente.nombre }}</td>
+            <td><span class="badge bg-light text-dark">{{ p.get_estado_display }}</span></td>
+            <td>{{ p.fecha_creacion|date:'Y-m-d H:i' }}</td>
+            <td class="text-end"><a class="btn btn-sm btn-primary" href="{% url 'operador_proyecto' p.id %}">Abrir</a></td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="6" class="text-center text-muted">Sin proyectos asignados.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  </div>
+{% endblock %}

@@ -23,6 +23,21 @@ from core.models import Proyecto, Cliente, Material, Tapacanto, OptimizationRun,
 from core.auth_utils import get_auth_context
 import math
 
+def _normalize_rut(rut: str) -> str:
+    """Normaliza un RUT/identificador para comparación: quita puntos, guiones y espacios, y pasa a mayúsculas.
+    Evita duplicados por formato (ej. 12.345.678-9 vs 12345678-9).
+    """
+    if not rut:
+        return ''
+    try:
+        s = str(rut).upper()
+        # quitar espacios, puntos y guiones
+        for ch in [' ', '.', '-']:
+            s = s.replace(ch, '')
+        return s
+    except Exception:
+        return str(rut).strip()
+
 class TipoMaterial:
     TABLERO = 'tablero'
 
@@ -279,6 +294,12 @@ def _pdf_from_result(proyecto, resultado):
             self._saved_page_states.append(dict(self.__dict__))
             self._startPage()
         def save(self):
+            # Asegurar que el estado de la página actual también esté incluido
+            # (si no se llamó a showPage() tras el último contenido, se perdería la última página).
+            try:
+                self._saved_page_states.append(dict(self.__dict__))
+            except Exception:
+                pass
             # Inserta numeración "Página X de Y" centrada abajo
             page_count = len(self._saved_page_states)
             for i, state in enumerate(self._saved_page_states, start=1):
@@ -927,6 +948,9 @@ def _pdf_from_result(proyecto, resultado):
             # y coordenadas fieles: decidir automáticamente si vienen relativas al área útil
             # o absolutas (incluyendo márgenes), eligiendo el caso que encaja en el área útil.
             piezas_tab = (t.get('piezas') or [])
+            # Colecciones para líneas de corte (coordenadas en PDF)
+            _cut_xs = set()
+            _cut_ys = set()
             for pieza in piezas_tab:
                 aN = int(pieza.get('ancho',0)); lN = int(pieza.get('largo',0))
                 kN = (pieza.get('nombre'), min(aN,lN), max(aN,lN))
@@ -987,22 +1011,70 @@ def _pdf_from_result(proyecto, resultado):
                 # Clip dentro de la pieza y dibujar alineado al largo
                 p.saveState()
                 clip = p.beginPath(); clip.rect(x, y, w, h); p.clipPath(clip, stroke=0, fill=0)
-                p.setFont("Helvetica-Bold", fs1)
                 p.setFillGray(0)
-                if is_vertical:
-                    # Rotar 90° alrededor del centro de la pieza
-                    cx, cy = x + w/2, y + h/2
-                    p.translate(cx, cy)
+                # Nombre de la pieza: mantener CENTRADO dentro de la pieza
+                try:
+                    from reportlab.pdfbase.pdfmetrics import stringWidth
+                    # Ajustar fs1 para que el nombre quepa horizontalmente en el ancho de la pieza
+                    max_text_w = max(w - 6, 8)
+                    while fs1 > 4 and stringWidth(et1, 'Helvetica-Bold', fs1) > max_text_w:
+                        fs1 -= 0.5
+                    p.setFont("Helvetica-Bold", fs1)
+                    # Centrar en el centro geométrico de la pieza
+                    p.drawCentredString(x + w/2, y + h/2 + (fs1/2), et1)
+                except Exception:
+                    try:
+                        p.setFont("Helvetica-Bold", fs1)
+                        p.drawCentredString(x + w/2, y + h/2 + (fs1/2), et1)
+                    except Exception:
+                        pass
+
+                # Mostrar medidas en los lados: ancho (pa) en el lado superior/central horizontal,
+                # y alto (pl) en el lado derecho/central vertical, siguiendo la línea (rotado 90°).
+                label_w = f"{pa} mm"
+                label_h = f"{pl} mm"
+                # Ajustar tamaño de fuente para que quepa en la longitud del lado
+                try:
+                    from reportlab.pdfbase.pdfmetrics import stringWidth
+                    # Fuente inicial
+                    fw = fs2
+                    fh = fs2
+                    max_w_w = max(w - 6, 6)
+                    max_w_h = max(h - 6, 6)
+                    # Reducir fuente si no cabe en la dimensión disponible
+                    while fw > 4 and stringWidth(label_w, 'Helvetica', fw) > max_w_w:
+                        fw -= 0.5
+                    while fh > 4 and stringWidth(label_h, 'Helvetica', fh) > max_w_h:
+                        fh -= 0.5
+                except Exception:
+                    fw = fs2; fh = fs2
+
+                # Dibujar label horizontal (ancho) cerca del borde superior interno
+                try:
+                    p.setFont('Helvetica', fw)
+                    y_label = y + h - (fw + 2)
+                    p.drawCentredString(x + w/2, y_label, label_w)
+                except Exception:
+                    pass
+
+                # Dibujar label vertical (alto) en el lado derecho, rotado 90° y centrado verticalmente
+                try:
+                    p.saveState()
+                    p.setFont('Helvetica', fh)
+                    # Punto de referencia: un poco dentro del borde derecho
+                    rx = x + w - (fh/2) - 2
+                    ry = y + h/2
+                    p.translate(rx, ry)
                     p.rotate(90)
-                    # Tras la rotación, el ancho disponible es h y centramos en horizontal (nuevo eje X)
-                    p.drawCentredString(0, fs2/2, et1)
-                    p.setFont("Helvetica", fs2)
-                    p.drawCentredString(0, -fs2/2, et2)
-                else:
-                    yc = y + h/2
-                    p.drawCentredString(x + w/2, yc + (fs2/2), et1)
-                    p.setFont("Helvetica", fs2)
-                    p.drawCentredString(x + w/2, yc - (fs2/2), et2)
+                    # Tras rotar, centrar en X=0
+                    p.drawCentredString(0, 0, label_h)
+                    p.restoreState()
+                except Exception:
+                    try:
+                        p.restoreState()
+                    except Exception:
+                        pass
+
                 p.restoreState()
 
                 # Tapacantos internos: líneas punteadas por dentro de la pieza
@@ -1029,6 +1101,35 @@ def _pdf_from_result(proyecto, resultado):
                     if taps.get('derecha'):
                         p.line(x + w - inset, y + inset, x + w - inset, y + h - inset)
                     p.restoreState()
+                # Registrar bordes para líneas de corte globales
+                try:
+                    _cut_xs.add(float(x))
+                    _cut_xs.add(float(x + w))
+                    _cut_ys.add(float(y))
+                    _cut_ys.add(float(y + h))
+                except Exception:
+                    pass
+
+            # Dibujar líneas de corte globales del tablero (verticales y horizontales)
+            try:
+                p.saveState()
+                p.setLineWidth(0.6)
+                p.setStrokeGray(0.6)
+                p.setDash(2, 2)
+                # Verticales
+                for cx in sorted(_cut_xs):
+                    if cx >= tX - 1 and cx <= tX + tW + 1:
+                        p.line(cx, tY, cx, tY + tH)
+                # Horizontales
+                for cy in sorted(_cut_ys):
+                    if cy >= tY - 1 and cy <= tY + tH + 1:
+                        p.line(tX, cy, tX + tW, cy)
+                p.restoreState()
+            except Exception:
+                try:
+                    p.restoreState()
+                except Exception:
+                    pass
 
             # En esta sección ya no se imprime tabla inferior; se dedica toda la página al tablero
             p.showPage()
@@ -1092,10 +1193,11 @@ def _pdf_from_result(proyecto, resultado):
             try:
                 if not lados_tuple:
                     return '—'
+                # Usar iniciales compactas para evitar solapes en la tabla resumen
                 orden = ['arriba','derecha','abajo','izquierda']
-                nombres = {'arriba':'Arriba','derecha':'Derecha','abajo':'Abajo','izquierda':'Izquierda'}
-                parts = [nombres[k] for k in orden if k in set(lados_tuple)]
-                return '—' if not parts else ', '.join(parts)
+                iniciales = {'arriba':'A','derecha':'D','abajo':'B','izquierda':'I'}
+                parts = [iniciales[k] for k in orden if k in set(lados_tuple)]
+                return '—' if not parts else ','.join(parts)
             except Exception:
                 return '—'
 
@@ -1369,7 +1471,8 @@ def crear_proyecto_optimizacion(request):
             # Si no llega cliente_id, intentar crear/buscar por nombre+rut
             if not cliente_id:
                 nombre_cliente = (data.get('cliente_nombre') or '').strip()
-                rut_cliente = (data.get('cliente_rut') or '').strip()
+                rut_cliente_raw = (data.get('cliente_rut') or '')
+                rut_cliente = _normalize_rut(rut_cliente_raw)
                 if nombre_cliente and rut_cliente:
                     # Determinar organización desde el usuario autenticado
                     org = None
@@ -2177,19 +2280,19 @@ def crear_cliente_ajax(request):
             
             # Validar datos requeridos
             nombre = data.get('nombre', '').strip()
-            rut = data.get('rut', '').strip()
+            rut = _normalize_rut(data.get('rut', '') or '')
             
             if not nombre:
                 return JsonResponse({'success': False, 'mensaje': 'El nombre es requerido'})
             
-            # Si no hay RUT, generar uno temporal basado en el nombre
+            # Si no hay RUT, generar uno temporal basado en el nombre (normalizado)
             if not rut:
                 import time
                 rut_temporal = f"TEMP-{int(time.time())}"
-                rut = rut_temporal
-            
-            # Verificar si el RUT ya existe
-            if Cliente.objects.filter(rut=rut).exists():
+                rut = _normalize_rut(rut_temporal)
+
+            # Verificar si el RUT ya existe (comparación normalizada)
+            if rut and Cliente.objects.filter(rut=rut).exists():
                 return JsonResponse({'success': False, 'mensaje': 'Ya existe un cliente con este RUT'})
             
             # Asignar organización del usuario que crea el cliente
@@ -2213,6 +2316,20 @@ def crear_cliente_ajax(request):
                 direccion=data.get('direccion', '') or None,
                 activo=True
             )
+            # Auditoría: registrar creación de cliente
+            try:
+                from core.models import AuditLog
+                AuditLog.objects.create(
+                    actor=request.user if getattr(request, 'user', None) and request.user.is_authenticated else None,
+                    organizacion=org,
+                    verb='CREATE',
+                    target_model='Cliente',
+                    target_id=str(cliente.id),
+                    target_repr=cliente.nombre,
+                    changes=None
+                )
+            except Exception:
+                pass
             
             return JsonResponse({
                 'success': True,

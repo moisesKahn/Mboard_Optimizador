@@ -43,12 +43,10 @@
             <table class="table bordered-table mb-0" style="min-width: 1200px;">
             <thead>
                 <tr>
-                    <th scope="col" style="width: 80px;">ID</th>
-                    <th scope="col" style="width: 280px;">Nombre del Proyecto</th>
                     <th scope="col" style="width: 140px;">ID del proyecto</th>
+                    <th scope="col" style="width: 280px;">Nombre del Proyecto</th>
                     <th scope="col" style="width: 200px;">Cliente</th>
-                    <th scope="col" style="width: 120px;">RUT Cliente</th>
-                    <th scope="col" style="width: 200px;">Encargado</th>
+                    <th scope="col" style="width: 200px;">Operador</th>
                     <th scope="col" style="width: 120px;">Fecha de Creación</th>
                     <th scope="col" style="width: 120px;">Estado</th>
                     <th scope="col" style="width: 140px;">Acción</th>
@@ -58,8 +56,15 @@
                 {% for proyecto in proyectos %}
                 <tr>
                     <td>
-                        <span class="text-sm fw-medium">{{ proyecto.codigo }}</span>
+                        {% if proyecto.public_id %}
+                            <span class="badge bg-primary-50 text-primary-700 border border-primary-200">{{ proyecto.public_id }}</span>
+                        {% elif proyecto.folio %}
+                            <span class="badge bg-primary-50 text-primary-700 border border-primary-200">{{ proyecto.folio }}</span>
+                        {% else %}
+                            <span class="text-xs text-secondary-light">—</span>
+                        {% endif %}
                     </td>
+
                     <td>
                         <div class="d-flex align-items-center">
                             <div class="w-32-px h-32-px bg-primary-50 text-primary-600 rounded-circle d-flex align-items-center justify-content-center me-12">
@@ -72,39 +77,19 @@
                         </div>
                     </td>
                     <td>
-                        {% if proyecto.public_id %}
-                            <span class="badge bg-primary-50 text-primary-700 border border-primary-200">{{ proyecto.public_id }}</span>
-                        {% elif proyecto.folio %}
-                            <span class="badge bg-primary-50 text-primary-700 border border-primary-200">{{ proyecto.folio }}</span>
-                        {% else %}
-                            <span class="text-xs text-secondary-light">—</span>
-                        {% endif %}
-                    </td>
-                    <td>
                         <div>
                             <h6 class="text-sm mb-0 fw-medium">{{ proyecto.cliente.nombre }}</h6>
                             <span class="text-xs text-secondary-light">{{ proyecto.cliente.rut }}</span>
                         </div>
                     </td>
                     <td>
-                        <span class="text-sm fw-medium">{{ proyecto.cliente.rut }}</span>
-                    </td>
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <div class="w-32-px h-32-px bg-secondary-50 text-secondary-600 rounded-circle flex-shrink-0 me-12 d-flex align-items-center justify-content-center">
-                                <iconify-icon icon="solar:user-outline" class="text-lg"></iconify-icon>
-                            </div>
-                            <div>
-                                <h6 class="text-sm mb-0 fw-medium">{{ proyecto.creado_por.get_full_name|default:proyecto.creado_por.username }}</h6>
-                                <span class="text-xs text-secondary-light">
-                                    {% if proyecto.creado_por.usuarioperfiloptimizador %}
-                                        {{ proyecto.creado_por.usuarioperfiloptimizador.empresa|default:"Sistema" }} / {{ proyecto.creado_por.usuarioperfiloptimizador.get_rol_display }}
-                                    {% else %}
-                                        Sistema / Admin
-                                    {% endif %}
-                                </span>
-                            </div>
-                        </div>
+                        <!-- Selector de operadores por organización -->
+                        <select class="form-select form-select-sm operador-select" data-project-id="{{ proyecto.id }}" onchange="assignOperador(this)" style="max-width: 240px;">
+                            <option value="">-- Sin asignar --</option>
+                            {% for op in proyecto.available_operadores %}
+                                <option value="{{ op.id }}" {% if proyecto.operador and proyecto.operador.id == op.id %}selected{% endif %}>{{ op.name }}</option>
+                            {% endfor %}
+                        </select>
                     </td>
                     <td><span class="text-sm text-secondary-light">{{ proyecto.fecha_creacion|date:"d M Y" }}</span></td>
                     <td>
@@ -244,6 +229,40 @@ function deleteProject(projectId) {
             showNotification('error', 'Error al eliminar el proyecto');
         });
     }
+}
+
+// Función para asignar operador
+function assignOperador(selectElement) {
+    const projectId = selectElement.getAttribute('data-project-id');
+    const operadorId = selectElement.value;
+
+    const formData = new FormData();
+    formData.append('proyecto_id', projectId);
+    formData.append('operador_id', operadorId);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('{% url "asignar_operador" %}', {
+        method: 'POST',
+        body: formData,
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('success', data.message);
+        } else {
+            showNotification('error', data.message);
+            // En caso de error recargar la página para mantener consistencia
+            setTimeout(() => location.reload(), 800);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showNotification('error', 'Error al asignar operador');
+        setTimeout(() => location.reload(), 800);
+    });
 }
 
 // Función para mostrar notificaciones

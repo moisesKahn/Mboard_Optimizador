@@ -39,10 +39,17 @@
                         </li>
                     </ul>
                     <div class="mt-16 d-grid gap-2">
-                        <a href="{% url 'editOwnProfile' %}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2">
-                            <iconify-icon icon="solar:user-linear"></iconify-icon>
-                            Editar Perfil
-                        </a>
+                        {% if viendo_otro and can_edit_target %}
+                            <a href="{% url 'editUser' user.id %}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2">
+                                <iconify-icon icon="solar:user-linear"></iconify-icon>
+                                Editar Perfil
+                            </a>
+                        {% else %}
+                            <a href="{% url 'editOwnProfile' %}" class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2">
+                                <iconify-icon icon="solar:user-linear"></iconify-icon>
+                                Editar Perfil
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>

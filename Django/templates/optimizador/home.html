@@ -544,6 +544,36 @@
         return !!(materialState[idx] && materialState[idx].resultado);
     }
 
+    // Control del botón PDF: habilitar/deshabilitar de forma centralizada
+    function setPdfButton(enabled){
+        const b = document.getElementById('btnDescargarPDF');
+        if(!b) return;
+        b.disabled = !enabled;
+        b.classList.toggle('gated', !enabled);
+        if(!enabled){
+            b.style.cursor = 'not-allowed';
+            b.setAttribute('title','PDF no disponible hasta que se genere el resultado');
+        } else {
+            b.style.cursor = '';
+            b.removeAttribute('title');
+        }
+    }
+
+    function updatePdfButton(){
+        // Regla: habilitar el botón solo si existe resultado optimizado guardado
+        // o si el material activo tiene un resultado en estado (después de optimizar y guardar).
+        try{
+            const cont = document.getElementById('resultadosOptimizacion');
+            const hasProyecto = !!(cont && cont.getAttribute('data-proyecto-id'));
+            const idx = getActiveMaterialIndex();
+            const tieneResultadoEnEstado = !!(materialState[idx] && materialState[idx].resultado);
+            // Si estamos bloqueando explícitamente (durante optimización), respetarlo
+            if (window._bloquearPDF) { setPdfButton(false); return; }
+            // Habilitar solo si hay proyecto y resultado
+            setPdfButton(hasProyecto && tieneResultadoEnEstado);
+        }catch(e){ console.warn('updatePdfButton error', e); }
+    }
+
     function limpiarProyectoCompleto(){
         try{
             // limpiar datos de cabecera
@@ -662,11 +692,14 @@
                     const cont = document.getElementById('visualizacionTableros');
                     if (cont){ cont.innerHTML=''; cont.removeAttribute('data-locked'); }
                 }
+                try{ updatePdfButton(); }catch(_e){}
             });
         });
         // Estado inicial
         activeMaterialIndex = getActiveMaterialIndex();
         materialState[activeMaterialIndex] = materialState[activeMaterialIndex]||{ piezas: piezasFromDOM() };
+        // Actualizar estado del botón PDF al cargar
+        try{ updatePdfButton(); }catch(_e){}
     });
 
     function getCsrfToken(){
@@ -696,6 +729,9 @@
             });
         }
     });
+
+    // Asegurar actualización del botón PDF en carga
+    document.addEventListener('DOMContentLoaded', ()=>{ try{ updatePdfButton(); }catch(_e){} });
 
     // Manejar selección de cliente desde datalist
     function manejarSeleccionCliente() {
@@ -1364,14 +1400,54 @@
                 const clienteInput = document.getElementById('clienteInput');
                 const rutInput = document.getElementById('rutCliente');
                 const nombreProyecto = document.getElementById('nombreProyecto');
-                if (clienteInput) clienteInput.value = 'Cliente Ejemplo S.A.';
-                if (rutInput) { rutInput.disabled = false; rutInput.value = '76.543.210-9'; }
+                const exampleName = 'Cliente Ejemplo S.A.';
+                const exampleRut = '76.543.210-9';
+                if (clienteInput) clienteInput.value = exampleName;
                 if (nombreProyecto && (!nombreProyecto.value || nombreProyecto.value === nombreProyecto.placeholder)) {
                     nombreProyecto.value = 'Proyecto de Ejemplo Doble Material';
                 }
-                // Refrescar resumen superior si existe
-                const rc = document.getElementById('resCliente'); if (rc) rc.textContent = clienteInput ? clienteInput.value : '';
-                const rr = document.getElementById('resClienteRut'); if (rr) rr.textContent = rutInput ? ` (${rutInput.value})` : '';
+                // Intentar buscar cliente existente y seleccionarlo en lugar de solo escribir el nombre
+                try{
+                    fetch(`{% url 'buscar_clientes_ajax' %}?q=${encodeURIComponent(exampleName)}`)
+                        .then(r=>r.json()).then(data=>{
+                            const lista = Array.isArray(data.clientes) ? data.clientes : [];
+                            if (lista.length){
+                                // Buscar coincidencia exacta por nombre o por RUT
+                                let found = lista.find(c => (c.nombre||'').toLowerCase() === exampleName.toLowerCase() || (c.rut||'') === exampleRut);
+                                if (!found) found = lista[0];
+                                if (found){
+                                    // Actualizar inputs y estado seleccionado
+                                    if (clienteInput) clienteInput.value = found.nombre || exampleName;
+                                    if (rutInput){ rutInput.value = found.rut || exampleRut; rutInput.disabled = true; }
+                                    clienteSeleccionado = {
+                                        id: found.id,
+                                        nombre: found.nombre,
+                                        rut: found.rut,
+                                        organizacion: found.organizacion,
+                                        email: found.email,
+                                        telefono: found.telefono
+                                    };
+                                    // Refrescar datalist con este cliente para coherencia
+                                    actualizarDatalistClientes(lista);
+                                }
+                            } else {
+                                // No encontrado: dejar RUT editable con valor de ejemplo
+                                if (rutInput){ rutInput.disabled = false; rutInput.value = exampleRut; }
+                                clienteSeleccionado = null;
+                            }
+                            // Refrescar resumen superior
+                            const rc = document.getElementById('resCliente'); if (rc) rc.textContent = clienteInput ? clienteInput.value : '';
+                            const rr = document.getElementById('resClienteRut'); if (rr) rr.textContent = rutInput ? ` (${rutInput.value})` : '';
+                        }).catch(err=>{
+                            console.warn('Error buscando cliente ejemplo:', err);
+                            if (rutInput){ rutInput.disabled = false; rutInput.value = exampleRut; }
+                            clienteSeleccionado = null;
+                        });
+                }catch(fe){
+                    // Fallback si el fetch falla
+                    if (rutInput){ rutInput.disabled = false; rutInput.value = exampleRut; }
+                    clienteSeleccionado = null;
+                }
             } catch(_e) { console.warn('No se pudo precargar datos de cliente ejemplo:', _e); }
 
             // 1) Asegurar 2 materiales
@@ -2445,8 +2521,7 @@
                 }
                 // Bloquear PDF hasta que se actualice el folio/archivo en backend
                 window._bloquearPDF = true;
-                const btnPdf = document.querySelector('button.btn.btn-outline-secondary.ms-2[onclick="descargarPDF()"]') || document.querySelector('button[onclick="descargarPDF()"]');
-                if (btnPdf){ btnPdf.disabled = true; btnPdf.style.cursor = 'progress'; }
+                setPdfButton(false);
 
                 const payload = {
                     proyecto_id: document.getElementById('resultadosOptimizacion').getAttribute('data-proyecto-id'),
@@ -2500,8 +2575,8 @@
                     // Desbloquear PDF tras breve espera para asegurar escritura del archivo
                     setTimeout(()=>{
                         window._bloquearPDF = false;
-                        const b = document.querySelector('button[onclick="descargarPDF()"]');
-                        if (b){ b.disabled = false; b.style.cursor = ''; }
+                        // Actualizar estado del botón según reglas
+                        updatePdfButton();
                         // Mostrar toast no intrusivo sin mover botones
                         try {
                             const toast = document.getElementById('toastGenerandoPdf');

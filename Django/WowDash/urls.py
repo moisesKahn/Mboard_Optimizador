@@ -36,9 +36,11 @@ from WowDash import users_views
 from WowDash import material_views
 from WowDash import core_views
 from WowDash import optimizer_views
+from WowDash import operator_views
 from WowDash import chat_views
 from WowDash import search_views
 from WowDash import api_views
+from WowDash import operator_views
 from WowDash import api_views
 
 urlpatterns = [
@@ -57,6 +59,7 @@ urlpatterns = [
     path('proyectos/editar/<int:proyecto_id>/', core_views.edit_proyecto, name='edit_proyecto'),
     path('proyectos/eliminar/<int:proyecto_id>/', core_views.delete_proyecto, name='delete_proyecto'),
     path('proyectos/actualizar-estado/', core_views.update_project_status, name='update_project_status'),
+    path('proyectos/asignar-operador/', core_views.asignar_operador, name='asignar_operador'),
 
 # clientes routes
     path('clientes/', core_views.clientes_list, name='clientes_lista'),
@@ -110,6 +113,10 @@ urlpatterns = [
     path('optimizador/buscar-clientes/', optimizer_views.buscar_clientes_ajax, name='opt_buscar_clientes_ajax'),
     path('optimizador/crear-cliente/', optimizer_views.crear_cliente_ajax, name='crear_cliente_ajax'),
 
+# operador routes
+    path('operador/', operator_views.operador_home, name='operador_home'),
+    path('operador/proyecto/<int:proyecto_id>/', operator_views.operador_proyecto, name='operador_proyecto'),
+
 # chat routes (real functionality)
     path('chat/', chat_views.chat_lista, name='chat'),
     path('chat/conversacion/<int:conversacion_id>/', chat_views.chat_conversacion, name='chat_conversacion'),
@@ -126,6 +133,10 @@ urlpatterns = [
     path('api/users', api_views.users_list_api, name='api_users_list'),
     path('api/users/<int:user_id>/resumen', api_views.user_resumen_api, name='api_user_resumen'),
     path('api/analytics/optimizations', api_views.analytics_optimizations, name='api_analytics_optimizations'),
+    # operador APIs
+    path('api/operador/proyectos', api_views.operador_proyectos_api, name='api_operador_proyectos'),
+    path('api/operador/proyectos/<int:proyecto_id>', api_views.operador_proyecto_detalle_api, name='api_operador_proyecto_detalle'),
+    path('api/operador/proyectos/<int:proyecto_id>/piezas/<str:pieza_id>', api_views.operador_pieza_estado_api, name='api_operador_pieza_estado'),
 
 # home routes
 
@@ -147,6 +158,10 @@ urlpatterns = [
     path('testimonials', home_views.testimonials, name='testimonials'),
     path('view-details', home_views.viewDetails, name='viewDetails'),
     path('widgets', home_views.widgets, name='widgets'),
+    path('public', home_views.public, name='public'),
+    # operador web
+    path('operador/', operator_views.operador_home, name='operador_home'),
+    path('operador/proyecto/<int:proyecto_id>/', operator_views.operador_proyecto, name='operador_proyecto'),
 
 # ai routes
     path('ai/code-generator', ai_views.codeGenerator, name='codeGenerator'),

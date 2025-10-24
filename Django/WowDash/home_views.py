@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.http import HttpResponse
 from django.contrib.auth.decorators import login_required
 from core.auth_utils import get_auth_context
 from django.contrib.auth.models import User
@@ -174,4 +175,13 @@ def widgets(request):
         "subTitle": "Widgets",
     }
     return render(request,"widgets.html", context)
+
+
+def public(request):
+    """Endpoint público y sencillo para comprobar que el servidor responde.
+
+    No requiere autenticación. Usar para verificar forwards/túneles cuando la raíz
+    está protegida por login.
+    """
+    return HttpResponse("OK - App running (public endpoint)")
     

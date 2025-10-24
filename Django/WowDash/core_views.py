@@ -282,6 +282,21 @@ def proyectos_list(request):
     # Obtener listas para filtros
     estados = Proyecto.ESTADOS
     clientes = Cliente.objects.filter(activo=True).order_by('nombre')
+    # Preparar operadores por organización (solo usuarios con rol 'operador')
+    from core.models import UsuarioPerfilOptimizador
+    org_ids = set([p.organizacion_id for p in proyectos if getattr(p, 'organizacion_id', None)])
+    operadores_qs = UsuarioPerfilOptimizador.objects.filter(rol='operador', organizacion_id__in=org_ids).select_related('user')
+    operadores_by_org = {}
+    for op in operadores_qs:
+        if not op.organizacion_id:
+            continue
+        operadores_by_org.setdefault(op.organizacion_id, []).append({
+            'id': op.user.id,
+            'name': op.user.get_full_name() or op.user.username,
+        })
+    # Adjuntar lista de operadores disponibles a cada proyecto para uso en plantilla
+    for p in proyectos:
+        setattr(p, 'available_operadores', operadores_by_org.get(getattr(p, 'organizacion_id', None), []))
     
     context = {
         "title": "Lista de Proyectos",
@@ -289,6 +304,7 @@ def proyectos_list(request):
         "proyectos": proyectos,
         "estados": estados,
         "clientes": clientes,
+        "operadores_by_org": operadores_by_org,
         "search": search,
         "estado_filter": estado_filter,
         "cliente_filter": cliente_filter,
@@ -387,6 +403,42 @@ def update_project_status(request):
                 'message': f'Error al actualizar estado: {str(e)}'
             })
     return JsonResponse({'success': False, 'message': 'Método no permitido'})
+
+
+@login_required
+def asignar_operador(request):
+    """Asignar un operador a un proyecto vía AJAX. Valida alcance por organización."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Método no permitido'})
+    try:
+        proyecto_id = request.POST.get('proyecto_id')
+        operador_id = request.POST.get('operador_id') or None
+        ctx = get_auth_context(request)
+        base_qs = Proyecto.objects
+        if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+            base_qs = base_qs.filter(organizacion_id=ctx.get('organization_id'))
+        proyecto = get_object_or_404(base_qs, pk=proyecto_id)
+
+        # Validar operador
+        operador_obj = None
+        if operador_id:
+            from django.contrib.auth.models import User
+            operador_obj = get_object_or_404(User, pk=operador_id)
+            # Verificar que el operador pertenezca a la misma organización (salvo organización general)
+            try:
+                perfil = operador_obj.usuarioperfiloptimizador
+                if perfil.rol != 'operador':
+                    return JsonResponse({'success': False, 'message': 'El usuario seleccionado no es un operador.'})
+                if not (ctx.get('organization_is_general') or ctx.get('is_support')) and perfil.organizacion_id != proyecto.organizacion_id:
+                    return JsonResponse({'success': False, 'message': 'No puedes asignar operadores de otra organización.'})
+            except Exception:
+                return JsonResponse({'success': False, 'message': 'El usuario no tiene perfil válido.'})
+
+        proyecto.operador = operador_obj
+        proyecto.save(update_fields=['operador'])
+        return JsonResponse({'success': True, 'message': 'Operador asignado correctamente.'})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Error asignando operador: {str(e)}'})
 
 @login_required
 def delete_proyecto(request, proyecto_id):

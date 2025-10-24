@@ -173,6 +173,8 @@ class Proyecto(models.Model):
     creado_por = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="Creado por")
     fecha_creacion = models.DateTimeField(auto_now_add=True, verbose_name="Fecha de Creación")
     fecha_modificacion = models.DateTimeField(auto_now=True, verbose_name="Fecha de Modificación")
+    # Operador asignado al proyecto (opcional)
+    operador = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="Operador", related_name='proyectos_operador')
     
     class Meta:
         verbose_name = "Proyecto"
@@ -226,8 +228,8 @@ class UsuarioPerfilOptimizador(models.Model):
         ('org_admin', 'Administrador de Organización'),  # ADMIN_ORG
         ('agente', 'Agente'),  # AGENTE
         ('subordinador', 'Subordinador'),  # SUBORDINADOR (solo lectura en materiales)
+        ('operador', 'Operador'),  # OPERADOR (nuevo)
     ]
-    
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="Usuario")
     rol = models.CharField(max_length=20, choices=ROLES, default='agente', verbose_name="Rol")
     telefono = models.CharField(max_length=15, blank=True, null=True, verbose_name="Teléfono")

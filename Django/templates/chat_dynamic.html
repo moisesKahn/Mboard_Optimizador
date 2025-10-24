@@ -365,7 +365,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         function startChatPolling(){
             if (chatIntervalId) return;
-            chatIntervalId = setInterval(pollNew, 3000);
+            // Reducimos el intervalo para efecto casi inmediato
+            chatIntervalId = setInterval(pollNew, 1000);
         }
         function stopChatPolling(){
             if (!chatIntervalId) return;

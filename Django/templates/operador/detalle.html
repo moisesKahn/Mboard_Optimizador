@@ -1,0 +1,264 @@
+{% extends 'layout/layout.html' %}
+{% load static %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-12 d-flex justify-content-between align-items-center">
+    <div>
+      <h5 class="mb-1">{{ proyecto.codigo }} · {{ proyecto.nombre }}</h5>
+      <div class="text-muted">Cliente: {{ proyecto.cliente.nombre }} · Estado: {{ proyecto.get_estado_display }}</div>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <label class="me-1 small text-muted">Tablero:</label>
+      <select id="selTablero" class="form-select form-select-sm" style="width: auto;"></select>
+      <div class="vr mx-1"></div>
+      <button id="btnZoomOut" class="btn btn-sm btn-outline-secondary" type="button">-</button>
+      <button id="btnZoomReset" class="btn btn-sm btn-outline-secondary" type="button">100%</button>
+      <button id="btnZoomIn" class="btn btn-sm btn-outline-secondary" type="button">+</button>
+      <a class="btn btn-outline-secondary ms-2" href="{% url 'operador_home' %}">Volver</a>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Visualizador</strong>
+      </div>
+      <div class="card-body">
+        <div id="lienzo" class="border rounded position-relative" style="width:100%;height:520px;background:#fbfbfb;overflow:hidden;">
+          <div class="text-muted d-flex w-100 h-100 align-items-center justify-content-center">Cargando diseño optimizado…</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <small class="text-muted">Consejos: zoom con rueda, arrastra para panear, clic para seleccionar pieza.</small>
+          <div class="small">
+            <span class="badge bg-secondary me-1" style="background:#6c757d">pendiente</span>
+            <span class="badge bg-info me-1" style="background:#0dcaf0">en_corte</span>
+            <span class="badge bg-success me-1">cortada</span>
+            <span class="badge bg-danger">descartada</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card h-100">
+      <div class="card-header">
+        <strong>Piezas</strong>
+      </div>
+      <div class="card-body">
+        <div id="lista-piezas" class="small" style="max-height:420px;overflow:auto;"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(async function(){
+  const proyectoId = parseInt('{{ proyecto.id }}', 10);
+  function getCookie(name){
+    const v = document.cookie.split('; ').find(r=>r.startsWith(name+'='));
+    return v ? decodeURIComponent(v.split('=')[1]) : '';
+  }
+  const resp = await fetch(`/api/operador/proyectos/${proyectoId}`);
+  if(!resp.ok){
+    document.getElementById('lienzo').innerHTML = '<span class="text-danger">No hay resultado de optimización disponible.</span>';
+    return;
+  }
+  const data = await resp.json();
+  // Renderizar lista y visualizador interactivo (SVG)
+  const list = document.getElementById('lista-piezas');
+  const tableros = data.tableros || [];
+  const selTab = document.getElementById('selTablero');
+  selTab.innerHTML = tableros.map((t,i)=>`<option value="${i}">Tablero ${t.num}</option>`).join('');
+  let boardIndex = 0;
+
+  function stateColor(st){
+    return st === 'cortada' ? '#198754' : st === 'en_corte' ? '#0dcaf0' : st === 'descartada' ? '#dc3545' : '#6c757d';
+  }
+
+  function renderList(board){
+    const piezas = (board?.piezas)||[];
+    if(!piezas.length){
+      list.innerHTML = '<div class="text-muted">Sin piezas en el diseño.</div>';
+      return;
+    }
+    list.innerHTML = piezas.map(p=>{
+      const st = p.estado || 'pendiente';
+      const pid = p.pieza_id;
+      return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom" data-row-pieza-id="${pid}">
+        <div class="me-2">
+          <div><strong>${p.nombre||pid}</strong></div>
+          <div class="text-muted">${p.ancho}×${p.largo} mm · (${p.x},${p.y})</div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="d-inline-block rounded-circle" style="width:10px;height:10px;background:${stateColor(st)}"></span>
+          <select class="form-select form-select-sm" style="min-width:140px" data-pieza-id="${pid}">
+            <option value="pendiente" ${st==='pendiente'?'selected':''}>Pendiente</option>
+            <option value="en_corte" ${st==='en_corte'?'selected':''}>En corte</option>
+            <option value="cortada" ${st==='cortada'?'selected':''}>Cortada</option>
+            <option value="descartada" ${st==='descartada'?'selected':''}>Descartada</option>
+          </select>
+        </div>
+      </div>`
+    }).join('');
+
+    list.querySelectorAll('select[data-pieza-id]').forEach(sel=>{
+      sel.addEventListener('change', async (e)=>{
+        const piezaId = e.target.getAttribute('data-pieza-id');
+        const estado = e.target.value;
+        try{
+          const r = await fetch(`/api/operador/proyectos/${proyectoId}/piezas/${encodeURIComponent(piezaId)}`,{
+            method:'PATCH', headers:{'Content-Type':'application/json','X-CSRFToken': getCookie('csrftoken')}, body: JSON.stringify({estado})
+          });
+          if(!r.ok){ throw new Error('Error'); }
+          // Actualizar color del item y del SVG
+          const dot = list.querySelector(`[data-row-pieza-id="${piezaId}"] span.rounded-circle`);
+          if(dot) dot.style.background = stateColor(estado);
+          const rect = svgRoot.querySelector(`#piece-${CSS.escape(piezaId)}`);
+          if(rect) rect.setAttribute('fill', stateColor(estado));
+        }catch(err){
+          alert('No se pudo guardar el estado de la pieza.');
+        }
+      });
+    });
+  }
+
+  const host = document.getElementById('lienzo');
+  host.innerHTML = '';
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('width', '100%');
+  svg.setAttribute('height', '100%');
+  svg.setAttribute('viewBox', '0 0 1000 700');
+  svg.style.cursor = 'grab';
+  const svgRoot = svg;
+  const g = document.createElementNS(svgNS, 'g');
+  svg.appendChild(g);
+  host.appendChild(svg);
+
+  let scale = 1, dx = 0, dy = 0;
+  let dragging = false, lastX = 0, lastY = 0;
+  function applyTransform(){
+    g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
+  }
+
+  function fitBoard(board){
+    const w = board?.ancho_mm || 2440;
+    const h = board?.largo_mm || 1830;
+    // Margen para que no toque los bordes
+    const PAD = 20;
+    const cw = host.clientWidth - 2*PAD;
+    const ch = host.clientHeight - 2*PAD;
+    const sx = cw / w;
+    const sy = ch / h;
+    scale = Math.min(sx, sy);
+    dx = PAD + (cw - w*scale)/2;
+    dy = PAD + (ch - h*scale)/2;
+    applyTransform();
+  }
+
+  function renderBoard(board){
+    // Limpiar
+    while(g.firstChild){ g.removeChild(g.firstChild); }
+    // Tablero
+    const w = board?.ancho_mm || 2440;
+    const h = board?.largo_mm || 1830;
+    const rectBoard = document.createElementNS(svgNS, 'rect');
+    rectBoard.setAttribute('x', '0');
+    rectBoard.setAttribute('y', '0');
+    rectBoard.setAttribute('width', String(w));
+    rectBoard.setAttribute('height', String(h));
+    rectBoard.setAttribute('fill', '#fff');
+    rectBoard.setAttribute('stroke', '#333');
+    rectBoard.setAttribute('stroke-width', '2');
+    g.appendChild(rectBoard);
+    // Piezas
+    for(const p of (board?.piezas||[])){
+      const r = document.createElementNS(svgNS, 'rect');
+      const st = p.estado || 'pendiente';
+      r.setAttribute('id', `piece-${p.pieza_id}`);
+      r.setAttribute('x', String(p.x||0));
+      r.setAttribute('y', String(p.y||0));
+      r.setAttribute('width', String(p.ancho||0));
+      r.setAttribute('height', String(p.largo||0));
+      r.setAttribute('fill', stateColor(st));
+      r.setAttribute('fill-opacity', '0.25');
+      r.setAttribute('stroke', '#222');
+      r.setAttribute('stroke-width', '1.2');
+      r.style.cursor = 'pointer';
+      r.addEventListener('click', ()=>{
+        const row = list.querySelector(`[data-row-pieza-id="${p.pieza_id}"]`);
+        row?.scrollIntoView({block:'nearest'});
+        const sel = row?.querySelector('select[data-pieza-id]');
+        row?.classList.add('bg-light');
+        setTimeout(()=>row?.classList.remove('bg-light'), 600);
+        sel?.focus();
+      });
+      g.appendChild(r);
+    }
+    // Líneas de corte (opcional si vienen como valores absolutos)
+    if (Array.isArray(board.cortes)){
+      for(const c of board.cortes){
+        const line = document.createElementNS(svgNS, 'line');
+        if(c.tipo === 'vertical'){
+          line.setAttribute('x1', String(c.posicion));
+          line.setAttribute('x2', String(c.posicion));
+          line.setAttribute('y1', '0');
+          line.setAttribute('y2', String(h));
+        } else if(c.tipo === 'horizontal'){
+          line.setAttribute('x1', '0');
+          line.setAttribute('x2', String(w));
+          line.setAttribute('y1', String(c.posicion));
+          line.setAttribute('y2', String(c.posicion));
+        } else {
+          continue;
+        }
+        line.setAttribute('stroke', '#888');
+        line.setAttribute('stroke-width', '0.8');
+        line.setAttribute('stroke-dasharray', '4 3');
+        g.appendChild(line);
+      }
+    }
+    fitBoard(board);
+  }
+
+  // Eventos de interacción
+  svg.addEventListener('wheel', (e)=>{
+    e.preventDefault();
+    const delta = e.deltaY < 0 ? 1.1 : 0.9;
+    const prev = scale;
+    scale = Math.max(0.1, Math.min(8, scale * delta));
+    // Zoom hacia el cursor
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX - host.getBoundingClientRect().left;
+    pt.y = e.clientY - host.getBoundingClientRect().top;
+    const svgPt = pt.matrixTransform(svg.getScreenCTM().inverse());
+    dx = svgPt.x - (svgPt.x - dx) * (scale/prev);
+    dy = svgPt.y - (svgPt.y - dy) * (scale/prev);
+    applyTransform();
+  }, {passive:false});
+
+  svg.addEventListener('mousedown', (e)=>{ dragging = true; lastX = e.clientX; lastY = e.clientY; svg.style.cursor='grabbing'; });
+  window.addEventListener('mouseup', ()=>{ dragging=false; svg.style.cursor='grab'; });
+  window.addEventListener('mousemove', (e)=>{
+    if(!dragging) return;
+    dx += (e.clientX - lastX);
+    dy += (e.clientY - lastY);
+    lastX = e.clientX; lastY = e.clientY;
+    applyTransform();
+  });
+
+  document.getElementById('btnZoomIn').addEventListener('click', ()=>{ scale = Math.min(8, scale*1.2); applyTransform(); });
+  document.getElementById('btnZoomOut').addEventListener('click', ()=>{ scale = Math.max(0.1, scale/1.2); applyTransform(); });
+  document.getElementById('btnZoomReset').addEventListener('click', ()=>{ fitBoard(tableros[boardIndex]); });
+  selTab.addEventListener('change', ()=>{ boardIndex = parseInt(selTab.value,10)||0; renderBoard(tableros[boardIndex]); renderList(tableros[boardIndex]); });
+
+  // Inicializar
+  renderBoard(tableros[boardIndex]||{});
+  renderList(tableros[boardIndex]||{});
+})();
+</script>
+
+{% endblock %}

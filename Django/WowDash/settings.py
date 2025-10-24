@@ -17,7 +17,8 @@ from urllib.parse import urlparse, parse_qs
 # Cargar variables desde .env si existe (solo local); en producción Render usa env vars del servicio
 try:
     from dotenv import load_dotenv  # type: ignore
-    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env')
+    # override=True para que variables locales en .env tengan prioridad sobre variables del entorno del contenedor
+    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env', override=True)
 except Exception:
     pass
 
@@ -31,6 +32,16 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-y9+u@w))$2g_mqgif#vknt$reo$o!p#h3!r4gyq!=i4s!#cxiw')
 DEBUG = os.getenv('DJANGO_DEBUG', 'True').lower() in ('1', 'true', 'yes', 'y')
 ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', '').split(',') if not DEBUG else ['*']
+
+# CSRF trusted origins: leer desde variable de entorno (por ejemplo en Codespaces)
+# Valor esperado: una lista separada por comas de orígenes completos, p.ej.
+# https://special-adventure-...-8000.app.github.dev,https://localhost:8000
+csrf_env = os.getenv('CSRF_TRUSTED_ORIGINS', '')
+if csrf_env:
+    CSRF_TRUSTED_ORIGINS = [x.strip() for x in csrf_env.split(',') if x.strip()]
+else:
+    # en desarrollo, permitir localhost por comodidad
+    CSRF_TRUSTED_ORIGINS = ['https://localhost:8000']
 
 # Application definition
 
@@ -57,6 +68,8 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'WowDash.middleware.RequireLoginMiddleware',
     'WowDash.middleware.NoCacheMiddleware',
+    # Middleware para exponer la request/usuario actual a señales (audit)
+    'core.middleware.RequestUserMiddleware',
 ]
 
 ROOT_URLCONF = 'WowDash.urls'
@@ -86,51 +99,60 @@ WSGI_APPLICATION = 'WowDash.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
-database_url = os.getenv('DATABASE_URL')
-if database_url:
-    # Espera formato postgres://USER:PASSWORD@HOST:PORT/NAME?sslmode=require
-    parsed = urlparse(database_url)
-    query = parse_qs(parsed.query)
-    db_conf = {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': parsed.path.lstrip('/'),
-        'USER': parsed.username,
-        'PASSWORD': parsed.password,
-        'HOST': parsed.hostname,
-        'PORT': str(parsed.port or ''),
+# Forzar SQLite en desarrollo si se define DJANGO_USE_SQLITE=1 (ignora DATABASE_URL/DB_*)
+if os.getenv('DJANGO_USE_SQLITE', '').lower() in ('1', 'true', 'yes', 'y'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-    # Pasar opciones como sslmode a psycopg2; si no viene, forzar 'require' en producción
-    if 'sslmode' in query:
-        db_conf['OPTIONS'] = {'sslmode': query['sslmode'][0]}
-    elif not DEBUG:
-        db_conf['OPTIONS'] = {'sslmode': 'require'}
-    DATABASES = {'default': db_conf}
 else:
-    # Si existen variables individuales de conexión, usar PostgreSQL
-    db_name = os.getenv('DB_NAME')
-    db_user = os.getenv('DB_USER')
-    db_password = os.getenv('DB_PASSWORD')
-    db_host = os.getenv('DB_HOST')
-    db_port = os.getenv('DB_PORT', '5432')
-    if all([db_name, db_user, db_password, db_host]):
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.postgresql',
-                'NAME': db_name,
-                'USER': db_user,
-                'PASSWORD': db_password,
-                'HOST': db_host,
-                'PORT': db_port,
-            }
+    database_url = os.getenv('DATABASE_URL')
+    if database_url:
+        # Espera formato postgres://USER:PASSWORD@HOST:PORT/NAME?sslmode=require
+        parsed = urlparse(database_url)
+        query = parse_qs(parsed.query)
+        db_conf = {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': parsed.path.lstrip('/'),
+            'USER': parsed.username,
+            'PASSWORD': parsed.password,
+            'HOST': parsed.hostname,
+            'PORT': str(parsed.port or ''),
         }
+        # Pasar opciones como sslmode a psycopg2; si no viene, forzar 'require' en producción
+        if 'sslmode' in query:
+            db_conf['OPTIONS'] = {'sslmode': query['sslmode'][0]}
+        elif not DEBUG:
+            db_conf['OPTIONS'] = {'sslmode': 'require'}
+        DATABASES = {'default': db_conf}
     else:
-        # Desarrollo local por defecto: SQLite (usa el db.sqlite3 existente)
-        DATABASES = {
-            'default': {
-                'ENGINE': 'django.db.backends.sqlite3',
-                'NAME': BASE_DIR / 'db.sqlite3',
+        # Si existen variables individuales de conexión, usar PostgreSQL
+        db_name = os.getenv('DB_NAME')
+        db_user = os.getenv('DB_USER')
+        db_password = os.getenv('DB_PASSWORD')
+        db_host = os.getenv('DB_HOST')
+        db_port = os.getenv('DB_PORT', '5432')
+        if all([db_name, db_user, db_password, db_host]):
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.postgresql',
+                    'NAME': db_name,
+                    'USER': db_user,
+                    'PASSWORD': db_password,
+                    'HOST': db_host,
+                    'PORT': db_port,
+                }
             }
-        }
+        else:
+            # Desarrollo local por defecto: SQLite (usa el db.sqlite3 existente)
+            DATABASES = {
+                'default': {
+                    'ENGINE': 'django.db.backends.sqlite3',
+                    'NAME': BASE_DIR / 'db.sqlite3',
+                }
+            }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators

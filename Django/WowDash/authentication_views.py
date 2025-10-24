@@ -65,6 +65,12 @@ def signin(request):
             next_url = request.GET.get('next') or request.POST.get('next')
             if next_url and next_url.startswith('/'):
                 return redirect(next_url)
+            # Si el usuario es operador, dirigir a su panel
+            try:
+                if getattr(perfil, 'rol', None) == 'operador':
+                    return redirect('operador_home')
+            except Exception:
+                pass
             return redirect('proyectos')  # Redirige a la página de proyectos por defecto
         else:
             messages.error(request, 'Usuario o contraseña incorrectos.')
