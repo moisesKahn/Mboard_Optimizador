@@ -141,6 +141,8 @@
       function zoomPercent(){ return Math.round((scale/baseScale)*100); }
       function updateZoomUI(){ const btn = document.getElementById('btnZoomReset'); if(btn){ btn.textContent = `${zoomPercent()}%`; } }
       function ensureBoardInView(){
+        // Solo garantizamos vista completa cuando estamos en el zoom base (fit).
+        if(!atBaseZoom()) return;
         const {w:vw, h:vh} = vbSize();
         const bx = dx + boardBounds.x*scale;
         const by = dy + boardBounds.y*scale;
@@ -149,11 +151,8 @@
         const padTol = 2; // tolerancia mínima de borde
         const out = (bx < -padTol) || (by < -padTol) || (bx + bw > vw + padTol) || (by + bh > vh + padTol);
         if(out){
-          // fuerza a FIT con margen superior apropiado
-          const {w:vw2} = vbSize();
-          scale = baseScale;
           const pad = getFitPad();
-          dx = (vw2 - boardBounds.width*scale)/2 - boardBounds.x*scale;
+          dx = (vw - boardBounds.width*scale)/2 - boardBounds.x*scale;
           dy = pad - boardBounds.y*scale;
         }
       }
