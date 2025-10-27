@@ -17,8 +17,16 @@ from urllib.parse import urlparse, parse_qs
 # Cargar variables desde .env si existe (solo local); en producción Render usa env vars del servicio
 try:
     from dotenv import load_dotenv  # type: ignore
-    # override=True para que variables locales en .env tengan prioridad sobre variables del entorno del contenedor
-    load_dotenv(dotenv_path=Path(__file__).resolve().parent.parent / '.env', override=True)
+    # Paths de posibles .env (ambos aceptados):
+    # - Django/.env (junto a manage.py)
+    # - Raíz del repositorio /.env
+    _DOTENV_ROOT = Path(__file__).resolve().parents[2] / '.env'      # repo-root/.env
+    _DOTENV_DJANGO = Path(__file__).resolve().parent.parent / '.env' # Django/.env
+    # Cargar primero el de la raíz (sin override) y luego el de Django (con override=True)
+    if _DOTENV_ROOT.exists():
+        load_dotenv(dotenv_path=_DOTENV_ROOT, override=False)
+    if _DOTENV_DJANGO.exists():
+        load_dotenv(dotenv_path=_DOTENV_DJANGO, override=True)
 except Exception:
     pass
 

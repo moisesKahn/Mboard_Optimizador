@@ -1008,24 +1008,36 @@ def _pdf_from_result(proyecto, resultado):
                 except Exception:
                     fs1, fs2 = 7.5, 7
                     is_vertical = h >= w
-                # Clip dentro de la pieza y dibujar alineado al largo
+                # Clip dentro de la pieza y dibujar el NOMBRE orientado al lado más largo
                 p.saveState()
                 clip = p.beginPath(); clip.rect(x, y, w, h); p.clipPath(clip, stroke=0, fill=0)
                 p.setFillGray(0)
-                # Nombre de la pieza: mantener CENTRADO dentro de la pieza
                 try:
                     from reportlab.pdfbase.pdfmetrics import stringWidth
-                    # Ajustar fs1 para que el nombre quepa horizontalmente en el ancho de la pieza
-                    max_text_w = max(w - 6, 8)
-                    while fs1 > 4 and stringWidth(et1, 'Helvetica-Bold', fs1) > max_text_w:
-                        fs1 -= 0.5
-                    p.setFont("Helvetica-Bold", fs1)
-                    # Centrar en el centro geométrico de la pieza
-                    p.drawCentredString(x + w/2, y + h/2 + (fs1/2), et1)
+                    # Determinar orientación por el lado más largo
+                    orient_vertical = h >= w
+                    # Limitar tamaño para que el alto de la fuente no supere el lado corto
+                    max_font = max(4.0, min(fs1, (min(w, h) - 6) * 0.9))
+                    fs_name = max_font
+                    # Ajustar a lo largo del lado largo disponible (-6 de margen)
+                    max_run = max((h if orient_vertical else w) - 6, 8)
+                    while fs_name > 4 and stringWidth(et1, 'Helvetica-Bold', fs_name) > max_run:
+                        fs_name -= 0.5
+                    p.setFont('Helvetica-Bold', fs_name)
+                    cx, cy = (x + w/2.0, y + h/2.0)
+                    if orient_vertical:
+                        p.saveState()
+                        p.translate(cx, cy)
+                        p.rotate(90)
+                        # Centrado perfecto tras la rotación
+                        p.drawCentredString(0, -fs_name/3.0, et1)
+                        p.restoreState()
+                    else:
+                        p.drawCentredString(cx, cy - fs_name/3.0, et1)
                 except Exception:
                     try:
-                        p.setFont("Helvetica-Bold", fs1)
-                        p.drawCentredString(x + w/2, y + h/2 + (fs1/2), et1)
+                        p.setFont('Helvetica-Bold', fs1)
+                        p.drawCentredString(x + w/2.0, y + h/2.0, et1)
                     except Exception:
                         pass
 

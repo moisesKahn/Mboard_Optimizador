@@ -10,19 +10,21 @@
     .op-wrapper { position: fixed; inset: 0; display: grid; grid-template-columns: 1fr 360px; grid-template-rows: auto 1fr; grid-template-areas: 'toolbar toolbar' 'canvas sidebar'; }
     .op-toolbar { grid-area: toolbar; display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #fff; border-bottom: 1px solid #eee; }
     .op-canvas { grid-area: canvas; position: relative; background: #fafafa; }
-    .op-sidebar { grid-area: sidebar; display: flex; flex-direction: column; border-left: 1px solid #eee; background: #fff; }
-    .op-stats { padding: 10px 12px; border-bottom: 1px solid #eee; }
-    .op-list { padding: 0 12px 12px 12px; overflow: auto; }
+  .op-sidebar { grid-area: sidebar; display: flex; flex-direction: column; border-left: 1px solid #eee; background: #fff; min-height: 0; overflow: hidden; }
+  .op-stats { padding: 10px 12px; border-bottom: 1px solid #eee; }
+  .op-list { padding: 0 12px 12px 12px; overflow: auto; flex: 1 1 auto; min-height: 0; }
     .op-btn { border: 1px solid #ddd; background: #fff; border-radius: 6px; padding: 6px 10px; }
     .op-btn:active { transform: translateY(1px); }
     .chip { display:inline-block; padding:2px 8px; border-radius:10px; font-size:12px; margin-right:6px; background:#f1f3f5; }
     .piece-highlight rect { filter: drop-shadow(0 0 0.5px rgba(0,0,0,.4)); stroke-width: 2; }
     .list-highlight { background: #fffbe6; }
     .piece-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); display:flex; align-items:center; justify-content:center; z-index: 20; }
-    .piece-modal { background: #fff; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.3); width: min(90vw, 760px); max-width: 760px; }
+  .piece-modal { background: #fff; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.3); width: 95vw; max-width: 1280px; height: 90vh; display:flex; flex-direction:column; }
     .piece-modal .hdr { display:flex; align-items:center; justify-content:space-between; padding: 10px 14px; border-bottom: 1px solid #eee; }
-    .piece-modal .cnt { padding: 10px; }
+    .piece-modal .cnt { padding: 10px; position: relative; overflow:auto; flex:1; padding-bottom: 12px; }
     .piece-modal .btn-close { border:none; background:transparent; font-size:22px; line-height:1; cursor:pointer; }
+  .pz-overview { position:absolute; right:12px; bottom:12px; width:260px; height:180px; background:transparent; border:none; border-radius:0; box-shadow:none; padding:0; z-index: 1; }
+  .piece-modal .ftr { display:flex; justify-content:flex-end; gap:8px; padding: 10px 14px; border-top:1px solid #eee; background:#fff; }
     /* Ocultar/mostrar sidebar */
     .op-wrapper.sidebar-hidden { grid-template-columns: 1fr 0; }
     .op-wrapper.sidebar-hidden .op-sidebar { display: none; }
@@ -114,11 +116,27 @@
   svg.setAttribute('touch-action','none');
   // Margen superior deseado en modo ajuste: responsivo al alto del host (6% del alto), con límites
   const FIT_PAD_MIN = 32, FIT_PAD_MAX = 80;
+  // Padding fijo cuando el modo es 'top'
+  const FIT_TOP_PAD = 16;   // menor margen superior para aprovechar más alto
+  const FIT_BOTTOM_PAD = 16; // pequeño colchón inferior para asegurar tablero completo visible
+  const FIT_LEFT_PAD = 24;   // separar ligeramente del borde izquierdo
+  const FIT_RIGHT_PAD = 16;  // colchón derecho
   // Escala tipográfica global del visor (85% de la actual)
   const FONT_SCALE = 0.85;
   function fs(px){ return String(Math.round(px*FONT_SCALE)); }
   // Permitir alejar por debajo del FIT hasta el 50%
   const MIN_ZOOM_FACTOR = 0.5; // 50% de la escala base
+  // Factor del FIT base: 1.0 = encajar exacto; 0.66 = que se vea como ~66% del encaje
+  const BASE_FIT_FACTOR = 0.66;
+  // Sobrepaneo cuando hay zoom: permitir mover el tablero fuera del visor
+  // en un porcentaje del viewport (en unidades de contenido). 1.0 = 100% del viewport.
+  const OVERPAN_FACTOR = 1.0;
+  // Paneo totalmente libre cuando hay zoom (> base). Si es true, no se aplica clamp fuera del fit.
+  const FREE_PAN_WHEN_ZOOMED = true;
+  // Padding alrededor al hacer zoom a una pieza
+  const PIECE_ZOOM_PAD = 32;
+  // Modo vertical de encaje: 'top' (anclado arriba), 'top-pad' (arriba con padding responsivo) o 'center'
+  const FIT_VERTICAL_MODE = 'top';
   function getFitPad(){
     const r = host.getBoundingClientRect();
     const h = (r && r.height) ? r.height : vbSize().h;
@@ -146,6 +164,8 @@
   let animFrame = 0;
   // Soporte pinch-to-zoom
   let pinch = {active:false, d0:0, s0:1, cx:0, cy:0};
+  // Evitar re-centrado automático una vez (por paneo con rueda al zoom base)
+  let suppressCenterOnce = false;
   // Forzar centrado exacto en el siguiente apply (usado tras cambios de tamaño)
   let forceCenterNext = false;
   // Bounds del TABLERO (no de todo el <g>), para centrar/clamp sin considerar textos externos
@@ -163,49 +183,83 @@
       }
   function zoomPercent(){ return Math.round((scale/baseScale)*100); }
   function updateZoomUI(){ const sp = document.getElementById('zoomPct'); if(sp){ sp.textContent = `${zoomPercent()}%`; } }
+      function fitTransformForScale(sc){
+        // Importante: dx/dy están en UNIDADES DE CONTENIDO porque el transform es translate(dx,dy) scale(sc)
+        // El viewport visible en contenido es vw/sc × vh/sc
+        const {w:vw, h:vh} = vbSize();
+        const bw = boardBounds.width, bh = boardBounds.height;
+  // Anclar horizontalmente el TABLERO al margen izquierdo con padding
+  const tx = (FIT_LEFT_PAD/sc) - boardBounds.x;
+        if(FIT_VERTICAL_MODE === 'center'){
+          const ty = (vh/sc - bh)/2 - boardBounds.y; // centrado vertical
+          return {dx: tx, dy: ty};
+        } else if (FIT_VERTICAL_MODE === 'top' || FIT_VERTICAL_MODE === 'top-pad'){
+          const padTop = (FIT_VERTICAL_MODE === 'top') ? FIT_TOP_PAD : getFitPad();
+          const ty = (padTop/sc) - boardBounds.y; // anclado arriba con padding en contenido
+          return {dx: tx, dy: ty};
+        } else {
+          // Fallback a centrado si el modo es desconocido
+          const ty = (vh/sc - bh)/2 - boardBounds.y;
+          return {dx: tx, dy: ty};
+        }
+      }
       function ensureBoardInView(){
         // Solo garantizamos vista completa cuando estamos en el zoom base (fit).
         if(!atBaseZoom()) return;
         const {w:vw, h:vh} = vbSize();
-        const bx = dx + boardBounds.x*scale;
-        const by = dy + boardBounds.y*scale;
-        const bw = boardBounds.width*scale;
-        const bh = boardBounds.height*scale;
+        // Calcular bordes en pantalla correctamente: screen = scale * (content + translate)
+        const left = scale * (boardBounds.x + dx);
+        const top = scale * (boardBounds.y + dy);
+        const right = left + boardBounds.width * scale;
+        const bottom = top + boardBounds.height * scale;
         const padTol = 2; // tolerancia mínima de borde
-        const out = (bx < -padTol) || (by < -padTol) || (bx + bw > vw + padTol) || (by + bh > vh + padTol);
+        const out = (left < -padTol) || (top < -padTol) || (right > vw + padTol) || (bottom > vh + padTol);
         if(out){
-          const pad = getFitPad();
-          dx = (vw - boardBounds.width*scale)/2 - boardBounds.x*scale;
-          dy = pad - boardBounds.y*scale;
+          const t = fitTransformForScale(scale);
+          dx = t.dx; dy = t.dy;
         }
       }
       function clamp(board){
         const {w:vw, h:vh} = vbSize();
-        // Límites de pan del TABLERO (para no salirnos del área útil)
-        const bxB = boardBounds.x, byB = boardBounds.y, bwB = boardBounds.width, bhB = boardBounds.height;
-        const dxMin = vw - (bxB + bwB) * scale;
-        const dxMax = -bxB * scale;
-        const dyMin = vh - (byB + bhB) * scale;
-        const dyMax = -byB * scale;
+        // dx/dy en UNIDADES DE CONTENIDO (translate antes que scale)
+        // Mantener el tablero dentro del viewport: condiciones en contenido
+        const bx = boardBounds.x, by = boardBounds.y, bw = boardBounds.width, bh = boardBounds.height;
+        // Límites básicos (sin sobrepaneo)
+        let dxMin = -bx;                             // left >= 0 => bx + dx >= 0
+        let dxMax = (vw/scale) - (bx + bw);          // right <= vw => bx + bw + dx <= vw/scale
+        let dyMin = -by;
+        let dyMax = (vh/scale) - (by + bh);
         // ¿Forzamos centrado puntual? (por resize/reset)
         const atBase = atBaseZoom();
-        if(forceCenterNext || atBase){
-          // Centrar horizontalmente y fijar margen superior mínimo
-          const bw = boardBounds.width;
-          const pad = getFitPad();
-          dx = (vw - bw*scale)/2 - boardBounds.x*scale;
-          dy = pad - boardBounds.y*scale;
+        if(forceCenterNext || (atBase && !suppressCenterOnce)){
+          const t = fitTransformForScale(scale);
+          dx = t.dx; dy = t.dy;
           if(forceCenterNext) forceCenterNext = false;
         } else {
+          if(!atBase && FREE_PAN_WHEN_ZOOMED){
+            // Sin límites al pan fuera del encaje (el usuario puede moverse libremente)
+            // No ajustar dx/dy aquí
+          } else {
+          // Si NO estamos en zoom base, permitir sobrepaneo para mover libremente
+          if(!atBase){
+            const overX = OVERPAN_FACTOR * (vw/scale);
+            const overY = OVERPAN_FACTOR * (vh/scale);
+            dxMin -= overX; dxMax += overX;
+            dyMin -= overY; dyMax += overY;
+          }
           dx = Math.max(dxMin, Math.min(dxMax, dx));
           dy = Math.max(dyMin, Math.min(dyMax, dy));
+          }
         }
+        if(suppressCenterOnce) suppressCenterOnce = false;
       }
       function apply(board){
         clamp(board||{});
         if(!isFinite(scale) || scale <= 0) scale = 1;
+        if(!isFinite(dx)) dx = 0; if(!isFinite(dy)) dy = 0;
         ensureBoardInView();
-        g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
+  // Orden: translate primero y luego scale (dx/dy en contenido)
+  g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
         updateCursor();
         updateZoomUI();
       }
@@ -236,6 +290,35 @@
         return parts.length? parts.join(',') : '—';
       }
 
+      // Dibuja líneas de tapacanto en los bordes indicados
+      function drawTapacantosLines(parent, x, y, w, h, tc, opts){
+        if(!tc) return;
+        const o = opts||{};
+        const color = o.color || '#DC3545';
+        const strokeWidth = o.strokeWidth || 3; // más grueso para claridad
+        const dash = o.dash || '8 5';
+        const offset = Math.max(0, o.offset || 0);
+        // Mantener la línea separada del borde de la pieza
+        const offX = Math.min(offset, Math.max(0, w) * 0.10);
+        const offY = Math.min(offset, Math.max(0, h) * 0.10);
+        const add = (x1,y1,x2,y2)=>{
+          const ln = document.createElementNS(svgNS,'line');
+          ln.setAttribute('x1', String(x1)); ln.setAttribute('y1', String(y1));
+          ln.setAttribute('x2', String(x2)); ln.setAttribute('y2', String(y2));
+          ln.setAttribute('stroke', color);
+          ln.setAttribute('stroke-width', String(strokeWidth));
+          ln.setAttribute('stroke-dasharray', dash);
+          ln.setAttribute('stroke-linecap', 'round');
+          parent.appendChild(ln);
+        };
+        try{
+          if(tc.arriba)    add(x, y + offY, x+w, y + offY);
+          if(tc.abajo)     add(x, y+h - offY, x+w, y+h - offY);
+          if(tc.izquierda) add(x + offX, y, x + offX, y+h);
+          if(tc.derecha)   add(x+w - offX, y, x+w - offX, y+h);
+        }catch(_e){}
+      }
+
       function inferCutLines(board){
         const xs = new Set(), ys = new Set();
         for(const p of (board.piezas||[])){
@@ -248,28 +331,40 @@
         function harden(arr){ const out=[]; let prev=null; const EPS=0.01; for(const x of arr){ if(prev===null || Math.abs(x-prev)>EPS){ out.push(x); prev=x; } } return out; }
       }
 
-      function recalcBase(board){
-        const PAD=48; const {w:vw, h:vh} = vbSize();
+  function recalcBase(board){
+        // Padding horizontal/vertical para el encaje base
+        // Prioriza el ALTO visible; si el ancho limita más, se respeta también.
+        const {w:vw, h:vh} = vbSize();
+        const PAD_LEFT = FIT_LEFT_PAD; // margen izquierdo fijo
+        const PAD_RIGHT = FIT_RIGHT_PAD; // margen derecho fijo
+        let PAD_TOP = 16, PAD_BOTTOM = 16;
+        if (FIT_VERTICAL_MODE === 'center') {
+          PAD_TOP = 16; PAD_BOTTOM = 16;
+        } else if (FIT_VERTICAL_MODE === 'top') {
+          PAD_TOP = FIT_TOP_PAD; PAD_BOTTOM = FIT_BOTTOM_PAD; // anclado arriba con margen superior y pequeño fondo
+        } else if (FIT_VERTICAL_MODE === 'top-pad') {
+          const p = getFitPad(); PAD_TOP = p; PAD_BOTTOM = 8;
+        }
         // Recalcular bbox completo para referencia, pero el ajuste base usa SOLO el tablero
         contentBounds = g.getBBox();
         fitBounds = contentBounds;
         const bw = Math.max(1, boardBounds.width || (board.ancho_mm||1));
         const bh = Math.max(1, boardBounds.height || (board.largo_mm||1));
-        const availW = Math.max(50, vw - PAD*2);
-        const availH = Math.max(50, vh - PAD*2);
-        baseScale = Math.min(availW/bw, availH/bh);
+  const availW = Math.max(50, vw - PAD_LEFT - PAD_RIGHT);
+        const availH = Math.max(50, vh - PAD_TOP - PAD_BOTTOM);
+        // Referencia principal: el ALTO visible; si el ancho es el limitante extremo, se respeta
+        const scaleH = availH / bh;
+        const scaleW = availW / bw;
+        // Priorizar que el tablero sea ligeramente menor que el alto visible y además reducirlo
+        // para que el 100% se perciba como ~66% del encaje clásico (más espacio alrededor)
+        baseScale = Math.min(scaleH, scaleW) * BASE_FIT_FACTOR;
         if(!isFinite(baseScale) || baseScale <= 0) baseScale = 0.01; // fallback seguro
       }
       function recenter(board, keepScale=true){
         recalcBase(board);
         if(!keepScale) scale = baseScale; else scale = Math.max(scale, baseScale);
-        const {w:vw, h:vh} = vbSize();
-        // Centrar horizontalmente y mantener un margen superior mínimo
-  const bw = boardBounds.width;
-  const pad = getFitPad();
-  dx = (vw - bw*scale)/2 - boardBounds.x*scale;
-  dy = pad - boardBounds.y*scale;
-        apply(board);
+        const t = fitTransformForScale(scale);
+        dx = t.dx; dy = t.dy; apply(board);
       }
       function fit(board){ recenter(board, false); }
 
@@ -277,12 +372,8 @@
             // Calcula transform objetivo para fit sin aplicarlo inmediatamente
             recalcBase(board);
             const sc = baseScale;
-            const {w:vw, h:vh} = vbSize();
-            const bw = boardBounds.width;
-            const pad = getFitPad();
-            const tx = (vw - bw*sc)/2 - boardBounds.x*sc;
-            const ty = pad - boardBounds.y*sc;
-            return {scale: sc, dx: tx, dy: ty};
+            const t = fitTransformForScale(sc);
+            return {scale: sc, dx: t.dx, dy: t.dy};
           }
 
           function animateTo(board, target, ms=180){
@@ -370,8 +461,8 @@
         boardBounds = {x:0, y:0, width:w, height:h};
         // medidas del tablero
   // Medidas del tablero por FUERA del tablero
-  const topTxt = document.createElementNS(svgNS,'text'); topTxt.setAttribute('x', String(w/2)); topTxt.setAttribute('y', String(-12)); topTxt.setAttribute('text-anchor','middle'); topTxt.setAttribute('font-size', fs(24)); topTxt.setAttribute('fill','#444'); topTxt.textContent = `${w} mm`; g.appendChild(topTxt);
-  const leftTxt = document.createElementNS(svgNS,'text'); leftTxt.setAttribute('x', String(-12)); leftTxt.setAttribute('y', String(h/2)); leftTxt.setAttribute('text-anchor','middle'); leftTxt.setAttribute('font-size', fs(24)); leftTxt.setAttribute('fill','#444'); leftTxt.setAttribute('transform', `rotate(-90 -12 ${h/2})`); leftTxt.textContent = `${h} mm`; g.appendChild(leftTxt);
+  const topTxt = document.createElementNS(svgNS,'text'); topTxt.setAttribute('x', String(w/2)); topTxt.setAttribute('y', String(-12)); topTxt.setAttribute('text-anchor','middle'); topTxt.setAttribute('font-size', fs(30)); topTxt.setAttribute('fill','#444'); topTxt.textContent = `${w} mm`; g.appendChild(topTxt);
+  const leftTxt = document.createElementNS(svgNS,'text'); leftTxt.setAttribute('x', String(-12)); leftTxt.setAttribute('y', String(h/2)); leftTxt.setAttribute('text-anchor','middle'); leftTxt.setAttribute('font-size', fs(30)); leftTxt.setAttribute('fill','#444'); leftTxt.setAttribute('transform', `rotate(-90 -12 ${h/2})`); leftTxt.textContent = `${h} mm`; g.appendChild(leftTxt);
   // Sombreado de márgenes (fuera del área útil) para resaltar banda a recortar
   try{
     const mx = Number(meta.margen_x);
@@ -417,27 +508,38 @@
           rc.setAttribute('stroke','#222'); rc.setAttribute('stroke-width','1.2');
           group.appendChild(rc);
 
+          // Tapacantos: línea punteada roja, gruesa y separada del borde
+          drawTapacantosLines(group, x, y, pw, ph, p.tapacantos||{}, { offset: 4, strokeWidth: 3.2, dash: '8 5' });
+
           // Etiquetas dentro de la pieza
           const padding = 6;
           const canShow = (pw >= 60 && ph >= 40);
           if(canShow){
             const nameText = document.createElementNS(svgNS,'text');
-            nameText.setAttribute('x', String(x + pw/2));
-            nameText.setAttribute('y', String(y + ph/2));
+            const ncx = x + pw/2, ncy = y + ph/2;
+            nameText.setAttribute('x', String(ncx));
+            nameText.setAttribute('y', String(ncy));
             nameText.setAttribute('text-anchor','middle');
             nameText.setAttribute('dominant-baseline','middle');
             nameText.setAttribute('font-size', fs(30));
             nameText.setAttribute('font-weight','bold');
             nameText.setAttribute('fill','#111');
+            // Orientar el nombre según el lado más largo y mantenerlo centrado
+            if (ph >= pw) {
+              nameText.setAttribute('transform', `rotate(-90 ${ncx} ${ncy})`);
+            }
             nameText.textContent = p.nombre || p.pieza_id;
             group.appendChild(nameText);
+
+            // Tamaños dinámicos, priorizando legibilidad sin desbordar
+            const fsm = Math.min(42, Math.max(18, Math.min(pw, ph) / 5));
 
             // ancho: en la parte superior centrado
             const wText = document.createElementNS(svgNS,'text');
             wText.setAttribute('x', String(x + pw/2));
-            wText.setAttribute('y', String(y + padding + 22));
+            wText.setAttribute('y', String(y + padding + fsm * 0.9));
             wText.setAttribute('text-anchor','middle');
-            wText.setAttribute('font-size', fs(20));
+            wText.setAttribute('font-size', fs(fsm));
             wText.setAttribute('fill','#111');
             wText.textContent = `${p.ancho} mm`;
             group.appendChild(wText);
@@ -448,7 +550,7 @@
             lText.setAttribute('x', String(cx));
             lText.setAttribute('y', String(cy));
             lText.setAttribute('text-anchor','middle');
-            lText.setAttribute('font-size', fs(20));
+            lText.setAttribute('font-size', fs(fsm));
             lText.setAttribute('fill','#111');
             lText.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
             lText.textContent = `${p.largo} mm`;
@@ -457,9 +559,9 @@
             // tapacanto abreviado
             const tcText = document.createElementNS(svgNS,'text');
             tcText.setAttribute('x', String(x + pw/2));
-            tcText.setAttribute('y', String(y + ph - padding - 6));
+            tcText.setAttribute('y', String(y + ph - padding - Math.max(6, fsm * 0.4)));
             tcText.setAttribute('text-anchor','middle');
-            tcText.setAttribute('font-size', fs(18));
+            tcText.setAttribute('font-size', fs(Math.max(18, fsm * 0.85)));
             tcText.setAttribute('fill','#111');
             tcText.textContent = `TC: ${tapsLabel(p.tapacantos)}`;
             group.appendChild(tcText);
@@ -477,9 +579,9 @@
             row?.classList.remove('list-highlight');
           });
 
-          // Click: flujo pieza -> en_corte con zoom a la pieza, segundo click -> cortada y volver a vista normal
-          group.addEventListener('click',()=>{
-            focusOrTogglePiece(p);
+          // Click: abrir modal con info; si está presionado Ctrl, NO abrir (se usa para mover)
+          group.addEventListener('click',(ev)=>{
+            onPieceClick(ev, p);
           });
           g.appendChild(group);
         }
@@ -514,12 +616,21 @@
         }
         // Bounding box completo (incluye textos/cortes) y vista inicial centrada
         contentBounds = g.getBBox();
+        // Ajuste inicial estándar (comportamiento original)
         fit(board);
       }
 
-      // Estado de zoom focal de pieza
-      let focusedPiece = null; // pieza_id o null
-      const pendingByPiece = new Map();
+  // Modal e interacción de pieza
+  let modalEl = null; let modalPid = null; // estado del modal de pieza
+  let modalChangedToEnCorte = false; // si pusimos en 'en_corte' al abrir
+  let modalWasCut = false; // si se marcó como cortada dentro del modal
+  function getPieceById(pid){
+    try{
+      const board = tableros[idx] || {};
+      return (board.piezas||[]).find(pp=>pp.pieza_id===pid) || null;
+    }catch(_e){ return null; }
+  }
+  const pendingByPiece = new Map();
       async function setPieceState(piezaId, estado){
         // Persistencia asíncrona; no bloquea la UI
         try{
@@ -538,47 +649,183 @@
         const sel = list.querySelector(`select[data-pieza="${pid}"]`); if(sel) sel.value = estado;
         const rect = document.getElementById(`piece-${pid}`); if(rect) rect.setAttribute('fill', stateColor(estado));
       }
-      function pieceZoom(board, p){
-        const {w:vw, h:vh} = vbSize();
-        const PAD = 40;
-        const pw = p.ancho||1, ph = p.largo||1;
-        // Escala para encajar la pieza con padding
-        const sc = Math.min((vw - PAD*2)/pw, (vh - PAD*2)/ph);
-        const targetScale = Math.max(sc, baseScale*MIN_ZOOM_FACTOR);
-        // Centrar pieza
-        const cx = p.x + pw/2, cy = p.y + ph/2;
-        const targetDx = vw/2 - cx*targetScale;
-        const targetDy = vh/2 - cy*targetScale;
-        animateTo(board, {scale: targetScale, dx: targetDx, dy: targetDy}, 200);
-      }
-      function pieceUnzoom(board){
-        const t = computeFitTransform(board);
-        animateTo(board, t, 200);
-      }
-      async function focusOrTogglePiece(p){
-        const board = tableros[idx]||{};
-        const pid = p.pieza_id;
-        const row=list.querySelector(`[data-row="${pid}"]`);
-        row?.scrollIntoView({block:'nearest'});
-        row?.classList.add('list-highlight'); setTimeout(()=>row?.classList.remove('list-highlight'),700);
-        if(pendingByPiece.get(pid)) return; // evitar spam
-        if(focusedPiece !== pid){
-          // Optimista: actualizar UI inmediato y animar zoom
-          p.estado = 'en_corte';
-          updatePieceUI(pid, 'en_corte');
-          focusedPiece = pid;
-          pieceZoom(board, p);
-          pendingByPiece.set(pid, true);
-          setPieceState(pid, 'en_corte');
-        } else {
-          // Segundo click: marcar cortada y volver
-          p.estado = 'cortada';
-          updatePieceUI(pid, 'cortada');
-          focusedPiece = null;
-          pieceUnzoom(board);
-          pendingByPiece.set(pid, true);
-          setPieceState(pid, 'cortada');
+      function closePieceModal(){
+        // Si al abrir pusimos 'en_corte' y NO terminó en 'cortada', volver a 'pendiente'
+        if(modalPid && modalChangedToEnCorte && !modalWasCut){
+          const piece = getPieceById(modalPid);
+          if(piece && piece.estado !== 'cortada'){
+            piece.estado = 'pendiente';
+            updatePieceUI(modalPid, 'pendiente');
+            pendingByPiece.set(modalPid,true);
+            setPieceState(modalPid, 'pendiente');
+          }
         }
+        if(modalEl){ modalEl.remove(); }
+        modalEl=null; modalPid=null; modalChangedToEnCorte=false; modalWasCut=false;
+      }
+      function showPieceModal(p){
+        closePieceModal();
+        modalPid = p.pieza_id;
+        modalChangedToEnCorte=false; modalWasCut=false;
+        // Al abrir: si no está cortada, pasar a 'en_corte'
+        if((p.estado||'pendiente') !== 'cortada'){
+          p.estado = 'en_corte';
+          updatePieceUI(p.pieza_id, 'en_corte');
+          pendingByPiece.set(p.pieza_id,true); setPieceState(p.pieza_id,'en_corte');
+          modalChangedToEnCorte = true;
+        }
+        const backdrop = document.createElement('div');
+        backdrop.className = 'piece-modal-backdrop';
+        const modal = document.createElement('div');
+        modal.className = 'piece-modal';
+        modal.innerHTML = `
+          <div class="hdr">
+            <strong>Pieza: ${p.nombre || p.pieza_id}</strong>
+            <button class="btn-close" aria-label="Cerrar">×</button>
+          </div>
+          <div class="cnt">
+            <div style="display:flex; gap:16px; align-items:stretch; height:100%;">
+              <div id="pzPreview" style="flex:2 1 520px; min-width:420px; min-height:420px; height: calc(70vh); border:1px solid #eee; border-radius:8px; background:#fff;">
+                <svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+              </div>
+              <div style="flex:1 1 300px; min-width:280px; display:flex; flex-direction:column; gap:8px;">
+                <div><strong>Dimensiones:</strong> ${p.ancho}×${p.largo} mm</div>
+                <div><strong>Posición:</strong> (${p.x}, ${p.y})</div>
+                <div><strong>Tapacantos:</strong> ${tapsLabel(p.tapacantos)}</div>
+                <div><strong>Estado:</strong> <span id="pzEstado">${p.estado||'pendiente'}</span></div>
+              </div>
+            </div>
+            <div class="pz-overview">
+              <div class="small text-muted" style="margin-bottom:4px;">Vista del tablero</div>
+              <svg id="pzMiniBoard" width="100%" height="140" viewBox="0 0 200 140" preserveAspectRatio="xMidYMid meet"></svg>
+            </div>
+          </div>
+          <div class="ftr">
+            <button id="btnBackBoard" class="op-btn">Volver al tablero</button>
+            <button id="btnMarkCut" class="op-btn" style="background:#0d6efd;color:#fff;border-color:#0d6efd;">Marcar como cortada</button>
+          </div>`;
+        backdrop.appendChild(modal);
+        document.body.appendChild(backdrop);
+        // Render preview de la pieza (completa y grande con etiquetas dentro)
+        try{
+          const svgPrev = modal.querySelector('#pzPreview svg');
+          const pw = Math.max(1, p.ancho||1), ph = Math.max(1, p.largo||1);
+          // Dejamos más espacio alrededor para ubicar etiquetas por fuera sin recortes
+          const pad = 14; const vw=100, vh=100;
+          const sc = Math.min((vw-2*pad)/pw, (vh-2*pad)/ph);
+          const dx = (vw - pw*sc)/2, dy = (vh - ph*sc)/2;
+          svgPrev.setAttribute('viewBox', `0 0 ${vw} ${vh}`);
+          while(svgPrev.firstChild) svgPrev.removeChild(svgPrev.firstChild);
+          const gPrev = document.createElementNS('http://www.w3.org/2000/svg','g');
+          gPrev.setAttribute('transform', `translate(${dx},${dy}) scale(${sc})`);
+          const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+          rect.setAttribute('x','0'); rect.setAttribute('y','0');
+          rect.setAttribute('width', String(pw)); rect.setAttribute('height', String(ph));
+          rect.setAttribute('fill', stateColor(p.estado||'pendiente'));
+          rect.setAttribute('fill-opacity','0.35'); rect.setAttribute('stroke','#222'); rect.setAttribute('stroke-width','0.8');
+          rect.setAttribute('id','pzRect');
+          gPrev.appendChild(rect);
+
+          // Tapacantos en modal: mismas líneas, más separadas y visibles
+          const offModal = Math.max(4, Math.min(pw, ph) * 0.03);
+          drawTapacantosLines(gPrev, 0, 0, pw, ph, p.tapacantos||{}, { offset: offModal, strokeWidth: 3.2, dash: '8 5' });
+          // Nombre centrado, orientado por lado más largo
+          const name = document.createElementNS('http://www.w3.org/2000/svg','text');
+          const ncx = pw/2, ncy = ph/2; name.setAttribute('x', String(ncx)); name.setAttribute('y', String(ncy));
+          name.setAttribute('text-anchor','middle'); name.setAttribute('dominant-baseline','middle');
+          name.setAttribute('font-size', String(Math.max(10, Math.min(pw,ph)/10))); name.setAttribute('font-weight','bold'); name.setAttribute('fill','#111');
+          if(ph >= pw){ name.setAttribute('transform', `rotate(-90 ${ncx} ${ncy})`); }
+          name.textContent = p.nombre || p.pieza_id; gPrev.appendChild(name);
+          // Etiquetas de medidas y tapacanto (GRANDES y por FUERA de la pieza, sin tocarla)
+          const fsMeasureVal = Math.max(14, Math.min(pw, ph) / 5);
+          // Gap en unidades de pieza (mm), proporcional
+          const gapMMBase = Math.max((pad * 0.6) / Math.max(1e-6, sc), Math.min(pw, ph) * 0.025);
+          // Evitar recortes: limitar posiciones por el padding disponible en contenido
+          const padC = pad / Math.max(1e-6, sc);
+          const maxTopGap = Math.max(0, padC - fsMeasureVal*0.60);
+          const maxSideGap = Math.max(0, padC - fsMeasureVal*0.60);
+          const topGap = Math.min(gapMMBase + fsMeasureVal*0.20, maxTopGap);
+          const sideGap = Math.min(gapMMBase + fsMeasureVal*0.20, maxSideGap);
+          // Ancho arriba, centrado, por fuera con margen adicional según tamaño de fuente
+          const topTxt = document.createElementNS('http://www.w3.org/2000/svg','text');
+          topTxt.setAttribute('x', String(pw/2)); topTxt.setAttribute('y', String(-topGap)); topTxt.setAttribute('text-anchor','middle');
+          topTxt.setAttribute('dominant-baseline','hanging');
+          topTxt.setAttribute('font-size', String(fsMeasureVal)); topTxt.setAttribute('font-weight','bold'); topTxt.setAttribute('fill','#111');
+          topTxt.textContent = `${p.ancho} mm`; gPrev.appendChild(topTxt);
+          // Largo a la derecha, vertical, por fuera con margen adicional
+          const rightTxt = document.createElementNS('http://www.w3.org/2000/svg','text');
+          const rx = pw + sideGap, ry = ph/2; rightTxt.setAttribute('x', String(rx)); rightTxt.setAttribute('y', String(ry)); rightTxt.setAttribute('text-anchor','middle');
+          rightTxt.setAttribute('font-size', String(fsMeasureVal)); rightTxt.setAttribute('font-weight','bold'); rightTxt.setAttribute('fill','#111'); rightTxt.setAttribute('transform', `rotate(-90 ${rx} ${ry})`);
+          rightTxt.textContent = `${p.largo} mm`; gPrev.appendChild(rightTxt);
+          // Tapacantos debajo, centrado, por fuera con margen suficiente
+          const fsTapVal = Math.max(12, Math.min(pw, ph)/9);
+          const tcTxt = document.createElementNS('http://www.w3.org/2000/svg','text');
+          const maxBottomGap = Math.max(0, padC - fsTapVal*0.60);
+          const bottomGap = Math.min(gapMMBase + fsTapVal*0.25, maxBottomGap);
+          tcTxt.setAttribute('x', String(pw/2)); tcTxt.setAttribute('y', String(ph + bottomGap)); tcTxt.setAttribute('text-anchor','middle');
+          tcTxt.setAttribute('font-size', String(fsTapVal)); tcTxt.setAttribute('fill','#111'); tcTxt.textContent = `TC: ${tapsLabel(p.tapacantos)}`; gPrev.appendChild(tcTxt);
+          svgPrev.appendChild(gPrev);
+        }catch(_e){}
+        // Render minimapa del tablero con pieza resaltada
+        try{
+          const board = tableros[idx] || {};
+          const svgMini = modal.querySelector('#pzMiniBoard');
+          if(svgMini){ renderMiniBoard(svgMini, board, p.pieza_id); }
+        }catch(_e){}
+        // Eventos
+        modal.querySelector('.btn-close')?.addEventListener('click', closePieceModal);
+        backdrop.addEventListener('click',(e)=>{ if(e.target===backdrop) closePieceModal(); });
+        modal.querySelector('#btnBackBoard')?.addEventListener('click',()=>{ closePieceModal(); });
+        modal.querySelector('#btnMarkCut')?.addEventListener('click',()=>{
+          const pid = p.pieza_id; p.estado='cortada'; updatePieceUI(pid,'cortada'); pendingByPiece.set(pid,true); setPieceState(pid,'cortada'); modalWasCut=true; closePieceModal();
+        });
+        // Click en la pieza dentro del modal: marcar como cortada (equivalente al botón)
+        try{
+          const rectPrev = modal.querySelector('#pzRect');
+          rectPrev?.addEventListener('click',()=>{
+            const pid = p.pieza_id; p.estado='cortada'; updatePieceUI(pid,'cortada'); pendingByPiece.set(pid,true); setPieceState(pid,'cortada'); modalWasCut=true; closePieceModal();
+          });
+        }catch(_e){}
+        modalEl = backdrop;
+      }
+      function renderMiniBoard(svgEl, board, selectedPid){
+        const w = Math.max(1, board.ancho_mm||1), h = Math.max(1, board.largo_mm||1);
+        const pad = 6; const vw = 200, vh = 140;
+        svgEl.setAttribute('viewBox', `0 0 ${vw} ${vh}`);
+        while(svgEl.firstChild) svgEl.removeChild(svgEl.firstChild);
+        const sc = Math.min((vw-2*pad)/w, (vh-2*pad)/h);
+        const dx = (vw - w*sc)/2, dy = (vh - h*sc)/2;
+        const gM = document.createElementNS('http://www.w3.org/2000/svg','g');
+        gM.setAttribute('transform', `translate(${dx},${dy}) scale(${sc})`);
+        // board
+        const br = document.createElementNS('http://www.w3.org/2000/svg','rect');
+        br.setAttribute('x','0'); br.setAttribute('y','0'); br.setAttribute('width', String(w)); br.setAttribute('height', String(h));
+        br.setAttribute('fill','#fff'); br.setAttribute('stroke','#444'); br.setAttribute('stroke-width','1');
+        gM.appendChild(br);
+        // pieces
+        for(const pp of (board.piezas||[])){
+          const r = document.createElementNS('http://www.w3.org/2000/svg','rect');
+          r.setAttribute('x', String(pp.x||0)); r.setAttribute('y', String(pp.y||0)); r.setAttribute('width', String(pp.ancho||0)); r.setAttribute('height', String(pp.largo||0));
+          const isSel = (pp.pieza_id === selectedPid);
+          r.setAttribute('fill', isSel ? '#0D6EFD' : '#B0D4FF');
+          r.setAttribute('fill-opacity', isSel ? '0.55' : '0.35');
+          r.setAttribute('stroke', isSel ? '#0B5ED7' : '#666'); r.setAttribute('stroke-width', isSel ? '2' : '1');
+          gM.appendChild(r);
+        }
+        svgEl.appendChild(gM);
+      }
+      function onPieceClick(ev, p){
+        // Si Ctrl/Cmd está presionado, interpretamos como intención de mover y NO abrimos modal
+        if(ev && (ev.ctrlKey || ev.metaKey)) return;
+        // Si ya hay modal abierto para esta pieza, marca cortada
+        if(modalEl && modalPid === p.pieza_id){
+          const pid = p.pieza_id; p.estado='cortada'; updatePieceUI(pid,'cortada'); pendingByPiece.set(pid,true); setPieceState(pid,'cortada'); closePieceModal();
+          return;
+        }
+        // Abrir modal con info
+        const row=list.querySelector(`[data-row="${p.pieza_id}"]`);
+        row?.scrollIntoView({block:'nearest'}); row?.classList.add('list-highlight'); setTimeout(()=>row?.classList.remove('list-highlight'),700);
+        showPieceModal(p);
       }
 
       function updateStats(board){
@@ -596,20 +843,55 @@
       }
 
       // Interacción
-  svg.addEventListener('wheel',(e)=>{ e.preventDefault(); const d = e.deltaY<0?1.1:0.9; const prev=scale; const board = tableros[idx]||{}; scale = Math.max(baseScale*MIN_ZOOM_FACTOR, Math.min(8, scale*d));
-        // Zoom anclado al centro del viewport
-        const rect=host.getBoundingClientRect(); const cx = rect.width/2, cy = rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse());
-        dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev);
-        apply(board);
+  svg.addEventListener('wheel',(e)=>{ 
+        const board = tableros[idx]||{};
+        // Ignorar eventos antes de tener escala base y bounds válidos
+        if(!boardBounds || !isFinite(boardBounds.width) || !isFinite(boardBounds.height) || boardBounds.width<=0 || baseScale<=0){ return; }
+  // Zoom solo con Ctrl/Cmd; si no, la rueda no actúa sobre el visor (no pan)
+        if(e.ctrlKey || e.metaKey){
+          e.preventDefault();
+          const factor = e.deltaY<0?1.1:0.9; 
+          const prev=scale; 
+          const newScale = Math.max(baseScale*MIN_ZOOM_FACTOR, Math.min(8, prev*factor));
+          // Zoom anclado al cursor (dx/dy en contenido):
+          // Mantener p bajo el cursor: (p + dx')*new = (p + dx)*prev => dx' = r*dx + (r-1)*p, r=prev/new
+          const ctm = (g.getScreenCTM && g.getScreenCTM()) || svg.getScreenCTM();
+          if(ctm){
+            const pt=svg.createSVGPoint(); pt.x=e.clientX; pt.y=e.clientY; const p=pt.matrixTransform(ctm.inverse());
+            const r = prev / newScale;
+            dx = r*dx + (r - 1)*p.x;
+            dy = r*dy + (r - 1)*p.y;
+          }
+          scale = newScale;
+          apply(board);
+        } else {
+          // Sin Ctrl: no hacemos nada (la página no se desplaza porque el body está oculto)
+          return;
+        }
       },{passive:false});
   svg.addEventListener('mousedown',(e)=>{
-    if(atBaseZoom()) { dragging=false; svg.style.cursor='default'; return; }
+    const isMid = (e.button===1);
+    const allowPan = isMid || e.ctrlKey || e.metaKey; // mover solo con botón medio o con Ctrl
+    if(!allowPan){ dragging=false; updateCursor(); return; }
+    e.preventDefault();
     dragging=true; lx=e.clientX; ly=e.clientY; svg.style.cursor='grabbing';
   });
   window.addEventListener('mouseup',()=>{ dragging=false; updateCursor(); });
-  window.addEventListener('mousemove',(e)=>{ if(!dragging) return; dx += (e.clientX-lx); dy += (e.clientY-ly); lx=e.clientX; ly=e.clientY; apply(tableros[idx]||{}); });
-  document.getElementById('btnZoomIn').addEventListener('click',()=>{ scale=Math.min(8,scale*1.2); const board=tableros[idx]||{}; const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); const prev=scale/1.2; dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
-  document.getElementById('btnZoomOut').addEventListener('click',()=>{ const board=tableros[idx]||{}; const prev=scale; scale=Math.max(baseScale*MIN_ZOOM_FACTOR,scale/1.2); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); });
+  window.addEventListener('mousemove',(e)=>{ if(!dragging) return; dx += (e.clientX-lx)/Math.max(1e-6, scale); dy += (e.clientY-ly)/Math.max(1e-6, scale); lx=e.clientX; ly=e.clientY; apply(tableros[idx]||{}); });
+  document.getElementById('btnZoomIn').addEventListener('click',()=>{ 
+    const board=tableros[idx]||{}; 
+    const ctm = (g.getScreenCTM && g.getScreenCTM()) || svg.getScreenCTM();
+    const prev=scale; const newScale=Math.min(8,prev*1.2);
+    if(ctm){ const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const p=pt.matrixTransform(ctm.inverse()); const r=prev/newScale; dx = r*dx + (r-1)*p.x; dy = r*dy + (r-1)*p.y; }
+    scale=newScale; apply(board); 
+  });
+  document.getElementById('btnZoomOut').addEventListener('click',()=>{ 
+    const board=tableros[idx]||{}; 
+    const ctm = (g.getScreenCTM && g.getScreenCTM()) || svg.getScreenCTM();
+    const prev=scale; const newScale=Math.max(baseScale*MIN_ZOOM_FACTOR,prev/1.2);
+    if(ctm){ const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const p=pt.matrixTransform(ctm.inverse()); const r=prev/newScale; dx = r*dx + (r-1)*p.x; dy = r*dy + (r-1)*p.y; }
+    scale=newScale; apply(board); 
+  });
   document.getElementById('btnZoomReset').addEventListener('click',()=>{
     // Ajustar vista: refresca el visualizador del tablero actual, centrando y re-ajustando sin recargar toda la página
     const board = tableros[idx]||{};
@@ -637,17 +919,22 @@
     if(pinch.active && e.touches.length===2){
       e.preventDefault();
       const t1=e.touches[0], t2=e.touches[1];
-      const d = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-      const prev=scale;
-  scale = Math.max(baseScale*MIN_ZOOM_FACTOR, Math.min(8, pinch.s0 * (d / Math.max(1, pinch.d0))));
-      const pt=svg.createSVGPoint(); pt.x=pinch.cx; pt.y=pinch.cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse());
-      dx = svgPt.x - (svgPt.x - dx) * (scale/prev);
-      dy = svgPt.y - (svgPt.y - dy) * (scale/prev);
+  const d = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+  const prev=scale;
+  const newScale = Math.max(baseScale*MIN_ZOOM_FACTOR, Math.min(8, pinch.s0 * (d / Math.max(1, pinch.d0))));
+  const ctm = (g.getScreenCTM && g.getScreenCTM()) || svg.getScreenCTM();
+  const pt=svg.createSVGPoint(); pt.x=pinch.cx; pt.y=pinch.cy; const p=ctm ? pt.matrixTransform(ctm.inverse()) : {x:0,y:0};
+  {
+    const r = prev / newScale;
+    dx = r*dx + (r - 1)*p.x;
+    dy = r*dy + (r - 1)*p.y;
+  }
+  scale = newScale;
       apply(tableros[idx]||{});
     } else if(dragging && e.touches.length===1){
       e.preventDefault();
       const tx=e.touches[0].clientX, ty=e.touches[0].clientY;
-      dx += (tx - lx); dy += (ty - ly); lx=tx; ly=ty; apply(tableros[idx]||{});
+      dx += (tx - lx)/Math.max(1e-6, scale); dy += (ty - ly)/Math.max(1e-6, scale); lx=tx; ly=ty; apply(tableros[idx]||{});
     }
   }, {passive:false});
   svg.addEventListener('touchend',()=>{ if(pinch.active && event.touches && event.touches.length<2) pinch.active=false; dragging=false; updateCursor(); }, {passive:true});
@@ -687,8 +974,35 @@
         const isLast = (idx === Math.max(0, tableros.length - 1));
         btn.style.display = isLast ? 'inline-block' : 'none';
       }
-      selTab.addEventListener('change',()=>{ idx=parseInt(selTab.value,10)||0; renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{}); updateCompletarVisibility(); });
-  window.addEventListener('keydown',(e)=>{ const board=tableros[idx]||{}; if(e.key==='+'){ const prev=scale; scale=Math.min(8,scale*1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='-'){ const prev=scale; scale=Math.max(baseScale*MIN_ZOOM_FACTOR,scale/1.1); const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const svgPt=pt.matrixTransform(svg.getScreenCTM().inverse()); dx = svgPt.x - (svgPt.x - dx) * (scale/prev); dy = svgPt.y - (svgPt.y - dy) * (scale/prev); apply(board); } else if(e.key==='0'){ fit(board); } else if(e.key==='ArrowRight'){ idx=Math.min(tableros.length-1, idx+1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='ArrowLeft'){ idx=Math.max(0, idx-1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change')); } else if(e.key==='s' || e.key==='S'){ const box=document.getElementById('statsBox'); box.style.display = (box.style.display==='none')? 'block' : 'none'; } });
+      selTab.addEventListener('change',()=>{ 
+        idx=parseInt(selTab.value,10)||0; 
+        renderBoard(tableros[idx]||{}); 
+        renderList(tableros[idx]||{}); 
+  updateStats(tableros[idx]||{}); 
+  updateCompletarVisibility();
+      });
+  window.addEventListener('keydown',(e)=>{ 
+    const board=tableros[idx]||{}; 
+    if(e.key==='+'){
+      const prev=scale; const newScale=Math.min(8,scale*1.1);
+      const ctm = (g.getScreenCTM && g.getScreenCTM()) || svg.getScreenCTM();
+      if(ctm){ const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const p=pt.matrixTransform(ctm.inverse()); const r=prev/newScale; dx = r*dx + (r-1)*p.x; dy = r*dy + (r-1)*p.y; }
+      scale = newScale; apply(board);
+    } else if(e.key==='-'){
+      const prev=scale; const newScale=Math.max(baseScale*MIN_ZOOM_FACTOR,scale/1.1);
+      const ctm = (g.getScreenCTM && g.getScreenCTM()) || svg.getScreenCTM();
+      if(ctm){ const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const p=pt.matrixTransform(ctm.inverse()); const r=prev/newScale; dx = r*dx + (r-1)*p.x; dy = r*dy + (r-1)*p.y; }
+      scale = newScale; apply(board);
+    } else if(e.key==='0'){
+      fit(board);
+    } else if(e.key==='ArrowRight'){
+      idx=Math.min(tableros.length-1, idx+1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change'));
+    } else if(e.key==='ArrowLeft'){
+      idx=Math.max(0, idx-1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change'));
+    } else if(e.key==='s' || e.key==='S'){
+      const box=document.getElementById('statsBox'); box.style.display = (box.style.display==='none')? 'block' : 'none';
+    }
+  });
 
       // Inicialización
       renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{});

@@ -69,7 +69,25 @@ python manage.py migrar_materiales_organizaciones
 ```
 
 ## Variables/Entorno
-- Por defecto usa SQLite. Si deseas PostgreSQL, configura `DATABASES` en `WowDash/settings.py` o vía variables de entorno.
+- Por defecto usa SQLite. Si deseas apuntar a PostgreSQL (por ejemplo, a la MISMA base que usa tu URL de despliegue), configura variables de entorno:
+
+		1) Copia `Django/.env.example` a `Django/.env` (recomendado) o crea `.env` en la raíz del repo.
+		2) Rellena `DATABASE_URL` con la URL exacta de tu base (formato: `postgres://user:pass@host:port/db?sslmode=require`).
+		3) Ajusta `CSRF_TRUSTED_ORIGINS` para incluir el host:puerto donde correrás el servidor.
+		4) Opcional: `DJANGO_ALLOWED_HOSTS=*` en desarrollo.
+
+		WowDash/settings.py intenta cargar `.env` tanto desde `Django/.env` como desde la raíz; si existen ambos, `Django/.env` tiene prioridad.
+
+### Ejecutar servidor en un puerto específico (usando la misma DB de la URL)
+
+Desde `Django/`:
+
+```bash
+python manage.py migrate              # usa la DB definida en DATABASE_URL
+python manage.py runserver 0.0.0.0:8000
+```
+
+Si necesitas otro puerto, cambia `8000` por el que prefieras.
 
 ## Tests / Lint
 Este repo trae un pipeline simple con GitHub Actions que:
