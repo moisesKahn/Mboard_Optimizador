@@ -2522,6 +2522,11 @@
                 // Bloquear PDF hasta que se actualice el folio/archivo en backend
                 window._bloquearPDF = true;
                 setPdfButton(false);
+                // Mostrar aviso de "Generando PDF…" durante el bloqueo
+                try {
+                    const toast = document.getElementById('toastGenerandoPdf');
+                    if (toast) toast.style.display = 'block';
+                } catch(_e) {}
 
                 const payload = {
                     proyecto_id: document.getElementById('resultadosOptimizacion').getAttribute('data-proyecto-id'),
@@ -2562,6 +2567,11 @@
                         window._bloquearPDF = false;
                         const b = document.querySelector('button[onclick="descargarPDF()"]');
                         if (b){ b.disabled = false; b.style.cursor = ''; }
+                        // Ocultar aviso de generación si estaba visible
+                        try {
+                            const toast = document.getElementById('toastGenerandoPdf');
+                            if (toast) toast.style.display = 'none';
+                        } catch(_e) {}
                         return;
                     }
                     try {
@@ -2577,13 +2587,10 @@
                         window._bloquearPDF = false;
                         // Actualizar estado del botón según reglas
                         updatePdfButton();
-                        // Mostrar toast no intrusivo sin mover botones
+                        // Ocultar aviso de generación ahora que el PDF está listo (o en caché)
                         try {
                             const toast = document.getElementById('toastGenerandoPdf');
-                            if (toast){
-                                toast.style.display = 'block';
-                                setTimeout(()=>{ toast.style.display = 'none'; }, 2000);
-                            }
+                            if (toast) toast.style.display = 'none';
                         } catch(_e) {}
                     }, 800);
                     window._resetResultado = false;
