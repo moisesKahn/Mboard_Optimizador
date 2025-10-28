@@ -333,6 +333,7 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
         'fast': True,               # si True, hachurar márgenes con relleno suave (más rápido)
         'hatch_spacing': 6.0,       # separación de líneas de hachurado (puntos PDF)
         'hatch_lw': 0.5,            # grosor de línea de hachura (puntos PDF)
+        'hatch_useful': False,      # si True, hachura también el área útil (por defecto NO)
         'kerf_min_lw': 0.6,         # grosor mínimo del kerf (puntos PDF)
         'kerf_max_lw': 3.0,         # grosor máximo del kerf (puntos PDF)
         'kerf_scale': 1.0,          # factor multiplicador extra del grosor del kerf
@@ -804,13 +805,13 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             tX = margin_lr + (box_w - tW)/2
             tY = bottom_reserved + (box_h - tH)/2
 
-            # Helper: hachurado diagonal en un rectángulo (para márgenes)
-            def hatch_rect(xh, yh, wh, hh, spacing=None, lw=None):
+            # Helper: hachurado en un rectángulo (para márgenes/áreas)
+            def hatch_rect(xh, yh, wh, hh, spacing=None, lw=None, *, cross=False, force_lines=False, stroke_gray=0.7):
                 if wh <= 0 or hh <= 0:
                     return
                 spacing = float(_opts.get('hatch_spacing', 6.0)) if spacing is None else spacing
                 lw = float(_opts.get('hatch_lw', 0.5)) if lw is None else lw
-                if FAST_PDF:
+                if FAST_PDF and not force_lines:
                     # Relleno gris muy suave sin recortes ni múltiples líneas
                     p.saveState()
                     p.setFillGray(0.95)
@@ -823,7 +824,7 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                     p.clipPath(path, stroke=0, fill=0)
                     p.setLineWidth(lw)
                     # Gris claro para no competir con piezas
-                    p.setStrokeGray(0.7)
+                    p.setStrokeGray(stroke_gray)
                     # Dibujar líneas 45°
                     import math as _m
                     # Extender para cubrir el área recortada
@@ -841,6 +842,16 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                         y2 = yh + hh
                         p.line(x1, y1, x2, y2)
                         i += eff_spacing
+                    # Si se solicita hachurado cruzado, dibujar el set inverso (-45°)
+                    if cross:
+                        i = start
+                        while i <= end:
+                            x1 = xh + i
+                            y1 = yh + hh
+                            x2 = xh + i + hh
+                            y2 = yh
+                            p.line(x1, y1, x2, y2)
+                            i += eff_spacing
                     p.restoreState()
 
             # Cabecera del tablero con resumen
@@ -951,16 +962,16 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             # Rect de área útil (sin punteado, solo referencia visual opcional)
             # p.rect(tX + offX, tY + offYBL, effW, effH)
 
-            # Márgenes: izquierda, derecha, abajo, arriba
+            # Márgenes: izquierda, derecha, abajo, arriba (SIEMPRE con líneas entrecruzadas)
             # Izquierda
-            hatch_rect(tX, tY, offX, tH, spacing=6, lw=0.5)
+            hatch_rect(tX, tY, offX, tH, spacing=6, lw=0.5, cross=True, force_lines=True)
             # Derecha
-            hatch_rect(tX + offX + effW, tY, max(tW - (offX + effW), 0), tH, spacing=6, lw=0.5)
+            hatch_rect(tX + offX + effW, tY, max(tW - (offX + effW), 0), tH, spacing=6, lw=0.5, cross=True, force_lines=True)
             # Abajo
-            hatch_rect(tX + offX, tY, effW, max(offYBL, 0), spacing=6, lw=0.5)
+            hatch_rect(tX + offX, tY, effW, max(offYBL, 0), spacing=6, lw=0.5, cross=True, force_lines=True)
             # Arriba
             top_h = max(tH - (offYBL + effH), 0)
-            hatch_rect(tX + offX, tY + offYBL + effH, effW, top_h, spacing=6, lw=0.5)
+            hatch_rect(tX + offX, tY + offYBL + effH, effW, top_h, spacing=6, lw=0.5, cross=True, force_lines=True)
 
             # Piezas y cortes (dos pasadas):
             # 1) Recorrer piezas para calcular posiciones y recolectar segmentos de corte
@@ -971,11 +982,12 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             _horiz_segments = {} # y -> list[(x0,x1)]
             piezas_geom = []     # guardar geometría para dibujar después del kerf
 
-            # Hachurar el área útil completa (los rectángulos de piezas la "limpiarán" encima)
-            try:
-                hatch_rect(tX + offX, tY + offYBL, effW, effH)
-            except Exception:
-                pass
+            # Opcional: hachurar el área útil completa (por defecto desactivado)
+            if bool(_opts.get('hatch_useful', False)):
+                try:
+                    hatch_rect(tX + offX, tY + offYBL, effW, effH, cross=False, force_lines=False, stroke_gray=0.85)
+                except Exception:
+                    pass
 
             for pieza in piezas_tab:
                 aN = int(pieza.get('ancho',0)); lN = int(pieza.get('largo',0))
