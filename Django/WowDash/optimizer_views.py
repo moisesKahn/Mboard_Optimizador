@@ -276,7 +276,7 @@ def _materiales_desde_resultado(resultado):
         return [resultado]
     return []
 
-def _pdf_from_result(proyecto, resultado):
+def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
     """Genera un PDF (bytes) que dibuja cada tablero y sus piezas según el resultado guardado.
     Paridad 1:1 con la vista: coords relativas al área útil con origen arriba-izquierda.
     """
@@ -328,8 +328,25 @@ def _pdf_from_result(proyecto, resultado):
     except Exception:
         folio_txt = ''
     p.setTitle(f"Optimizacion_{folio_txt or proyecto.codigo}_{cliente_slug}")
+    # Opciones de renderizado PDF (con valores por defecto)
+    PDF_OPTS_DEFAULT = {
+        'fast': True,               # si True, hachurar márgenes con relleno suave (más rápido)
+        'hatch_spacing': 6.0,       # separación de líneas de hachurado (puntos PDF)
+        'hatch_lw': 0.5,            # grosor de línea de hachura (puntos PDF)
+        'kerf_min_lw': 0.6,         # grosor mínimo del kerf (puntos PDF)
+        'kerf_max_lw': 3.0,         # grosor máximo del kerf (puntos PDF)
+        'kerf_scale': 1.0,          # factor multiplicador extra del grosor del kerf
+    }
+    _opts = dict(PDF_OPTS_DEFAULT)
+    try:
+        if isinstance(opts, dict):
+            for k in PDF_OPTS_DEFAULT.keys():
+                if k in opts and opts[k] is not None:
+                    _opts[k] = opts[k]
+    except Exception:
+        pass
     # Modo rápido: simplificar hachurado de márgenes para acelerar generación
-    FAST_PDF = True
+    FAST_PDF = bool(_opts.get('fast', True))
 
     materiales = _materiales_desde_resultado(resultado)
     if not materiales:
@@ -788,9 +805,11 @@ def _pdf_from_result(proyecto, resultado):
             tY = bottom_reserved + (box_h - tH)/2
 
             # Helper: hachurado diagonal en un rectángulo (para márgenes)
-            def hatch_rect(xh, yh, wh, hh, spacing=6, lw=0.5):
+            def hatch_rect(xh, yh, wh, hh, spacing=None, lw=None):
                 if wh <= 0 or hh <= 0:
                     return
+                spacing = float(_opts.get('hatch_spacing', 6.0)) if spacing is None else spacing
+                lw = float(_opts.get('hatch_lw', 0.5)) if lw is None else lw
                 if FAST_PDF:
                     # Relleno gris muy suave sin recortes ni múltiples líneas
                     p.saveState()
@@ -943,28 +962,28 @@ def _pdf_from_result(proyecto, resultado):
             top_h = max(tH - (offYBL + effH), 0)
             hatch_rect(tX + offX, tY + offYBL + effH, effW, top_h, spacing=6, lw=0.5)
 
-            # Piezas
-            # Etiquetado como en el visualizador: usar índices GLOBALES por tipo dentro del material
-            # y coordenadas fieles: decidir automáticamente si vienen relativas al área útil
-            # o absolutas (incluyendo márgenes), eligiendo el caso que encaja en el área útil.
+            # Piezas y cortes (dos pasadas):
+            # 1) Recorrer piezas para calcular posiciones y recolectar segmentos de corte
             piezas_tab = (t.get('piezas') or [])
-            # Colecciones para líneas de corte (coordenadas en PDF) y segmentos por eje
             _cut_xs = set()
             _cut_ys = set()
             _vert_segments = {}  # x -> list[(y0,y1)]
             _horiz_segments = {} # y -> list[(x0,x1)]
+            piezas_geom = []     # guardar geometría para dibujar después del kerf
 
             # Hachurar el área útil completa (los rectángulos de piezas la "limpiarán" encima)
             try:
-                hatch_rect(tX + offX, tY + offYBL, effW, effH, spacing=6, lw=0.5)
+                hatch_rect(tX + offX, tY + offYBL, effW, effH)
             except Exception:
                 pass
+
             for pieza in piezas_tab:
                 aN = int(pieza.get('ancho',0)); lN = int(pieza.get('largo',0))
                 kN = (pieza.get('nombre'), min(aN,lN), max(aN,lN))
                 corridas_global_por_tipo[kN] = corridas_global_por_tipo.get(kN, 0) + 1
                 running_tipo = pieza.get('indiceUnidad') or corridas_global_por_tipo[kN]
                 total_tipo = pieza.get('totalUnidades') or totales_global_por_tipo.get(kN, 1)
+
                 # Normalización robusta de coordenadas a relativas al área útil
                 px_mm = float(pieza.get('x',0)); py_mm = float(pieza.get('y',0))
                 pw_mm = float(pieza.get('ancho',0)); ph_mm = float(pieza.get('largo',0))
@@ -975,15 +994,13 @@ def _pdf_from_result(proyecto, resultado):
                         rx + pw_mm <= effW_mm + eps and
                         ry + ph_mm <= effH_mm + eps
                     )
-                candA = (px_mm, py_mm)  # asumir ya relativas
-                candB = (px_mm - mx_val, py_mm - my_val)  # asumir absolutas con margen
-                # Preferimos la que mejor encaje dentro del área útil
+                candA = (px_mm, py_mm)
+                candB = (px_mm - mx_val, py_mm - my_val)
                 if _fits(candB[0], candB[1], eps=2.0):
                     px_rel_mm, py_rel_mm = candB
                 elif _fits(candA[0], candA[1], eps=2.0):
                     px_rel_mm, py_rel_mm = candA
                 else:
-                    # En última instancia, usar B y recortar a límites [0, útil]
                     rx, ry = candB
                     rx = max(0.0, min(rx, max(effW_mm - pw_mm, 0.0)))
                     ry = max(0.0, min(ry, max(effH_mm - ph_mm, 0.0)))
@@ -995,136 +1012,21 @@ def _pdf_from_result(proyecto, resultado):
                 h = ph_mm * scale
                 x = tX + offX + px
                 y = tY + offYBL + (effH - (py + h))
-                # Rectángulo de la pieza: sin borde; relleno blanco para tapar hachurado y cualquier kerf subyacente
-                p.setFillGray(1.0)
-                p.rect(x, y, w, h, stroke=0, fill=1)
-                # Etiquetas mínimas: siempre a lo largo de la pieza para no invadir adyacentes
-                nombre = str(pieza.get('nombre','Pieza'))
-                pa = int(pieza.get('ancho',0)); pl = int(pieza.get('largo',0))
-                rot = ' ↻' if pieza.get('rotada') else ''
-                et1 = f"{nombre} ({running_tipo}/{total_tipo}){rot}"
-                et2 = f"{pa}×{pl} mm"
-                try:
-                    from reportlab.pdfbase.pdfmetrics import stringWidth
-                    fs1, fs2 = 7.5, 7
-                    # Si la pieza es más alta que ancha, rotamos texto 90° y usamos altura como ancho disponible
-                    is_vertical = h >= w
-                    maxW = max((h if is_vertical else w) - 6, 10)
-                    while fs1 > 4 and stringWidth(et1, 'Helvetica-Bold', fs1) > maxW:
-                        fs1 -= 0.5
-                    while fs2 > 4 and stringWidth(et2, 'Helvetica', fs2) > maxW:
-                        fs2 -= 0.5
-                except Exception:
-                    fs1, fs2 = 7.5, 7
-                    is_vertical = h >= w
-                # Clip dentro de la pieza y dibujar el NOMBRE orientado al lado más largo
-                p.saveState()
-                clip = p.beginPath(); clip.rect(x, y, w, h); p.clipPath(clip, stroke=0, fill=0)
-                p.setFillGray(0)
-                try:
-                    from reportlab.pdfbase.pdfmetrics import stringWidth
-                    # Determinar orientación por el lado más largo
-                    orient_vertical = h >= w
-                    # Limitar tamaño para que el alto de la fuente no supere el lado corto
-                    max_font = max(4.0, min(fs1, (min(w, h) - 6) * 0.9))
-                    fs_name = max_font
-                    # Ajustar a lo largo del lado largo disponible (-6 de margen)
-                    max_run = max((h if orient_vertical else w) - 6, 8)
-                    while fs_name > 4 and stringWidth(et1, 'Helvetica-Bold', fs_name) > max_run:
-                        fs_name -= 0.5
-                    p.setFont('Helvetica-Bold', fs_name)
-                    cx, cy = (x + w/2.0, y + h/2.0)
-                    if orient_vertical:
-                        p.saveState()
-                        p.translate(cx, cy)
-                        p.rotate(90)
-                        # Centrado perfecto tras la rotación
-                        p.drawCentredString(0, -fs_name/3.0, et1)
-                        p.restoreState()
-                    else:
-                        p.drawCentredString(cx, cy - fs_name/3.0, et1)
-                except Exception:
-                    try:
-                        p.setFont('Helvetica-Bold', fs1)
-                        p.drawCentredString(x + w/2.0, y + h/2.0, et1)
-                    except Exception:
-                        pass
 
-                # Mostrar medidas en los lados: ancho (pa) en el lado superior/central horizontal,
-                # y alto (pl) en el lado derecho/central vertical, siguiendo la línea (rotado 90°).
-                label_w = f"{pa} mm"
-                label_h = f"{pl} mm"
-                # Ajustar tamaño de fuente para que quepa en la longitud del lado
-                try:
-                    from reportlab.pdfbase.pdfmetrics import stringWidth
-                    # Fuente inicial
-                    fw = fs2
-                    fh = fs2
-                    max_w_w = max(w - 6, 6)
-                    max_w_h = max(h - 6, 6)
-                    # Reducir fuente si no cabe en la dimensión disponible
-                    while fw > 4 and stringWidth(label_w, 'Helvetica', fw) > max_w_w:
-                        fw -= 0.5
-                    while fh > 4 and stringWidth(label_h, 'Helvetica', fh) > max_w_h:
-                        fh -= 0.5
-                except Exception:
-                    fw = fs2; fh = fs2
+                # Guardar geometría y metadatos mínimos para el dibujado posterior
+                piezas_geom.append({
+                    'x': x, 'y': y, 'w': w, 'h': h,
+                    'nombre': str(pieza.get('nombre','Pieza')),
+                    'pa': int(pieza.get('ancho',0)),
+                    'pl': int(pieza.get('largo',0)),
+                    'rotada': bool(pieza.get('rotada')),
+                    'running_tipo': running_tipo,
+                    'total_tipo': total_tipo,
+                    'taps': pieza.get('tapacantos') or {},
+                })
 
-                # Dibujar label horizontal (ancho) cerca del borde superior interno
-                try:
-                    p.setFont('Helvetica', fw)
-                    y_label = y + h - (fw + 2)
-                    p.drawCentredString(x + w/2, y_label, label_w)
-                except Exception:
-                    pass
-
-                # Dibujar label vertical (alto) en el lado derecho, rotado 90° y centrado verticalmente
-                try:
-                    p.saveState()
-                    p.setFont('Helvetica', fh)
-                    # Punto de referencia: un poco dentro del borde derecho
-                    rx = x + w - (fh/2) - 2
-                    ry = y + h/2
-                    p.translate(rx, ry)
-                    p.rotate(90)
-                    # Tras rotar, centrar en X=0
-                    p.drawCentredString(0, 0, label_h)
-                    p.restoreState()
-                except Exception:
-                    try:
-                        p.restoreState()
-                    except Exception:
-                        pass
-
-                p.restoreState()
-
-                # Tapacantos internos: líneas punteadas por dentro de la pieza
-                taps = pieza.get('tapacantos') or {}
-                if any(taps.values()):
-                    p.saveState()
-                    # Rojo similar al del visualizador (#dc3545)
-                    p.setStrokeColorRGB(220/255.0, 53/255.0, 69/255.0)
-                    p.setLineWidth(1.2)
-                    p.setDash(3, 2)
-                    # ~6.0 mm hacia adentro para mayor separación respecto al borde
-                    inset = 6.0 * scale
-                    inset = max(0.5, min(inset, (min(w, h) / 2.0) - 0.5))
-                    # Arriba
-                    if taps.get('arriba'):
-                        p.line(x + inset, y + h - inset, x + w - inset, y + h - inset)
-                    # Abajo
-                    if taps.get('abajo'):
-                        p.line(x + inset, y + inset, x + w - inset, y + inset)
-                    # Izquierda
-                    if taps.get('izquierda'):
-                        p.line(x + inset, y + inset, x + inset, y + h - inset)
-                    # Derecha
-                    if taps.get('derecha'):
-                        p.line(x + w - inset, y + inset, x + w - inset, y + h - inset)
-                    p.restoreState()
                 # Registrar bordes para líneas de corte globales y segmentos útiles (solo sobre rango de piezas)
                 try:
-                    # Normalizar con redondeo para agrupar flotantes cercanos
                     rx0 = round(float(x), 2); rx1 = round(float(x + w), 2)
                     ry0 = round(float(y), 2); ry1 = round(float(y + h), 2)
                     _cut_xs.add(rx0); _cut_xs.add(rx1)
@@ -1145,7 +1047,11 @@ def _pdf_from_result(proyecto, resultado):
                     kerf_mm = float((mat.get('config') or {}).get('kerf', mat.get('desperdicio_sierra', 0)) or 0)
                 except Exception:
                     kerf_mm = 0.0
-                lw = max(0.6, min(3.0, kerf_mm * float(scale)))
+                # Grosor parametrizable
+                k_min = float(_opts.get('kerf_min_lw', 0.6))
+                k_max = float(_opts.get('kerf_max_lw', 3.0))
+                k_scale = float(_opts.get('kerf_scale', 1.0))
+                lw = max(k_min, min(k_max, kerf_mm * float(scale) * k_scale))
                 p.setLineWidth(lw)
                 p.setStrokeGray(0.15)
                 # Sin dash: línea normal continua
@@ -1194,6 +1100,115 @@ def _pdf_from_result(proyecto, resultado):
                     p.restoreState()
                 except Exception:
                     pass
+
+            # 2) DIBUJAR PIEZAS y etiquetas/tapacantos por ENCIMA del kerf
+            for g in piezas_geom:
+                x, y, w, h = g['x'], g['y'], g['w'], g['h']
+                nombre = g['nombre']
+                pa, pl = g['pa'], g['pl']
+                rot_flag = g['rotada']
+                running_tipo = g['running_tipo']
+                total_tipo = g['total_tipo']
+                taps = g['taps']
+
+                # Rectángulo de la pieza: sin borde; relleno blanco que tapa hachura y kerf
+                p.setFillGray(1.0)
+                p.rect(x, y, w, h, stroke=0, fill=1)
+
+                # Etiquetas mínimas
+                rot = ' ↻' if rot_flag else ''
+                et1 = f"{nombre} ({running_tipo}/{total_tipo}){rot}"
+                et2 = f"{pa}×{pl} mm"
+                try:
+                    from reportlab.pdfbase.pdfmetrics import stringWidth
+                    fs1, fs2 = 7.5, 7
+                    is_vertical = h >= w
+                    maxW = max((h if is_vertical else w) - 6, 10)
+                    while fs1 > 4 and stringWidth(et1, 'Helvetica-Bold', fs1) > maxW:
+                        fs1 -= 0.5
+                    while fs2 > 4 and stringWidth(et2, 'Helvetica', fs2) > maxW:
+                        fs2 -= 0.5
+                except Exception:
+                    fs1, fs2 = 7.5, 7
+                    is_vertical = h >= w
+
+                # Clip y nombre orientado
+                p.saveState()
+                clip = p.beginPath(); clip.rect(x, y, w, h); p.clipPath(clip, stroke=0, fill=0)
+                p.setFillGray(0)
+                try:
+                    from reportlab.pdfbase.pdfmetrics import stringWidth
+                    orient_vertical = h >= w
+                    max_font = max(4.0, min(fs1, (min(w, h) - 6) * 0.9))
+                    fs_name = max_font
+                    max_run = max((h if orient_vertical else w) - 6, 8)
+                    while fs_name > 4 and stringWidth(et1, 'Helvetica-Bold', fs_name) > max_run:
+                        fs_name -= 0.5
+                    p.setFont('Helvetica-Bold', fs_name)
+                    cx, cy = (x + w/2.0, y + h/2.0)
+                    if orient_vertical:
+                        p.saveState(); p.translate(cx, cy); p.rotate(90)
+                        p.drawCentredString(0, -fs_name/3.0, et1)
+                        p.restoreState()
+                    else:
+                        p.drawCentredString(cx, cy - fs_name/3.0, et1)
+                except Exception:
+                    try:
+                        p.setFont('Helvetica-Bold', fs1)
+                        p.drawCentredString(x + w/2.0, y + h/2.0, et1)
+                    except Exception:
+                        pass
+
+                # Medidas en lados
+                label_w = f"{pa} mm"; label_h = f"{pl} mm"
+                try:
+                    from reportlab.pdfbase.pdfmetrics import stringWidth
+                    fw = fs2; fh = fs2
+                    max_w_w = max(w - 6, 6); max_w_h = max(h - 6, 6)
+                    while fw > 4 and stringWidth(label_w, 'Helvetica', fw) > max_w_w:
+                        fw -= 0.5
+                    while fh > 4 and stringWidth(label_h, 'Helvetica', fh) > max_w_h:
+                        fh -= 0.5
+                except Exception:
+                    fw = fs2; fh = fs2
+
+                try:
+                    p.setFont('Helvetica', fw)
+                    y_label = y + h - (fw + 2)
+                    p.drawCentredString(x + w/2, y_label, label_w)
+                except Exception:
+                    pass
+
+                try:
+                    p.saveState(); p.setFont('Helvetica', fh)
+                    rx = x + w - (fh/2) - 2; ry = y + h/2
+                    p.translate(rx, ry); p.rotate(90)
+                    p.drawCentredString(0, 0, label_h)
+                    p.restoreState()
+                except Exception:
+                    try: p.restoreState()
+                    except Exception: pass
+
+                p.restoreState()
+
+                # Tapacantos internos
+                if any((taps or {}).values()):
+                    p.saveState()
+                    # Estilo B/N: trazo negro en vez de rojo
+                    p.setStrokeGray(0.0)
+                    p.setLineWidth(1.2)
+                    p.setDash(3, 2)
+                    inset = 6.0 * scale
+                    inset = max(0.5, min(inset, (min(w, h) / 2.0) - 0.5))
+                    if taps.get('arriba'):
+                        p.line(x + inset, y + h - inset, x + w - inset, y + h - inset)
+                    if taps.get('abajo'):
+                        p.line(x + inset, y + inset, x + w - inset, y + inset)
+                    if taps.get('izquierda'):
+                        p.line(x + inset, y + inset, x + inset, y + h - inset)
+                    if taps.get('derecha'):
+                        p.line(x + w - inset, y + inset, x + w - inset, y + h - inset)
+                    p.restoreState()
 
             # En esta sección ya no se imprime tabla inferior; se dedica toda la página al tablero
             p.showPage()
@@ -1989,7 +2004,32 @@ def exportar_pdf(request, proyecto_id):
     from django.conf import settings
     import os
 
-    # Priorizar servir el PDF del ID del proyecto si existe (rápido y consistente)
+    # Leer flags/opciones de query
+    q = request.GET
+    def _get_bool(key, default=False):
+        v = q.get(key)
+        if v is None:
+            return default
+        return str(v).lower() in ('1','true','yes','y','on')
+    def _get_float(key, default=None):
+        try:
+            if q.get(key) is None:
+                return default
+            return float(q.get(key))
+        except Exception:
+            return default
+
+    force_regen = _get_bool('force', False)
+    pdf_opts = {
+        'fast': _get_bool('fast', True),
+        'hatch_spacing': _get_float('hatch_spacing', None),
+        'hatch_lw': _get_float('hatch_lw', None),
+        'kerf_min_lw': _get_float('kerf_min', None),
+        'kerf_max_lw': _get_float('kerf_max', None),
+        'kerf_scale': _get_float('kerf_scale', None),
+    }
+
+    # Priorizar servir el PDF del ID del proyecto si existe (rápido y consistente) salvo force=1
     try:
         folio_actual = str(proyecto.public_id) if proyecto.public_id else f"{proyecto.correlativo}-{proyecto.version}"
     except Exception:
@@ -1997,7 +2037,7 @@ def exportar_pdf(request, proyecto_id):
 
     from django.conf import settings
     import os
-    if folio_actual:
+    if folio_actual and not force_regen:
         rel_dir = f"proyectos/{proyecto.id}"
         # Primero buscar con cliente en nombre
         try:
@@ -2030,7 +2070,7 @@ def exportar_pdf(request, proyecto_id):
         resultado = json.loads(proyecto.resultado_optimizacion) if proyecto.resultado_optimizacion else {}
     except Exception:
         resultado = {}
-    pdf_bytes = _pdf_from_result(proyecto, resultado)
+    pdf_bytes = _pdf_from_result(proyecto, resultado, opts=pdf_opts)
 
     # Guardar como PDF del ID/folio actual (si se pudo obtener)
     rel_dir = f"proyectos/{proyecto.id}"

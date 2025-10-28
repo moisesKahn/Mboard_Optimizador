@@ -5,10 +5,12 @@ from core.auth_utils import jwt_encode
 from core.models import AuditLog
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import ensure_csrf_cookie
 
 def forgotPassword(request):
     return render(request, "authentication/forgotPassword.html")
 
+@ensure_csrf_cookie
 def signin(request):
     if request.method == 'POST':
         username = request.POST['username']

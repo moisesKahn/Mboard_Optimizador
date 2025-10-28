@@ -29,3 +29,24 @@ def user_initials(user):
     except Exception:
         pass
     return 'US'
+
+
+@register.filter
+def estado_badge(estado: str) -> str:
+    """Devuelve la clase Bootstrap de badge según el estado del proyecto.
+    Uso: <span class="badge {{ proyecto.estado|estado_badge }}">{{ proyecto.get_estado_display }}</span>
+    """
+    try:
+        e = (estado or '').strip().lower()
+        mapping = {
+            'borrador': 'bg-secondary',
+            'en_proceso': 'bg-warning text-dark',
+            'optimizado': 'bg-info text-dark',
+            'aprobado': 'bg-primary',
+            'produccion': 'bg-primary',
+            'completado': 'bg-success',
+            'cancelado': 'bg-danger',
+        }
+        return mapping.get(e, 'bg-light text-dark')
+    except Exception:
+        return 'bg-light text-dark'

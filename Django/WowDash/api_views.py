@@ -327,6 +327,7 @@ def operador_proyecto_detalle_api(request: HttpRequest, proyecto_id: int):
     })
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["PATCH"])
 def operador_pieza_estado_api(request: HttpRequest, proyecto_id: int, pieza_id: str):
@@ -424,6 +425,7 @@ def operador_pieza_estado_api(request: HttpRequest, proyecto_id: int, pieza_id: 
     return JsonResponse({'success': True})
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["PATCH"])
 def operador_proyecto_estado_api(request: HttpRequest, proyecto_id: int):
@@ -464,6 +466,7 @@ def operador_proyecto_estado_api(request: HttpRequest, proyecto_id: int):
     return JsonResponse({'success': True})
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def operador_proyecto_marcar_todas_cortadas_api(request: HttpRequest, proyecto_id: int):
@@ -521,6 +524,7 @@ def operador_proyecto_marcar_todas_cortadas_api(request: HttpRequest, proyecto_i
     return JsonResponse({'success': True, 'updated': count})
 
 
+@csrf_exempt
 @login_required
 @require_http_methods(["POST"])
 def operador_proyecto_completar_api(request: HttpRequest, proyecto_id: int):

@@ -1268,6 +1268,9 @@
       // Handler: marcar todas como cortadas
       document.getElementById('btnMarcarTodas').addEventListener('click', async ()=>{
         if(!confirm('¿Marcar todas las piezas de este proyecto como CORTADAS?')) return;
+        const btn = document.getElementById('btnMarcarTodas');
+        const prevText = btn.textContent;
+        btn.disabled = true; btn.textContent = 'Marcando…';
         try{
           const r = await fetch(`/api/operador/proyectos/${proyectoId}/piezas/marcar-todas`, {method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrf()}, body: JSON.stringify({estado:'cortada'})});
           let jr = {};
@@ -1278,8 +1281,12 @@
           renderList(tableros[idx]||{});
           // Colorear rects actuales
           (tableros[idx]?.piezas||[]).forEach(p=>{ const rect=document.getElementById(`piece-${p.pieza_id}`); if(rect) rect.setAttribute('fill', stateColor('cortada')); });
+          // Actualizar estadísticas y botón completar
+          updateStats(tableros[idx]||{});
+          updateCompletarVisibility();
           alert('Todas las piezas marcadas como cortadas.');
         }catch(_e){ alert('Error al marcar todas como cortadas.'); }
+        finally{ btn.disabled = false; btn.textContent = prevText; }
       });
 
       // Handler: completar proyecto (sólo en último tablero visible)

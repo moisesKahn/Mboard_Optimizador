@@ -48,8 +48,22 @@ csrf_env = os.getenv('CSRF_TRUSTED_ORIGINS', '')
 if csrf_env:
     CSRF_TRUSTED_ORIGINS = [x.strip() for x in csrf_env.split(',') if x.strip()]
 else:
-    # en desarrollo, permitir localhost por comodidad
-    CSRF_TRUSTED_ORIGINS = ['https://localhost:8000']
+    # En desarrollo, permitir orígenes locales comunes (http y https; puertos 8000/8001)
+    CSRF_TRUSTED_ORIGINS = [
+        'http://localhost:8000', 'https://localhost:8000',
+        'http://localhost:8001', 'https://localhost:8001',
+        'http://127.0.0.1:8000', 'https://127.0.0.1:8000',
+        'http://127.0.0.1:8001', 'https://127.0.0.1:8001',
+    ]
+    # Si se está ejecutando en Codespaces, agregar el dominio de reenvío de puertos
+    cname = os.getenv('CODESPACE_NAME')
+    cdomain = os.getenv('GITHUB_CODESPACES_PORT_FORWARDING_DOMAIN')
+    if cname and cdomain:
+        # Ej.: https://<codespace>-8001.<domain>
+        CSRF_TRUSTED_ORIGINS += [
+            f"https://{cname}-8000.{cdomain}",
+            f"https://{cname}-8001.{cdomain}",
+        ]
 
 # Application definition
 

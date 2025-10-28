@@ -52,6 +52,51 @@ def operador_home(request: HttpRequest):
 
 
 @login_required
+def operador_historial(request: HttpRequest):
+    """Historial para el rol Operador.
+    - Operador: ve solo proyectos asignados a él en estados cerrados (completado/cancelado) o finalizados.
+    - Org admin / super_admin: ven historial de su organización (o todos si soporte).
+    Filtros: estado opcional y búsqueda.
+    """
+    ctx = get_auth_context(request)
+    if not _require_operator_or_admin(ctx):
+        return redirect('index')
+
+    # Estados considerados "historial" por defecto
+    estados_hist = {'completado', 'cancelado'}
+    estado = request.GET.get('estado') or ''
+    search = request.GET.get('search') or ''
+
+    qs = Proyecto.objects.select_related('cliente')
+    # Scope por organización (excepto soporte)
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        qs = qs.filter(organizacion_id=ctx.get('organization_id'))
+    # Scope por rol operador: solo asignados a sí mismo
+    if ctx.get('role') == 'operador':
+        qs = qs.filter(operador=request.user)
+
+    # Filtro por estados de historial (por defecto)
+    if estado:
+        qs = qs.filter(estado=estado)
+    else:
+        qs = qs.filter(estado__in=list(estados_hist))
+
+    if search:
+        qs = qs.filter(Q(codigo__icontains=search) | Q(nombre__icontains=search) | Q(cliente__nombre__icontains=search))
+
+    proyectos = qs.order_by('-fecha_modificacion', '-fecha_creacion')[:200]
+    context = {
+        'title': 'Operador',
+        'subTitle': 'Historial de proyectos',
+        'proyectos': proyectos,
+        'estado': estado,
+        'search': search,
+        'estados_hist': sorted(list(estados_hist)),
+    }
+    return render(request, 'operador/historial.html', context)
+
+
+@login_required
 @ensure_csrf_cookie
 def operador_proyecto(request: HttpRequest, proyecto_id: int):
     """Detalle de un proyecto para operación/corte."""

@@ -115,6 +115,7 @@ urlpatterns = [
 
 # operador routes
     path('operador/', operator_views.operador_home, name='operador_home'),
+    path('operador/historial/', operator_views.operador_historial, name='operador_historial'),
     path('operador/proyecto/<int:proyecto_id>/', operator_views.operador_proyecto, name='operador_proyecto'),
 
 # chat routes (real functionality)
@@ -136,9 +137,9 @@ urlpatterns = [
     # operador APIs
     path('api/operador/proyectos', api_views.operador_proyectos_api, name='api_operador_proyectos'),
     path('api/operador/proyectos/<int:proyecto_id>', api_views.operador_proyecto_detalle_api, name='api_operador_proyecto_detalle'),
-    path('api/operador/proyectos/<int:proyecto_id>/piezas/<str:pieza_id>', api_views.operador_pieza_estado_api, name='api_operador_pieza_estado'),
     path('api/operador/proyectos/<int:proyecto_id>/estado', api_views.operador_proyecto_estado_api, name='api_operador_proyecto_estado'),
     path('api/operador/proyectos/<int:proyecto_id>/piezas/marcar-todas', api_views.operador_proyecto_marcar_todas_cortadas_api, name='api_operador_proyecto_marcar_todas'),
+    path('api/operador/proyectos/<int:proyecto_id>/piezas/<str:pieza_id>', api_views.operador_pieza_estado_api, name='api_operador_pieza_estado'),
     path('api/operador/proyectos/<int:proyecto_id>/completar', api_views.operador_proyecto_completar_api, name='api_operador_proyecto_completar'),
 
 # home routes
@@ -164,6 +165,7 @@ urlpatterns = [
     path('public', home_views.public, name='public'),
     # operador web
     path('operador/', operator_views.operador_home, name='operador_home'),
+    path('operador/historial/', operator_views.operador_historial, name='operador_historial'),
     path('operador/proyecto/<int:proyecto_id>/', operator_views.operador_proyecto, name='operador_proyecto'),
 
 # ai routes
