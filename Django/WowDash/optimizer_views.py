@@ -1154,31 +1154,40 @@ def _pdf_from_result(proyecto, resultado):
                 x_max = tX + offX + effW - 0.1
                 y_min = tY + offYBL + 0.1
                 y_max = tY + offYBL + effH - 0.1
-                # Verticales: para cada x, dibujar desde min(y0) a max(y1) dentro de útil
+                # Helper: fusionar intervalos sin unir huecos visibles
+                def merge_intervals(intervals, eps=0.8):
+                    if not intervals:
+                        return []
+                    ivs = sorted([(min(a,b), max(a,b)) for a,b in intervals], key=lambda t: t[0])
+                    merged = []
+                    cs, ce = ivs[0]
+                    for s,e in ivs[1:]:
+                        if s <= ce + eps:  # solape o muy pegado -> fusionar
+                            ce = max(ce, e)
+                        else:
+                            merged.append((cs, ce))
+                            cs, ce = s, e
+                    merged.append((cs, ce))
+                    return merged
+
+                # Verticales: dibujar cada intervalo fusionado dentro del área útil
                 for cx, segs in _vert_segments.items():
                     if cx <= x_min or cx >= x_max:
-                        # Evitar dibujar exactamente en el borde útil
-                        continue
-                    ymin = min((s for s,_ in segs), default=None)
-                    ymax = max((e for _,e in segs), default=None)
-                    if ymin is None or ymax is None:
-                        continue
-                    y0 = max(y_min, ymin)
-                    y1 = min(y_max, ymax)
-                    if y1 - y0 > 0.5:
-                        p.line(cx, y0, cx, y1)
+                        continue  # evitar bordes
+                    for s,e in merge_intervals(segs):
+                        y0 = max(y_min, s)
+                        y1 = min(y_max, e)
+                        if y1 - y0 > 0.5:
+                            p.line(cx, y0, cx, y1)
                 # Horizontales
                 for cy, segs in _horiz_segments.items():
                     if cy <= y_min or cy >= y_max:
                         continue
-                    xmin = min((s for s,_ in segs), default=None)
-                    xmax = max((e for _,e in segs), default=None)
-                    if xmin is None or xmax is None:
-                        continue
-                    x0 = max(x_min, xmin)
-                    x1 = min(x_max, xmax)
-                    if x1 - x0 > 0.5:
-                        p.line(x0, cy, x1, cy)
+                    for s,e in merge_intervals(segs):
+                        x0 = max(x_min, s)
+                        x1 = min(x_max, e)
+                        if x1 - x0 > 0.5:
+                            p.line(x0, cy, x1, cy)
                 p.restoreState()
             except Exception:
                 try:
