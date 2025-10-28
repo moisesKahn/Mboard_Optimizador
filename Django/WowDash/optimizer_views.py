@@ -333,7 +333,7 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
         'fast': True,               # si True, hachurar márgenes con relleno suave (más rápido)
         'hatch_spacing': 6.0,       # separación de líneas de hachurado (puntos PDF)
         'hatch_lw': 0.5,            # grosor de línea de hachura (puntos PDF)
-        'hatch_useful': False,      # si True, hachura también el área útil (por defecto NO)
+        'hatch_useful': True,       # si True, hachura también el área útil (gris en modo rápido)
         'kerf_min_lw': 0.6,         # grosor mínimo del kerf (puntos PDF)
         'kerf_max_lw': 3.0,         # grosor máximo del kerf (puntos PDF)
         'kerf_scale': 1.0,          # factor multiplicador extra del grosor del kerf
