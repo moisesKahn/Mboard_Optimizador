@@ -1,4 +1,5 @@
 from django.views.decorators.http import require_POST
+import re
 from django.contrib.auth import authenticate
 from django.http import JsonResponse, HttpRequest
 from django.views.decorators.csrf import csrf_exempt
@@ -257,44 +258,59 @@ def operador_proyecto_detalle_api(request: HttpRequest, proyecto_id: int):
 
     # Soporte: resultado puede ser un único material (raíz) o materiales[]
     materiales = resd.get('materiales') if isinstance(resd.get('materiales'), list) else [resd]
-    # Elegimos primer material para simplificar respuesta (v1)
-    mat = materiales[0] if materiales else {}
-    # Metadatos útiles para visualizador
-    try:
-        kerf = (mat.get('config') or {}).get('kerf', mat.get('desperdicio_sierra'))
-    except Exception:
-        kerf = None
-    try:
-        margen_x = (mat.get('margenes') or {}).get('margen_x', (mat.get('config') or {}).get('margen_x'))
-        margen_y = (mat.get('margenes') or {}).get('margen_y', (mat.get('config') or {}).get('margen_y'))
-    except Exception:
-        margen_x = margen_y = None
-    material_nombre = (mat.get('material') or {}).get('nombre') or None
-    tableros = mat.get('tableros') or []
-    normalized_tableros = []
-    for t_idx, t in enumerate(tableros, start=1):
-        piezas = []
-        for i, pi in enumerate(t.get('piezas') or [], start=1):
-            pieza_id = f"t{t_idx}p{i}"
-            pieza = {
-                'pieza_id': pieza_id,
-                'tablero_num': t_idx,
-                'nombre': pi.get('nombre') or pi.get('id_unico') or f"P{i}",
-                'x': pi.get('x'), 'y': pi.get('y'),
-                'ancho': pi.get('ancho'), 'largo': pi.get('largo'),
-                'rotada': bool(pi.get('rotada')),
-                'estado': pi.get('estado') or 'pendiente',
-                'tapacantos': pi.get('tapacantos') or {},
-            }
-            piezas.append(pieza)
-        normalized_tableros.append({
-            'num': t_idx,
-            'ancho_mm': t.get('ancho') or mat.get('tablero_ancho_original') or mat.get('tablero_ancho_efectivo'),
-            'largo_mm': t.get('largo') or mat.get('tablero_largo_original') or mat.get('tablero_largo_efectivo'),
-            'piezas': piezas,
-            'eficiencia': t.get('eficiencia_tablero'),
-            'cortes': t.get('cortes') or [],  # opcional (vacío si no disponible)
+    # Normalizar TODOS los materiales (para selector en UI)
+    normalized_materiales = []
+    for m_idx, mat in enumerate(materiales, start=1):
+        try:
+            kerf = (mat.get('config') or {}).get('kerf', mat.get('desperdicio_sierra'))
+        except Exception:
+            kerf = None
+        try:
+            margen_x = (mat.get('margenes') or {}).get('margen_x', (mat.get('config') or {}).get('margen_x'))
+            margen_y = (mat.get('margenes') or {}).get('margen_y', (mat.get('config') or {}).get('margen_y'))
+        except Exception:
+            margen_x = margen_y = None
+        material_nombre = (mat.get('material') or {}).get('nombre') or None
+        tableros = mat.get('tableros') or []
+        normalized_tableros_m = []
+        for t_idx, t in enumerate(tableros, start=1):
+            piezas = []
+            for i, pi in enumerate(t.get('piezas') or [], start=1):
+                # PID único incluyendo índice de material
+                pieza_id = f"m{m_idx}t{t_idx}p{i}"
+                pieza = {
+                    'pieza_id': pieza_id,
+                    'tablero_num': t_idx,
+                    'nombre': pi.get('nombre') or pi.get('id_unico') or f"P{i}",
+                    'x': pi.get('x'), 'y': pi.get('y'),
+                    'ancho': pi.get('ancho'), 'largo': pi.get('largo'),
+                    'rotada': bool(pi.get('rotada')),
+                    'estado': pi.get('estado') or 'pendiente',
+                    'tapacantos': pi.get('tapacantos') or {},
+                }
+                piezas.append(pieza)
+            normalized_tableros_m.append({
+                'num': t_idx,
+                'ancho_mm': t.get('ancho') or mat.get('tablero_ancho_original') or mat.get('tablero_ancho_efectivo'),
+                'largo_mm': t.get('largo') or mat.get('tablero_largo_original') or mat.get('tablero_largo_efectivo'),
+                'piezas': piezas,
+                'eficiencia': t.get('eficiencia_tablero'),
+                'cortes': t.get('cortes') or [],
+            })
+        normalized_materiales.append({
+            'indice': m_idx,
+            'nombre': material_nombre,
+            'meta': {
+                'material': material_nombre,
+                'kerf': kerf,
+                'margen_x': margen_x,
+                'margen_y': margen_y,
+            },
+            'tableros': normalized_tableros_m,
         })
+
+    # Mantener compatibilidad: exponer también el PRIMER material al nivel raíz
+    first = normalized_materiales[0] if normalized_materiales else {'meta': {}, 'tableros': []}
     return JsonResponse({
         'success': True,
         'proyecto': {
@@ -305,13 +321,9 @@ def operador_proyecto_detalle_api(request: HttpRequest, proyecto_id: int):
             'cliente': getattr(p.cliente, 'nombre', None),
             'estado': p.estado,
         },
-        'tableros': normalized_tableros,
-        'meta': {
-            'material': material_nombre,
-            'kerf': kerf,
-            'margen_x': margen_x,
-            'margen_y': margen_y,
-        }
+        'tableros': first.get('tableros', []),  # legacy
+        'meta': first.get('meta', {}),          # legacy
+        'materiales': normalized_materiales,    # nuevo para selector
     })
 
 
@@ -348,20 +360,42 @@ def operador_pieza_estado_api(request: HttpRequest, proyecto_id: int, pieza_id: 
 
     materiales = resd.get('materiales') if isinstance(resd.get('materiales'), list) else [resd]
     updated = False
-    for mat in materiales:
-        tableros = mat.get('tableros') or []
-        for t_idx, t in enumerate(tableros, start=1):
-            piezas = t.get('piezas') or []
-            for i, pi in enumerate(piezas, start=1):
-                pid = f"t{t_idx}p{i}"
-                if pid == pieza_id:
-                    pi['estado'] = estado
-                    updated = True
-                    break
+    # Intentar formato nuevo: m{m}t{t}p{i}
+    mti = re.match(r'^m(\d+)t(\d+)p(\d+)$', pieza_id or '')
+    if mti:
+        target_m = int(mti.group(1))
+        target_t = int(mti.group(2))
+        target_p = int(mti.group(3))
+        for m_idx, mat in enumerate(materiales, start=1):
+            if m_idx != target_m:
+                continue
+            tableros = mat.get('tableros') or []
+            for t_idx, t in enumerate(tableros, start=1):
+                if t_idx != target_t:
+                    continue
+                piezas = t.get('piezas') or []
+                for i, pi in enumerate(piezas, start=1):
+                    if i == target_p:
+                        pi['estado'] = estado
+                        updated = True
+                        break
+                break
+            break
+    else:
+        # Compatibilidad: formato antiguo t{t}p{i} (sin material)
+        for mat in materiales:
+            tableros = mat.get('tableros') or []
+            for t_idx, t in enumerate(tableros, start=1):
+                piezas = t.get('piezas') or []
+                for i, pi in enumerate(piezas, start=1):
+                    pid = f"t{t_idx}p{i}"
+                    if pid == pieza_id:
+                        pi['estado'] = estado
+                        updated = True
+                        break
             if updated:
                 break
-        if updated:
-            break
+        # no-op
 
     if not updated:
         return JsonResponse({'success': False, 'message': 'Pieza no encontrada'}, status=404)

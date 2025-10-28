@@ -24,6 +24,17 @@
     .piece-modal .cnt { padding: 10px; position: relative; overflow:auto; flex:1; padding-bottom: 12px; }
     .piece-modal .btn-close { border:none; background:transparent; font-size:22px; line-height:1; cursor:pointer; }
   .pz-overview { position:absolute; right:12px; bottom:12px; width:260px; height:180px; background:transparent; border:none; border-radius:0; box-shadow:none; padding:0; z-index: 1; }
+  /* Botón flotante siguiente tablero (centrado abajo) */
+  .op-next-board { position:absolute; left:0; right:0; bottom:12px; z-index: 1000; display:flex; align-items:center; justify-content:center; gap:10px; pointer-events:auto; }
+  .op-next-board .op-btn { box-shadow: 0 2px 6px rgba(0,0,0,.12); padding: 8px 14px; font-weight: 600; }
+  .op-next-board .op-btn[disabled] { opacity: .55; cursor: not-allowed; }
+  /* Footer de navegación en sidebar */
+  .op-nav-footer { padding: 10px 12px; border-top: 1px solid #eee; display:flex; align-items:center; justify-content:space-between; gap:8px; background:#fff; }
+  /* Overlay de navegación alrededor del tablero */
+  .op-canvas-nav { position:absolute; inset:0; z-index: 1000; pointer-events:none; }
+  .op-canvas-nav .op-nav-circle { width: 42px; height: 42px; border-radius: 50%; pointer-events:auto; display:flex; align-items:center; justify-content:center; font-weight:700; }
+  .op-canvas-nav .op-nav-counter { position:absolute; pointer-events:none; }
+  .op-canvas-nav .op-toast { position:absolute; left:50%; top:12px; transform:translateX(-50%); background: rgba(0,0,0,.72); color:#fff; padding:6px 10px; border-radius:8px; font-weight:600; opacity:0; transition: opacity .2s ease; pointer-events:none; box-shadow: 0 2px 10px rgba(0,0,0,.15); }
   .piece-modal .ftr { display:flex; justify-content:flex-end; gap:8px; padding: 10px 14px; border-top:1px solid #eee; background:#fff; }
     /* Ocultar/mostrar sidebar */
     .op-wrapper.sidebar-hidden { grid-template-columns: 1fr 0; }
@@ -40,7 +51,11 @@
   <span>· {{ proyecto.nombre }}</span>
         <div class="vr mx-2"></div>
     <label class="me-1 small text-muted">Tablero</label>
-    <select id="selTablero" class="form-select form-select-sm" style="width:auto;"></select>
+  <select id="selTablero" class="form-select form-select-sm" style="width:auto;"></select>
+  <div class="vr mx-2"></div>
+  <label class="me-1 small text-muted">Material</label>
+  <span id="matBadge" class="chip" title="Material del tablero actual">—</span>
+  <select id="selMaterial" class="form-select form-select-sm" style="width:auto; display:none;"></select>
     <div class="vr mx-2"></div>
     <!-- Controles de zoom: [-] [porcentaje] [+] -->
     <button id="btnZoomOut" class="op-btn" type="button" title="Alejar">-</button>
@@ -56,7 +71,13 @@
   <div class="small text-muted ms-2">Atajos: + / - / 0 · ← → cambia tablero</div>
       </div>
       <div class="op-canvas" id="canvasHost">
-        <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">Cargando diseño…</div>
+        <div id="loadingPlaceholder" class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">Cargando diseño…</div>
+        <div id="canvasNav" class="op-canvas-nav">
+          <button id="btnPrevCanvas" class="op-btn op-nav-circle" type="button" title="Tablero anterior">◂</button>
+          <button id="btnNextCanvas" class="op-btn op-nav-circle" type="button" title="Siguiente tablero">▸</button>
+          <div id="boardCounterCanvas" class="chip op-nav-counter" title="Tablero actual / total">1/1</div>
+          <div id="materialToast" class="op-toast" aria-live="polite"></div>
+        </div>
       </div>
       <div class="op-sidebar">
         <div class="op-stats small" id="statsBox">
@@ -73,9 +94,16 @@
     <script>
     (async function(){
       const proyectoId = parseInt('{{ proyecto.id }}', 10);
-      const host = document.getElementById('canvasHost');
+  const host = document.getElementById('canvasHost');
       const selTab = document.getElementById('selTablero');
+  const selMaterial = document.getElementById('selMaterial');
       const list = document.getElementById('listaPiezas');
+  const matBadge = document.getElementById('matBadge');
+  // Controles de navegación (canvas)
+  const btnNextCanvas = document.getElementById('btnNextCanvas');
+  const btnPrevCanvas = document.getElementById('btnPrevCanvas');
+  const boardCounterCanvas = document.getElementById('boardCounterCanvas');
+  const btnPrevBoard = document.getElementById('btnPrevBoard');
       const stMaterial = document.getElementById('stMaterial');
       const stSize = document.getElementById('stSize');
       const stEff = document.getElementById('stEff');
@@ -85,6 +113,21 @@
       const stCutV = document.getElementById('stCutV');
       const stCutH = document.getElementById('stCutH');
       const stML = document.getElementById('stML');
+      // Habilitar scroll con rueda en todo el panel lateral (no sólo dentro de la lista)
+      // Si el usuario hace wheel sobre el header/espacios del sidebar, desviamos el scroll a la lista
+      try{
+        const sidebar = document.querySelector('.op-sidebar');
+        if(sidebar && list){
+          sidebar.addEventListener('wheel', (e)=>{
+            // Si el evento ocurre dentro de la propia lista, dejamos el comportamiento nativo
+            if(e.target && e.target.closest && e.target.closest('#listaPiezas')) return;
+            const before = list.scrollTop;
+            list.scrollTop += e.deltaY;
+            // Sólo prevenimos el default si efectivamente desplazamos la lista
+            if(list.scrollTop !== before){ e.preventDefault(); }
+          }, {passive:false});
+        }
+      }catch(_e){}
 
       function getCookie(name){
         const v = document.cookie.split('; ').find(r=>r.startsWith(name+'='));
@@ -97,19 +140,186 @@
   const resp = await fetch(`/api/operador/proyectos/${proyectoId}`, {credentials:'same-origin'});
       if(!resp.ok){ host.innerHTML = '<div class="w-100 h-100 d-flex align-items-center justify-content-center text-danger">No hay resultado.</div>'; return; }
       const data = await resp.json();
-      const tableros = data.tableros||[];
-      const meta = data.meta||{};
+      // Normalizar materiales (nuevo formato) o degradar al legado
+      const materiales = Array.isArray(data.materiales) && data.materiales.length
+        ? data.materiales
+        : [{ nombre: (data.meta||{}).material || '—', meta: (data.meta||{}), tableros: (data.tableros||[]) }];
+      let matIdx = 0;
+      let tableros = materiales[matIdx]?.tableros || [];
+      let meta = Object.assign({}, materiales[matIdx]?.meta || {});
+      meta.material = materiales[matIdx]?.nombre || meta.material || '—';
   const proyectoMeta = data.proyecto||{};
 
+      // Poblar selector de materiales (si hay más de uno)
+      if (materiales.length > 1) {
+        selMaterial.innerHTML = materiales.map((m,i)=>`<option value="${i}">${m.nombre || 'Material '+(i+1)}</option>`).join('');
+        selMaterial.value = String(matIdx);
+        selMaterial.style.display = 'inline-block';
+      } else {
+        selMaterial.style.display = 'none';
+      }
       stMaterial.textContent = meta.material || '—';
+      matBadge.textContent = meta.material || '—';
       selTab.innerHTML = tableros.map((t,i)=>`<option value="${i}">Tablero ${t.num}</option>`).join('');
       let idx = 0;
+      // Ajustar visibilidad para evitar duplicar material en chip y selector
+      (function(){
+        const multi = materiales.length > 1;
+        if(matBadge) matBadge.style.display = multi ? 'none' : 'inline-block';
+      })();
 
-      // SVG setup
-      host.innerHTML = '';
-      const svgNS = 'http://www.w3.org/2000/svg';
+      // Helpers de UI (material actual, contador y visibilidad del botón siguiente)
+      function boardMaterialLabel(board){
+        // Intentar detectar material del tablero; si no existe, usar el del meta
+        return (board && (board.material_nombre || board.material)) || (meta && meta.material) || '—';
+      }
+      function updateTopMaterial(board){
+        const label = boardMaterialLabel(board || (tableros[idx]||{}));
+        if(matBadge) matBadge.textContent = label || '—';
+        if(stMaterial) stMaterial.textContent = label || '—';
+      }
+      function updateBoardCounter(){
+        const ctr = document.getElementById('boardCounter');
+        const curNum = (tableros[idx] && tableros[idx].num) ? tableros[idx].num : (idx + 1);
+        const total = tableros.length || 0;
+        if(ctr) ctr.textContent = `${curNum}/${total}`;
+        if(boardCounterCanvas) boardCounterCanvas.textContent = `${curNum}/${total}`;
+      }
+      function updateMaterialControlsVisibility(){
+        const multi = Array.isArray(materiales) && materiales.length > 1;
+        if(selMaterial){ selMaterial.style.display = multi ? 'inline-block' : 'none'; }
+        if(matBadge){ matBadge.style.display = multi ? 'none' : 'inline-block'; }
+      }
+      function updateNextButtonVisibility(){
+        const isLastBoard = (idx >= Math.max(0, tableros.length - 1));
+        const hasNextMaterial = (typeof materiales !== 'undefined') && (matIdx < (materiales.length - 1));
+        if(btnNextCanvas){
+          btnNextCanvas.disabled = !( (!isLastBoard) || (isLastBoard && hasNextMaterial) );
+          btnNextCanvas.title = isLastBoard ? (hasNextMaterial ? 'Siguiente material' : 'Último tablero') : 'Siguiente tablero';
+        }
+      }
+      function updatePrevButtonVisibility(){
+        const isFirstBoard = (idx <= 0);
+        const hasPrevMaterial = (typeof materiales !== 'undefined') && (matIdx > 0);
+        if(btnPrevCanvas){
+          btnPrevCanvas.disabled = !( (!isFirstBoard) || (isFirstBoard && hasPrevMaterial) );
+          btnPrevCanvas.title = isFirstBoard ? (hasPrevMaterial ? 'Material anterior' : 'Primer tablero') : 'Tablero anterior';
+        }
+      }
+      function showMaterialToast(text){
+        try{
+          const el = document.getElementById('materialToast');
+          if(!el) return;
+          const total = (typeof materiales !== 'undefined' && Array.isArray(materiales)) ? materiales.length : 1;
+          const cur = (typeof matIdx === 'number') ? (matIdx + 1) : 1;
+          el.textContent = `Material ${cur}/${total}: ${text}`;
+          el.style.opacity = '1';
+          if(materialToastTimer) clearTimeout(materialToastTimer);
+          materialToastTimer = setTimeout(()=>{ el.style.opacity = '0'; }, 1500);
+        }catch(_e){}
+      }
+      function switchToMaterial(newIdx, opts){
+        const nextIdx = Math.max(0, Math.min((materiales?.length||1)-1, newIdx));
+        if(nextIdx === matIdx) return;
+        matIdx = nextIdx;
+        tableros = materiales[matIdx]?.tableros || [];
+        meta = Object.assign({}, materiales[matIdx]?.meta || {});
+        meta.material = materiales[matIdx]?.nombre || meta.material || '—';
+        // Reset al primer/último tablero según desde dónde venimos
+        idx = Math.max(0, Math.min(tableros.length-1, idx));
+        selMaterial.value = String(matIdx);
+        selTab.innerHTML = tableros.map((t,i)=>`<option value="${i}">Tablero ${t.num}</option>`).join('');
+        selTab.value = String(idx);
+        // Actualizar UI
+        updateTopMaterial(tableros[idx]||{});
+        renderBoard(tableros[idx]||{});
+        renderList(tableros[idx]||{});
+        updateStats(tableros[idx]||{});
+        updateCompletarVisibility();
+        updateNextButtonVisibility();
+        if (typeof updatePrevButtonVisibility === 'function') updatePrevButtonVisibility();
+        updateMaterialControlsVisibility();
+        updateBoardCounter();
+        if(opts && opts.toast){ showMaterialToast(materiales[matIdx]?.nombre || meta.material || '—'); }
+      }
+      btnNextCanvas?.addEventListener('click', ()=>{
+        if(idx < tableros.length - 1){
+          idx += 1; selTab.value = String(idx); selTab.dispatchEvent(new Event('change'));
+        } else if (matIdx < (materiales.length - 1)) {
+          // Pasar al siguiente material, primer tablero
+          idx = 0; switchToMaterial(matIdx + 1, {toast:true});
+        }
+      });
+      btnPrevCanvas?.addEventListener('click', ()=>{
+        if(idx > 0){
+          idx -= 1; selTab.value = String(idx); selTab.dispatchEvent(new Event('change'));
+        } else if (matIdx > 0) {
+          // Volver al material anterior, último tablero
+          const prevMat = matIdx - 1;
+          const prevTabs = materiales[prevMat]?.tableros || [];
+          idx = Math.max(0, prevTabs.length - 1);
+          switchToMaterial(prevMat, {toast:true});
+        }
+      });
+
+      // Posicionamiento dinámico de flechas y contador alrededor del tablero
+      function positionCanvasNav(){
+        const wrap = document.getElementById('canvasNav'); if(!wrap) return;
+        // Convertir las esquinas del tablero a coordenadas de pantalla reales usando la CTM
+        // Esto evita discrepancias si hay cambios de relación de aspecto, DPR o transformaciones CSS
+        const rectHost = host.getBoundingClientRect();
+        const ctm = (g.getScreenCTM && g.getScreenCTM()) || (svg && svg.getScreenCTM && svg.getScreenCTM());
+        let left, top, right, bottom;
+        if(ctm && isFinite(boardBounds.width) && isFinite(boardBounds.height)){
+          const pt = svg.createSVGPoint();
+          // Top-left
+          pt.x = boardBounds.x + 0; pt.y = boardBounds.y + 0; const p1 = pt.matrixTransform(ctm);
+          // Bottom-right
+          pt.x = boardBounds.x + boardBounds.width; pt.y = boardBounds.y + boardBounds.height; const p2 = pt.matrixTransform(ctm);
+          left = p1.x - rectHost.left;
+          top = p1.y - rectHost.top;
+          right = p2.x - rectHost.left;
+          bottom = p2.y - rectHost.top;
+        } else {
+          // Fallback al cálculo analítico (mismo que antes)
+          const {w:vw, h:vh} = vbSize();
+          left = scale * (boardBounds.x + dx);
+          top = scale * (boardBounds.y + dy);
+          right = left + (boardBounds.width * scale);
+          bottom = top + (boardBounds.height * scale);
+        }
+        // Derivados
+        const midY = (top + bottom) / 2;
+        const midX = (left + right) / 2;
+        const {w:vw2, h:vh2} = vbSize();
+        const m = 12; // margen respecto al borde del tablero en px
+        // Botón anterior (izquierda)
+        if(btnPrevCanvas){
+          btnPrevCanvas.style.position='absolute';
+          btnPrevCanvas.style.left = Math.max(0, (left || 0) - m - 42) + 'px';
+          btnPrevCanvas.style.top = Math.max(0, (midY || 0) - 21) + 'px';
+        }
+        // Botón siguiente (derecha)
+        if(btnNextCanvas){
+          btnNextCanvas.style.position='absolute';
+          btnNextCanvas.style.left = Math.min(vw2, (right || 0) + m) + 'px';
+          btnNextCanvas.style.top = Math.max(0, (midY || 0) - 21) + 'px';
+        }
+        // Contador centrado abajo
+        if(boardCounterCanvas){
+          boardCounterCanvas.style.left = (midX || 0) + 'px';
+          boardCounterCanvas.style.top = ((bottom || 0) + m) + 'px';
+          boardCounterCanvas.style.transform = 'translateX(-50%)';
+        }
+      }
+
+    // SVG setup: quitar solo el placeholder de carga y mantener el botón flotante
+    const loadingEl = document.getElementById('loadingPlaceholder');
+    if(loadingEl) loadingEl.remove();
+    const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('width','100%'); svg.setAttribute('height','100%');
+  // Posicionamiento del overlay de navegación se maneja dinámicamente
   // Cursor: por defecto, según zoom
   svg.style.cursor = 'default';
   // Evitar gestos de pinch nativos que hagan zoom del viewport del navegador en móviles
@@ -126,8 +336,11 @@
   function fs(px){ return String(Math.round(px*FONT_SCALE)); }
   // Permitir alejar por debajo del FIT hasta el 50%
   const MIN_ZOOM_FACTOR = 0.5; // 50% de la escala base
-  // Factor del FIT base: 1.0 = encajar exacto; 0.66 = que se vea como ~66% del encaje
-  const BASE_FIT_FACTOR = 0.66;
+  // Factor del FIT base: 1.0 = encajar exacto; antes 0.66 para dejar margen.
+  // Pedido: que el tamaño que hoy es ~131% pase a ser el nuevo 100%.
+  // Entonces multiplicamos el factor base por 1.31 para que baseScale_nuevo ≈ 1.31 × baseScale_anterior.
+  const FIT_BASELINE_MULT = 1.31;
+  const BASE_FIT_FACTOR = 0.66 * FIT_BASELINE_MULT; // ≈ 0.8646
   // Sobrepaneo cuando hay zoom: permitir mover el tablero fuera del visor
   // en un porcentaje del viewport (en unidades de contenido). 1.0 = 100% del viewport.
   const OVERPAN_FACTOR = 1.0;
@@ -164,6 +377,8 @@
   let animFrame = 0;
   // Soporte pinch-to-zoom
   let pinch = {active:false, d0:0, s0:1, cx:0, cy:0};
+  // Timer para ocultar el toast de material
+  let materialToastTimer = 0;
   // Evitar re-centrado automático una vez (por paneo con rueda al zoom base)
   let suppressCenterOnce = false;
   // Forzar centrado exacto en el siguiente apply (usado tras cambios de tamaño)
@@ -262,6 +477,7 @@
   g.setAttribute('transform', `translate(${dx},${dy}) scale(${scale})`);
         updateCursor();
         updateZoomUI();
+        if (typeof positionCanvasNav === 'function') positionCanvasNav();
       }
 
       function stateColor(st){
@@ -618,6 +834,8 @@
         contentBounds = g.getBBox();
         // Ajuste inicial estándar (comportamiento original)
         fit(board);
+        // Posicionar controles alrededor del tablero
+        if (typeof positionCanvasNav === 'function') positionCanvasNav();
       }
 
   // Modal e interacción de pieza
@@ -892,13 +1110,17 @@
     if(ctm){ const rect=host.getBoundingClientRect(); const cx=rect.width/2, cy=rect.height/2; const pt=svg.createSVGPoint(); pt.x=cx; pt.y=cy; const p=pt.matrixTransform(ctm.inverse()); const r=prev/newScale; dx = r*dx + (r-1)*p.x; dy = r*dy + (r-1)*p.y; }
     scale=newScale; apply(board); 
   });
-  document.getElementById('btnZoomReset').addEventListener('click',()=>{
+      document.getElementById('btnZoomReset').addEventListener('click',()=>{
     // Ajustar vista: refresca el visualizador del tablero actual, centrando y re-ajustando sin recargar toda la página
     const board = tableros[idx]||{};
     renderBoard(board);
     renderList(board);
-    updateStats(board);
-    updateCompletarVisibility();
+  updateStats(board);
+  updateCompletarVisibility();
+    updateTopMaterial(board);
+    updateNextButtonVisibility();
+    if (typeof updatePrevButtonVisibility === 'function') updatePrevButtonVisibility();
+    updateBoardCounter();
     updateCursor();
   });
 
@@ -944,6 +1166,8 @@
     const r = host.getBoundingClientRect();
     if((r.width<10 || r.height<10) && tries>0){ setTimeout(()=>preserveWhenReady(board, tries-1), 60); return; }
   preserveViewOnContainerChange(board);
+  // Reposicionar overlays dependientes del tablero tras cambios de tamaño
+  if (typeof positionCanvasNav === 'function') positionCanvasNav();
   }
   const ro = new ResizeObserver(entries=>{
     for(const e of entries){
@@ -974,12 +1198,24 @@
         const isLast = (idx === Math.max(0, tableros.length - 1));
         btn.style.display = isLast ? 'inline-block' : 'none';
       }
+      // Cambio de material: recarga tableros y meta del material seleccionado
+      selMaterial.addEventListener('change', ()=>{
+        const newIdx = parseInt(selMaterial.value, 10) || 0;
+        idx = 0; // al cambiar manualmente, ir al primer tablero
+        switchToMaterial(newIdx, {toast:true});
+      });
+      if (typeof positionCanvasNav === 'function') positionCanvasNav();
       selTab.addEventListener('change',()=>{ 
         idx=parseInt(selTab.value,10)||0; 
         renderBoard(tableros[idx]||{}); 
         renderList(tableros[idx]||{}); 
   updateStats(tableros[idx]||{}); 
   updateCompletarVisibility();
+  updateTopMaterial(tableros[idx]||{});
+  updateNextButtonVisibility();
+  if (typeof updatePrevButtonVisibility === 'function') updatePrevButtonVisibility();
+  updateMaterialControlsVisibility();
+  updateBoardCounter();
       });
   window.addEventListener('keydown',(e)=>{ 
     const board=tableros[idx]||{}; 
@@ -996,18 +1232,31 @@
     } else if(e.key==='0'){
       fit(board);
     } else if(e.key==='ArrowRight'){
-      idx=Math.min(tableros.length-1, idx+1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change'));
+      if(idx < tableros.length-1){
+        idx = idx+1; selTab.value=String(idx); selTab.dispatchEvent(new Event('change'));
+      } else if (matIdx < (materiales.length-1)) {
+        idx = 0; switchToMaterial(matIdx + 1, {toast:true});
+      }
     } else if(e.key==='ArrowLeft'){
-      idx=Math.max(0, idx-1); selTab.value=String(idx); selTab.dispatchEvent(new Event('change'));
+      if(idx > 0){
+        idx = idx-1; selTab.value=String(idx); selTab.dispatchEvent(new Event('change'));
+      } else if (matIdx > 0) {
+        const prevMat = matIdx - 1; const prevTabs = materiales[prevMat]?.tableros || [];
+        idx = Math.max(0, prevTabs.length-1); switchToMaterial(prevMat, {toast:true});
+      }
     } else if(e.key==='s' || e.key==='S'){
       const box=document.getElementById('statsBox'); box.style.display = (box.style.display==='none')? 'block' : 'none';
     }
   });
 
       // Inicialización
-      renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{});
+  renderBoard(tableros[idx]||{}); renderList(tableros[idx]||{}); updateStats(tableros[idx]||{});
       updateZoomUI();
-      updateCompletarVisibility();
+  updateCompletarVisibility();
+  updateTopMaterial(tableros[idx]||{});
+  updateNextButtonVisibility();
+  if (typeof updatePrevButtonVisibility === 'function') updatePrevButtonVisibility();
+  updateBoardCounter();
 
       // Al iniciar edición, marcar proyecto EN PROCESO si no está completado
       try{
