@@ -948,9 +948,17 @@ def _pdf_from_result(proyecto, resultado):
             # y coordenadas fieles: decidir automáticamente si vienen relativas al área útil
             # o absolutas (incluyendo márgenes), eligiendo el caso que encaja en el área útil.
             piezas_tab = (t.get('piezas') or [])
-            # Colecciones para líneas de corte (coordenadas en PDF)
+            # Colecciones para líneas de corte (coordenadas en PDF) y segmentos por eje
             _cut_xs = set()
             _cut_ys = set()
+            _vert_segments = {}  # x -> list[(y0,y1)]
+            _horiz_segments = {} # y -> list[(x0,x1)]
+
+            # Hachurar el área útil completa (los rectángulos de piezas la "limpiarán" encima)
+            try:
+                hatch_rect(tX + offX, tY + offYBL, effW, effH, spacing=6, lw=0.5)
+            except Exception:
+                pass
             for pieza in piezas_tab:
                 aN = int(pieza.get('ancho',0)); lN = int(pieza.get('largo',0))
                 kN = (pieza.get('nombre'), min(aN,lN), max(aN,lN))
@@ -987,8 +995,9 @@ def _pdf_from_result(proyecto, resultado):
                 h = ph_mm * scale
                 x = tX + offX + px
                 y = tY + offYBL + (effH - (py + h))
-                # Rectángulo
-                p.rect(x, y, w, h)
+                # Rectángulo de la pieza: sin borde; relleno blanco para tapar hachurado y cualquier kerf subyacente
+                p.setFillGray(1.0)
+                p.rect(x, y, w, h, stroke=0, fill=1)
                 # Etiquetas mínimas: siempre a lo largo de la pieza para no invadir adyacentes
                 nombre = str(pieza.get('nombre','Pieza'))
                 pa = int(pieza.get('ancho',0)); pl = int(pieza.get('largo',0))
@@ -1113,29 +1122,63 @@ def _pdf_from_result(proyecto, resultado):
                     if taps.get('derecha'):
                         p.line(x + w - inset, y + inset, x + w - inset, y + h - inset)
                     p.restoreState()
-                # Registrar bordes para líneas de corte globales
+                # Registrar bordes para líneas de corte globales y segmentos útiles (solo sobre rango de piezas)
                 try:
-                    _cut_xs.add(float(x))
-                    _cut_xs.add(float(x + w))
-                    _cut_ys.add(float(y))
-                    _cut_ys.add(float(y + h))
+                    # Normalizar con redondeo para agrupar flotantes cercanos
+                    rx0 = round(float(x), 2); rx1 = round(float(x + w), 2)
+                    ry0 = round(float(y), 2); ry1 = round(float(y + h), 2)
+                    _cut_xs.add(rx0); _cut_xs.add(rx1)
+                    _cut_ys.add(ry0); _cut_ys.add(ry1)
+                    _vert_segments.setdefault(rx0, []).append((ry0, ry1))
+                    _vert_segments.setdefault(rx1, []).append((ry0, ry1))
+                    _horiz_segments.setdefault(ry0, []).append((rx0, rx1))
+                    _horiz_segments.setdefault(ry1, []).append((rx0, rx1))
                 except Exception:
                     pass
 
-            # Dibujar líneas de corte globales del tablero (verticales y horizontales)
+            # Dibujar líneas de corte (kerf) como segmentos continuos SOLO donde hay piezas;
+            # trazo continuo (sin dash) y grosor proporcional al kerf.
             try:
                 p.saveState()
-                p.setLineWidth(0.6)
-                p.setStrokeGray(0.6)
-                p.setDash(2, 2)
-                # Verticales
-                for cx in sorted(_cut_xs):
-                    if cx >= tX - 1 and cx <= tX + tW + 1:
-                        p.line(cx, tY, cx, tY + tH)
+                # Grosor del kerf en puntos PDF
+                try:
+                    kerf_mm = float((mat.get('config') or {}).get('kerf', mat.get('desperdicio_sierra', 0)) or 0)
+                except Exception:
+                    kerf_mm = 0.0
+                lw = max(0.6, min(3.0, kerf_mm * float(scale)))
+                p.setLineWidth(lw)
+                p.setStrokeGray(0.15)
+                # Sin dash: línea normal continua
+                # Limitar a área útil para no marcar en puro desperdicio
+                x_min = tX + offX + 0.1
+                x_max = tX + offX + effW - 0.1
+                y_min = tY + offYBL + 0.1
+                y_max = tY + offYBL + effH - 0.1
+                # Verticales: para cada x, dibujar desde min(y0) a max(y1) dentro de útil
+                for cx, segs in _vert_segments.items():
+                    if cx <= x_min or cx >= x_max:
+                        # Evitar dibujar exactamente en el borde útil
+                        continue
+                    ymin = min((s for s,_ in segs), default=None)
+                    ymax = max((e for _,e in segs), default=None)
+                    if ymin is None or ymax is None:
+                        continue
+                    y0 = max(y_min, ymin)
+                    y1 = min(y_max, ymax)
+                    if y1 - y0 > 0.5:
+                        p.line(cx, y0, cx, y1)
                 # Horizontales
-                for cy in sorted(_cut_ys):
-                    if cy >= tY - 1 and cy <= tY + tH + 1:
-                        p.line(tX, cy, tX + tW, cy)
+                for cy, segs in _horiz_segments.items():
+                    if cy <= y_min or cy >= y_max:
+                        continue
+                    xmin = min((s for s,_ in segs), default=None)
+                    xmax = max((e for _,e in segs), default=None)
+                    if xmin is None or xmax is None:
+                        continue
+                    x0 = max(x_min, xmin)
+                    x1 = min(x_max, xmax)
+                    if x1 - x0 > 0.5:
+                        p.line(x0, cy, x1, cy)
                 p.restoreState()
             except Exception:
                 try:
