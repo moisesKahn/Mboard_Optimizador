@@ -61,7 +61,8 @@ class Command(BaseCommand):
         ]
 
         for cliente_data in clientes_data:
-            if not Cliente.objects.filter(rut=cliente_data['rut']).exists():
+            # Estos clientes demo no están asociados a una organización (NULL)
+            if not Cliente.objects.filter(rut=cliente_data['rut'], organizacion__isnull=True).exists():
                 Cliente.objects.create(**cliente_data)
 
         # Crear materiales

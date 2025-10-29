@@ -1613,10 +1613,20 @@ def crear_proyecto_optimizacion(request):
                     except Exception:
                         org = None
 
-                    cliente, creado = Cliente.objects.get_or_create(
-                        rut=rut_cliente,
-                        defaults={'nombre': nombre_cliente, 'activo': True, 'organizacion': org}
-                    )
+                    # Buscar/crear cliente por RUT dentro del alcance de la organización
+                    if org:
+                        cliente, creado = Cliente.objects.get_or_create(
+                            rut=rut_cliente,
+                            organizacion=org,
+                            defaults={'nombre': nombre_cliente, 'activo': True}
+                        )
+                    else:
+                        # Sin organización asociada al usuario: usar NULL como scope
+                        cliente, creado = Cliente.objects.get_or_create(
+                            rut=rut_cliente,
+                            organizacion__isnull=True,
+                            defaults={'nombre': nombre_cliente, 'activo': True, 'organizacion': None}
+                        )
                     # Si ya existía y no tenía organización, asignarla
                     if not creado and org and not cliente.organizacion:
                         cliente.organizacion = org
@@ -2446,10 +2456,6 @@ def crear_cliente_ajax(request):
                 rut_temporal = f"TEMP-{int(time.time())}"
                 rut = _normalize_rut(rut_temporal)
 
-            # Verificar si el RUT ya existe (comparación normalizada)
-            if rut and Cliente.objects.filter(rut=rut).exists():
-                return JsonResponse({'success': False, 'mensaje': 'Ya existe un cliente con este RUT'})
-            
             # Asignar organización del usuario que crea el cliente
             org = None
             try:
@@ -2460,6 +2466,15 @@ def crear_cliente_ajax(request):
                     org = request.user.usuario_perfil_optimizador.organizacion
             except Exception:
                 org = None
+
+            # Verificar si el RUT ya existe en la misma organización (comparación normalizada)
+            if rut:
+                if org:
+                    exists = Cliente.objects.filter(rut=rut, organizacion=org).exists()
+                else:
+                    exists = Cliente.objects.filter(rut=rut, organizacion__isnull=True).exists()
+                if exists:
+                    return JsonResponse({'success': False, 'mensaje': 'Ya existe un cliente con este RUT en esta organización'})
 
             # Crear nuevo cliente con campos válidos del modelo actual
             cliente = Cliente.objects.create(

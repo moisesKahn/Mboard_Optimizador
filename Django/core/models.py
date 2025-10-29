@@ -24,7 +24,8 @@ class Organizacion(models.Model):
 
 class Cliente(models.Model):
     """Modelo para clientes del sistema"""
-    rut = models.CharField(max_length=12, unique=True, verbose_name="RUT")
+    # RUT único por organización (no global): se aplica constraint en Meta
+    rut = models.CharField(max_length=12, verbose_name="RUT")
     nombre = models.CharField(max_length=100, verbose_name="Nombre Completo")
     organizacion = models.ForeignKey(Organizacion, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Organización")
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, blank=True, null=True, verbose_name="Creado por", related_name="clientes_creados")
@@ -42,6 +43,7 @@ class Cliente(models.Model):
             models.Index(fields=["organizacion", "fecha_creacion"], name="cli_org_fecha_idx"),
             models.Index(fields=["created_by", "fecha_creacion"], name="cli_creador_fecha_idx"),
         ]
+        unique_together = [('rut', 'organizacion')]  # RUT único por organización
     
     def __str__(self):
         return f"{self.nombre} ({self.rut})"

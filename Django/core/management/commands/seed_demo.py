@@ -166,9 +166,9 @@ class Command(BaseCommand):
                 nombre_cli = f"Cliente {name.split()[1]} {cidx:02d}" if ' ' in name else f"Cliente {name} {cidx:02d}"
                 cli, _ = Cliente.objects.get_or_create(
                     rut=rut,
+                    organizacion=org,
                     defaults={
                         'nombre': nombre_cli,
-                        'organizacion': org,
                         'activo': True,
                     }
                 )
