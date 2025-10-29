@@ -348,6 +348,18 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
         pass
     # Modo rápido: simplificar hachurado de márgenes para acelerar generación
     FAST_PDF = bool(_opts.get('fast', True))
+    PROFILE = bool(_opts.get('profile', False))
+    import time as _t
+    _t_total_start = _t.perf_counter() if PROFILE else None
+    _prof = {
+        'summary_s': 0.0,
+        'boards_hatch_margin_s': 0.0,
+        'boards_hatch_useful_s': 0.0,
+        'boards_kerf_s': 0.0,
+        'boards_pieces_s': 0.0,
+        'boards_count': 0,
+        'pieces_count': 0,
+    }
 
     materiales = _materiales_desde_resultado(resultado)
     if not materiales:
@@ -492,6 +504,7 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
     except Exception:
         materiales = _materiales_desde_resultado(resultado)
     if materiales:
+        _t_sum0 = _t.perf_counter() if PROFILE else None
         draw_logo(width-40, height-40)
         # Título e ID del proyecto
         p.setFont("Helvetica-Bold", 16)
@@ -758,6 +771,8 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             # Avanzar a la siguiente fila
             y_row_top -= row_height + 8
             i += 3
+    if PROFILE:
+        _prof['summary_s'] += (_t.perf_counter() - _t_sum0)
     p.showPage()
 
     # Un tablero por página, por cada material (páginas horizontales sin tabla inferior)
@@ -963,6 +978,7 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             # p.rect(tX + offX, tY + offYBL, effW, effH)
 
             # Márgenes: izquierda, derecha, abajo, arriba (SIEMPRE con líneas entrecruzadas)
+            _tm0 = _t.perf_counter() if PROFILE else None
             # Izquierda
             hatch_rect(tX, tY, offX, tH, spacing=6, lw=0.5, cross=True, force_lines=True)
             # Derecha
@@ -972,6 +988,8 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             # Arriba
             top_h = max(tH - (offYBL + effH), 0)
             hatch_rect(tX + offX, tY + offYBL + effH, effW, top_h, spacing=6, lw=0.5, cross=True, force_lines=True)
+            if PROFILE:
+                _prof['boards_hatch_margin_s'] += (_t.perf_counter() - _tm0)
 
             # Piezas y cortes (dos pasadas):
             # 1) Recorrer piezas para calcular posiciones y recolectar segmentos de corte
@@ -984,10 +1002,13 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
 
             # Opcional: hachurar el área útil completa (por defecto desactivado)
             if bool(_opts.get('hatch_useful', False)):
+                _tu0 = _t.perf_counter() if PROFILE else None
                 try:
                     hatch_rect(tX + offX, tY + offYBL, effW, effH, cross=False, force_lines=False, stroke_gray=0.85)
                 except Exception:
                     pass
+                if PROFILE:
+                    _prof['boards_hatch_useful_s'] += (_t.perf_counter() - _tu0)
 
             for pieza in piezas_tab:
                 aN = int(pieza.get('ancho',0)); lN = int(pieza.get('largo',0))
@@ -1053,6 +1074,7 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             # Dibujar líneas de corte (kerf) como segmentos continuos SOLO donde hay piezas;
             # trazo continuo (sin dash) y grosor proporcional al kerf.
             try:
+                _tk0 = _t.perf_counter() if PROFILE else None
                 p.saveState()
                 # Grosor del kerf en puntos PDF
                 try:
@@ -1112,8 +1134,11 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                     p.restoreState()
                 except Exception:
                     pass
+            if PROFILE:
+                _prof['boards_kerf_s'] += (_t.perf_counter() - _tk0)
 
             # 2) DIBUJAR PIEZAS y etiquetas/tapacantos por ENCIMA del kerf
+            _tp0 = _t.perf_counter() if PROFILE else None
             for g in piezas_geom:
                 x, y, w, h = g['x'], g['y'], g['w'], g['h']
                 nombre = g['nombre']
@@ -1221,9 +1246,14 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                     if taps.get('derecha'):
                         p.line(x + w - inset, y + inset, x + w - inset, y + h - inset)
                     p.restoreState()
+            if PROFILE:
+                _prof['boards_pieces_s'] += (_t.perf_counter() - _tp0)
+                _prof['pieces_count'] += len(piezas_geom)
 
             # En esta sección ya no se imprime tabla inferior; se dedica toda la página al tablero
             p.showPage()
+            if PROFILE:
+                _prof['boards_count'] += 1
 
         # Tras imprimir los tableros de este material, agregar hoja(s) resumen del material
         # 1) Resumen general del material + (en la misma hoja) resumen de piezas por tablero
@@ -1402,6 +1432,14 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             pass
 
     p.save()
+    if PROFILE:
+        total_s = (_t.perf_counter() - _t_total_start)
+        try:
+            print("PDF_PROFILE | resumen_s=%.3fs boards_hatch_margin_s=%.3fs boards_hatch_useful_s=%.3fs boards_kerf_s=%.3fs boards_pieces_s=%.3fs boards=%d piezas=%d total=%.3fs" % (
+                _prof['summary_s'], _prof['boards_hatch_margin_s'], _prof['boards_hatch_useful_s'], _prof['boards_kerf_s'], _prof['boards_pieces_s'], _prof['boards_count'], _prof['pieces_count'], total_s
+            ))
+        except Exception:
+            pass
     data = buf.getvalue(); buf.close(); return data
 
 # ------------------------------
@@ -2036,6 +2074,7 @@ def exportar_pdf(request, proyecto_id):
         'fast': _get_bool('fast', True),
         'hatch_spacing': _get_float('hatch_spacing', None),
         'hatch_lw': _get_float('hatch_lw', None),
+        'profile': _get_bool('profile', False),
         'kerf_min_lw': _get_float('kerf_min', None),
         'kerf_max_lw': _get_float('kerf_max', None),
         'kerf_scale': _get_float('kerf_scale', None),
