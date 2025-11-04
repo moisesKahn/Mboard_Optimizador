@@ -8,6 +8,12 @@
     .cursor-x { cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24'><line x1='4' y1='4' x2='20' y2='20' stroke='red' stroke-width='3'/><line x1='20' y1='4' x2='4' y2='20' stroke='red' stroke-width='3'/></svg>") 12 12, not-allowed !important; }
     /* Aviso fijo para generación de PDF: no ocupa espacio en layout */
     #toastGenerandoPdf { position: fixed; right: 16px; bottom: 16px; z-index: 2000; display: none; }
+    /* Overlay de carga cuando se llega desde Configurador 3D */
+    #cfg3dOverlay { position: fixed; inset: 0; background: rgba(255,255,255,.85); backdrop-filter: blur(2px); z-index: 3000; display: none; align-items: center; justify-content: center; }
+    #cfg3dOverlay .box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 18px 22px; box-shadow: 0 10px 30px rgba(0,0,0,.08); min-width: 260px; text-align:center; }
+    #cfg3dOverlay .spinner { width: 42px; height: 42px; border: 3px solid #cfd8dc; border-top-color: #1976d2; border-radius: 50%; margin: 0 auto 10px; animation: spin 0.9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #cfg3dOverlay.show { display: flex; }
 </style>
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
     <h6 class="fw-semibold mb-0">Optimizador de Materiales</h6>
@@ -15,6 +21,27 @@
         <i class="ri-add-line"></i>
         <span>Nuevo Proyecto</span>
     </button>
+</div>
+
+<!-- Toast: Listo tras carga desde Configurador 3D -->
+<div id="toastCfg3dReady" class="alert alert-success shadow-sm py-2 px-3" style="display:none; position: fixed; right: 16px; bottom: 16px; z-index: 3001;">
+    <i class="ri-check-line me-1"></i>
+    <span class="msg">Listo: proyecto cargado y optimizado.</span>
+    <button type="button" class="btn-close ms-2" aria-label="Close" onclick="this.parentElement.style.display='none'"></button>
+ </div>
+
+<!-- Overlay de carga desde Configurador 3D -->
+<div id="cfg3dOverlay" aria-live="polite" aria-busy="true">
+    <div class="box">
+        <div class="spinner" aria-hidden="true"></div>
+        <div id="cfg3dOverlayText" class="fw-semibold">Cargando proyecto desde Configurador 3D…</div>
+        <div id="cfg3dOverlayError" class="text-danger mt-2" style="display:none;">Se está demorando más de lo esperado…</div>
+        <div class="mt-2" id="cfg3dOverlayActions" style="display:none;">
+            <button class="btn btn-sm btn-primary" onclick="try{window.location.reload();}catch(_e){}">Reintentar</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="(function(){ try{ document.getElementById('cfg3dOverlay').classList.remove('show'); }catch(_e){} })()">Continuar</button>
+        </div>
+    </div>
+  
 </div>
 
 <!-- 1. Información del Proyecto -->
@@ -1510,20 +1537,20 @@
     }
 
     // Al cargar, bloquear UI si no hay tablero/tapacanto seleccionados (por pestaña activa)
-    document.addEventListener('DOMContentLoaded', () => {
+    // Helpers de overlay para la llegada desde Configurador 3D
+    let __cfg3dTimer = null;
+    function cfg3dOverlayShow(txt){ try{ const ov=document.getElementById('cfg3dOverlay'); const t=document.getElementById('cfg3dOverlayText'); const e=document.getElementById('cfg3dOverlayError'); const a=document.getElementById('cfg3dOverlayActions'); if (ov) ov.classList.add('show'); if (t && txt) t.textContent = txt; if (e) e.style.display='none'; if (a) a.style.display='none'; clearTimeout(__cfg3dTimer); __cfg3dTimer=setTimeout(()=>{ cfg3dOverlayError('Se está demorando más de lo esperado…'); }, 15000); }catch(_e){} }
+    function cfg3dOverlayText(txt){ try{ const t=document.getElementById('cfg3dOverlayText'); if (t) t.textContent = txt; }catch(_e){} }
+    function cfg3dOverlayError(msg){ try{ const e=document.getElementById('cfg3dOverlayError'); const a=document.getElementById('cfg3dOverlayActions'); if (e){ e.textContent = msg || 'Hubo un problema al cargar.'; e.style.display='block'; } if (a){ a.style.display='block'; } }catch(_e){} }
+    function cfg3dShowReadyToast(msg){ try{ const t=document.getElementById('toastCfg3dReady'); if (t){ const m=t.querySelector('.msg'); if (m && msg) m.textContent=msg; t.style.display='block'; clearTimeout(window.__toastCfg3dTimer); window.__toastCfg3dTimer=setTimeout(()=>{ try{ t.style.display='none'; }catch(_e){} }, 3000); } }catch(_e){} }
+    function cfg3dOverlayHide(){ try{ const ov=document.getElementById('cfg3dOverlay'); if (ov) ov.classList.remove('show'); sessionStorage.removeItem('cfg3d_loading_pid'); clearTimeout(__cfg3dTimer); cfg3dShowReadyToast('Listo: proyecto cargado y optimizado.'); }catch(_e){} }
+
+    document.addEventListener('DOMContentLoaded', async function(){
         const btnAdd = document.getElementById('btnAgregarFila');
         const tbody = document.getElementById('piezasTableBody');
         const addRowArea = document.querySelector('.table-add-row');
         const chkVetaMaster = document.getElementById('vetaLibreMaster');
         const chkTapMaster = document.getElementById('tapacantoMaster');
-
-        const getActiveSelects = () => {
-            const idx = getActiveMaterialIndex();
-            return {
-                tapSel: document.getElementById(`tapacantoSelect${idx}`),
-                tableroSel: document.getElementById(`tableroSelect${idx}`) || document.getElementById('materialSelect')
-            };
-        };
 
         const actualizarBloqueoTabla = () => {
             const { tapSel, tableroSel } = getActiveSelects();
@@ -1534,6 +1561,7 @@
             if (btnAdd) btnAdd.disabled = !ok;
             if (inputFilas) inputFilas.disabled = !ok;
             if (tbody) {
+                cfg3dOverlayText('Cargando datos del proyecto…');
                 tbody.style.pointerEvents = ok ? 'auto' : 'none';
                 tbody.style.opacity = ok ? '1' : '0.6';
                 tbody.classList.toggle('gated', !ok);
@@ -1553,6 +1581,7 @@
             if (chkTapMaster){
                 chkTapMaster.disabled = !ok || !(tapSel && tapSel.value);
                 chkTapMaster.title = (!ok) ? MSG_TABLERO_REQ : (tapSel && tapSel.value ? 'Aplicar tapacanto en todos los lados a todas las piezas' : MSG_TAPACANTO_REQ);
+                cfg3dOverlayText('Rehidratando materiales y piezas…');
             }
         };
         const actualizarBotonesTap = () => {
@@ -3927,6 +3956,15 @@
 
     // Precarga desde parámetro ?proyecto_id= para abrir en modo edición
     document.addEventListener('DOMContentLoaded', async function(){
+        // Si venimos desde Configurador 3D con el mismo proyecto_id, mostrar overlay hasta terminar precarga
+        try{
+            const params = new URLSearchParams(window.location.search);
+            const pid = params.get('proyecto_id');
+            const key = sessionStorage.getItem('cfg3d_loading_pid');
+            if (pid && key && key === String(pid)){
+                cfg3dOverlayShow('Cargando proyecto desde Configurador 3D…');
+            }
+        }catch(_e){}
         try{
             const params = new URLSearchParams(window.location.search);
             const pid = params.get('proyecto_id');
@@ -3940,6 +3978,7 @@
             try { if (typeof actualizarBloqueoTabla === 'function') actualizarBloqueoTabla(); } catch(_e) {}
             // 1) Cargar datos básicos del proyecto
             try{
+                cfg3dOverlayText('Cargando datos del proyecto…');
                 const r = await fetch(`/optimizador/proyectos/preview-json/${encodeURIComponent(pid)}/`, { headers: {'X-Requested-With':'XMLHttpRequest'} });
                 if (r.ok){
                     const dj = await r.json();
@@ -3957,8 +3996,53 @@
                 }
             }catch(_e){}
             // 2) Cargar resultado guardado y visualizarlo (rehidratar materiales)
+            let resultadoCargado = false;
             try{
-                const r2 = await fetch(`/optimizador/exportar-salida/${encodeURIComponent(pid)}/`, { headers: {'X-Requested-With':'XMLHttpRequest'} });
+                cfg3dOverlayText('Rehidratando materiales y piezas…');
+                let r2 = await fetch(`/optimizador/exportar-salida/${encodeURIComponent(pid)}/`, { headers: {'X-Requested-With':'XMLHttpRequest'} });
+                // Fallback: si no hay resultado, ejecutar optimización usando la entrada guardada
+                if (!r2.ok) {
+                    try {
+                        cfg3dOverlayText('Optimizando…');
+                        const rIn = await fetch(`/optimizador/exportar-entrada/${encodeURIComponent(pid)}/`, { headers: {'X-Requested-With':'XMLHttpRequest'} });
+                        if (rIn.ok) {
+                            const entrada = await rIn.json();
+                            // Construir payload de optimización desde entrada
+                            const mat = (entrada && entrada.material) || {};
+                            const tap = (entrada && entrada.tapacanto) || {};
+                            const piezas = Array.isArray(entrada && entrada.cut_list) ? (entrada.cut_list||[]) : [];
+                            const payload = {
+                                proyecto_id: parseInt(pid, 10),
+                                material_index: 1,
+                                configuracion_material: {
+                                    material_id: mat.id,
+                                    ancho_custom: mat.ancho,
+                                    largo_custom: mat.largo,
+                                    margen_x: 10,
+                                    margen_y: 10,
+                                    desperdicio_sierra: 3,
+                                    tapacanto_codigo: tap.codigo || '',
+                                    tapacanto_nombre: tap.nombre || ''
+                                },
+                                piezas: (piezas||[]).map(it=>({
+                                    nombre: it.nombre,
+                                    ancho: it.ancho,
+                                    largo: it.alto,
+                                    cantidad: it.cantidad||1,
+                                    veta_libre: !!(it.veta_libre),
+                                    tapacantos: it.tapacantos || {}
+                                }))
+                            };
+                            await fetch(`/optimizador/optimizar/`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+                            // Intentar nuevamente obtener salida
+                            r2 = await fetch(`/optimizador/exportar-salida/${encodeURIComponent(pid)}/`, { headers: {'X-Requested-With':'XMLHttpRequest'} });
+                            cfg3dOverlayText('Rehidratando materiales y piezas…');
+                        }
+                    } catch (_e) {
+                        // Mostrar error pero permitir continuar si el usuario desea
+                        cfg3dOverlayError('No fue posible optimizar automáticamente. Puedes reintentar.');
+                    }
+                }
                 if (r2.ok){
                     const txt = await r2.text();
                     const resultado = JSON.parse(txt);
@@ -4029,8 +4113,17 @@
                         // Re-evaluar bloqueo una vez renderizado
                         try { if (typeof actualizarBloqueoTabla === 'function') actualizarBloqueoTabla(); } catch(__e) {}
                     }
+                    resultadoCargado = true;
                 }
             }catch(_e){}
+            // Señal de listo: ocultar overlay si venimos del configurador
+            try{
+                const key = sessionStorage.getItem('cfg3d_loading_pid');
+                const pidNow = new URLSearchParams(window.location.search).get('proyecto_id');
+                if (key && pidNow && key === String(pidNow)){
+                    cfg3dOverlayHide();
+                }
+            }catch(__e){}
         }catch(_e){}
     });
 

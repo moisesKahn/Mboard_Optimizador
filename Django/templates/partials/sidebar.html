@@ -81,6 +81,14 @@
                       <span>Optimizador</span>
                   </a>
               </li>
+              {% if user.is_superuser %}
+              <li>
+                  <a href="{% url 'configurador_3d' %}">
+                      <iconify-icon icon="mdi:cube-outline" class="menu-icon"></iconify-icon>
+                      <span>Configurador 3D</span>
+                  </a>
+              </li>
+              {% endif %}
               <li>
                   <a href="{% url 'clientes_lista' %}">
                       <iconify-icon icon="solar:users-group-rounded-outline" class="menu-icon"></iconify-icon>

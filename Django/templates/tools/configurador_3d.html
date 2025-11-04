@@ -1,0 +1,847 @@
+{% extends 'layout/layout.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container-fluid py-16">
+  <div class="row g-3">
+    <div class="col-12">
+      <div class="card radius-16 shadow-sm">
+        <div class="card-header d-flex align-items-center gap-12">
+          <iconify-icon icon="mdi:cube-outline" class="text-primary-600 text-2xl"></iconify-icon>
+          <h5 class="mb-0">Configurador 3D (Versión Unificada)</h5>
+          <span class="badge bg-primary-100 text-primary-600 ms-auto">Solo superusuarios</span>
+        </div>
+        <div class="card-body">
+          <!-- Overlay de proceso (optimización/PDF) -->
+          <div id="process-overlay" class="process-overlay d-none">
+            <div class="process-box">
+              <div class="board-anim" aria-hidden="true">
+                <div class="grid">
+                  <!-- 25 celdas para animación simple de tablero/piezas -->
+                  <span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span>
+                  <span></span><span></span><span></span><span></span><span></span>
+                </div>
+              </div>
+              <div id="process-text" class="mt-3 fw-semibold text-center">Preparando…</div>
+            </div>
+          </div>
+          <!-- Bloque superior: Cliente, RUT, ID y Nombre del proyecto en una sola línea -->
+          <div class="row g-3 align-items-end mb-4">
+            <div class="col-12 col-md-4">
+              <label class="form-label fw-semibold">Cliente</label>
+              <input type="text" class="form-control" id="clienteInput" list="clientesDatalist" placeholder="Escribe al menos 3 letras para buscar cliente..." autocomplete="off">
+              <datalist id="clientesDatalist"></datalist>
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">RUT</label>
+              <input type="text" class="form-control" id="rutCliente" placeholder="12.345.678-9" maxlength="12" autocomplete="off">
+            </div>
+            <div class="col-6 col-md-2">
+              <label class="form-label">ID proyecto</label>
+              <input type="text" class="form-control" id="folioProyecto" placeholder="—" disabled>
+            </div>
+            <div class="col-12 col-md-4">
+              <label class="form-label">Nombre del proyecto</label>
+              <input type="text" class="form-control" id="nombreProyecto" placeholder="Se generará automáticamente">
+            </div>
+            <div class="col-12 col-md-12 mt-1 text-end">
+              <div class="text-muted small" id="estadoGuardado" style="min-height:22px;"></div>
+            </div>
+          </div>
+
+          <div id="app-container">
+            <div id="main-container" class="d-flex flex-wrap gap-3">
+              <div id="controls" class="flex-grow-1" style="min-width:320px; max-width:520px;">
+                <h6 class="mb-3">1. Elija el Módulo</h6>
+                <select id="module-type" class="form-select">
+                  <option value="kitchen_cabinet">Mueble Aéreo de Cocina (2 Puertas)</option>
+                  <option value="kitchen_cabinet_single">Mueble Aéreo de Cocina (1 Puerta)</option>
+                  <option value="shelf_simple">Estantería Simple</option>
+                  <option value="shelf_editable">Estantería Editable</option>
+                  <option value="shelf_divided">Estantería con Divisiones</option>
+                  <option value="shelf_custom">Estantería Personalizada</option>
+                </select>
+
+                <h6 id="params-title" class="mt-4">2. Defina los Parámetros</h6>
+                <div id="generic-controls" class="control-panel">
+                  <label for="material-select" class="form-label">Material</label>
+                  <select id="material-select" class="form-select mb-2"></select>
+
+                  <label for="tapacanto-select" class="form-label">Tapacanto</label>
+                  <select id="tapacanto-select" class="form-select mb-2"></select>
+
+                  <div class="row g-2 mt-1">
+                    <div class="col-6">
+                      <label for="width" class="form-label">Ancho (mm)</label>
+                      <input type="number" id="width" value="600" min="400" step="10" class="form-control">
+                    </div>
+                    <div class="col-6">
+                      <label for="height" class="form-label">Alto (mm)</label>
+                      <input type="number" id="height" value="600" min="400" step="10" class="form-control">
+                    </div>
+                    <div class="col-6">
+                      <label for="depth" class="form-label">Profundidad (mm)</label>
+                      <input type="number" id="depth" value="300" min="200" step="10" class="form-control">
+                    </div>
+                    <div class="col-6">
+                      <label for="thickness" class="form-label">Grosor (mm)</label>
+                      <input type="number" id="thickness" value="18" min="15" step="1" class="form-control">
+                    </div>
+                  </div>
+                </div>
+
+                <div id="shelf-controls" class="control-panel" style="display:none;">
+                  <label for="shelves" class="form-label mt-2">Número de Estantes</label>
+                  <input type="number" id="shelves" value="1" min="0" max="10" class="form-control">
+                </div>
+
+                <div id="kitchen-controls" class="control-panel" style="display:none;">
+                  <div class="form-check mt-3">
+                    <input class="form-check-input" type="checkbox" id="add-back" checked>
+                    <label class="form-check-label" for="add-back">Añadir Fondo (3mm)</label>
+                  </div>
+                </div>
+
+                <div id="advanced-kitchen-controls" class="control-panel advanced-panel" style="display:none;">
+                  <h6 class="mt-3">Dimensiones de Puertas</h6>
+                  <label for="door-height" class="form-label">Alto Puertas (mm)</label>
+                  <input type="number" id="door-height" placeholder="Automático" class="form-control">
+                  <label for="left-door-width" class="form-label mt-2">Ancho Puerta Izquierda (mm)</label>
+                  <input type="number" id="left-door-width" placeholder="Automático" class="form-control">
+                  <label for="right-door-width" class="form-label mt-2">Ancho Puerta Derecha (mm)</label>
+                  <input type="number" id="right-door-width" placeholder="Automático" class="form-control">
+                </div>
+
+                <div id="advanced-shelf-controls" class="control-panel advanced-panel" style="display:none;">
+                  <h6 class="mt-3">Posición de Estantes</h6>
+                  <div id="shelf-positions-container"></div>
+                </div>
+
+                <div id="advanced-divider-controls" class="control-panel advanced-panel" style="display:none;">
+                  <h6 class="mt-3">Divisores Verticales</h6>
+                  <div id="divider-positions-container"></div>
+                  <button id="add-divider-btn" class="btn btn-sm btn-danger mt-2">+ Añadir Divisor</button>
+                </div>
+
+                <h6 class="mt-4">Lista de Corte:</h6>
+                <div id="cut-list" class="border rounded p-3 bg-light" style="min-height:100px;"></div>
+                <div class="d-grid gap-2 mt-3">
+                  <button id="export-btn" class="btn btn-outline-primary">Exportar Lista (.txt)</button>
+                  <button id="go-optimizer-btn" class="btn btn-secondary">Ir al optimizador</button>
+                  <button id="save-project-btn" class="btn btn-primary">Guardar y salir</button>
+                </div>
+              </div>
+
+              <div class="flex-grow-1" style="min-width:400px;">
+                <div id="viewer" class="w-100 checker-bg" style="height:80vh; border:1px solid #e5e7eb; border-radius:8px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Ajustes visuales para integrarse con el tema */
+  #controls label { font-weight: 600; }
+  .advanced-panel { border-top: 2px solid #eef2ff; margin-top: 12px; padding-top: 10px; }
+  /* Fondo clásico de cuadrados (ajedrezado suave) */
+  .checker-bg {
+    background-color: #ffffff;
+    background-image:
+      linear-gradient(45deg, rgba(0,0,0,0.045) 25%, transparent 25%),
+      linear-gradient(-45deg, rgba(0,0,0,0.045) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.045) 75%),
+      linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.045) 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  }
+  /* Overlay de proceso */
+  .process-overlay { position: fixed; inset: 0; background: rgba(255,255,255,.8); backdrop-filter: blur(2px); z-index: 2000; display: flex; align-items: center; justify-content: center; }
+  .process-box { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px 24px; box-shadow: 0 10px 30px rgba(0,0,0,.08); min-width: 280px; }
+  .board-anim { width: 220px; height: 140px; border: 2px solid #9e9e9e; border-radius: 6px; margin: 0 auto; position: relative; overflow: hidden; background: repeating-linear-gradient(135deg, #f9f9f9, #f9f9f9 8px, #f3f3f3 8px, #f3f3f3 16px); }
+  .board-anim .grid { position: absolute; inset: 8px; display: grid; grid-template-columns: repeat(5,1fr); grid-template-rows: repeat(5,1fr); gap: 4px; }
+  .board-anim .grid span { background: #cfd8dc; transform-origin: center; animation: piecePulse 1.6s infinite ease-in-out; border-radius: 2px; }
+  .board-anim .grid span:nth-child(odd) { background: #b0bec5; }
+  @keyframes piecePulse { 0% { transform: scale(1); opacity: .9; } 40% { transform: scale(.92) rotate(1deg); opacity: .75; } 60% { transform: scale(1.04) rotate(-1deg); opacity: .9; } 100% { transform: scale(1); opacity: .9; } }
+  /* Estados para simular armado/desarmado */
+  .stage-cut .grid span { animation: pieceAssemble 1.4s infinite ease-in-out; }
+  .stage-pdf .grid span { animation: pieceDisassemble 1.4s infinite ease-in-out; }
+  @keyframes pieceAssemble { 0% { transform: translateY(0) scale(1); } 50%{ transform: translateY(-6px) scale(0.96);} 100% { transform: translateY(0) scale(1);} }
+  @keyframes pieceDisassemble { 0% { transform: translateX(0) scale(1); } 50%{ transform: translateX(6px) scale(0.96);} 100% { transform: translateX(0) scale(1);} }
+</style>
+{% endblock %}
+
+{% block script %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+<script>
+// ==== Código principal del configurador (adaptado al layout) ====
+const viewer = document.getElementById('viewer');
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(75, viewer.clientWidth / viewer.clientHeight, 0.1, 10000);
+camera.position.set(800, 600, 1200);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+viewer.appendChild(renderer.domElement);
+renderer.setClearColor(0x000000, 0); // transparente para ver el patrón de fondo
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+scene.add(ambientLight);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.7);
+directionalLight.position.set(1, 1, 0.5).normalize();
+scene.add(directionalLight);
+const furnitureGroup = new THREE.Group();
+scene.add(furnitureGroup);
+let mainMaterial = new THREE.MeshLambertMaterial({ color: 0xFAFAFA });
+const doorMaterial = new THREE.MeshLambertMaterial({ color: 0xFFC107 });
+const backMaterial = new THREE.MeshLambertMaterial({ color: 0xE0E0E0 });
+const shelfMaterial = new THREE.MeshLambertMaterial({ color: 0xDEB887 });
+let tapacantoMaterial = new THREE.MeshLambertMaterial({ color: 0x9E9E9E });
+const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x333333, linewidth: 2 });
+const allInputs = document.querySelectorAll('#controls input, #controls select');
+const cutListDiv = document.getElementById('cut-list');
+const moduleSelector = document.getElementById('module-type');
+const exportBtn = document.getElementById('export-btn');
+const shelfCountInput = document.getElementById('shelves');
+const addDividerBtn = document.getElementById('add-divider-btn');
+const materialSelect = document.getElementById('material-select');
+const tapacantoSelect = document.getElementById('tapacanto-select');
+const saveProjectBtn = document.getElementById('save-project-btn');
+const goOptimizerBtn = document.getElementById('go-optimizer-btn');
+// Proyecto (auto-creación y autosave)
+let proyectoId = null; let proyectoFolio = null; let autosaveTimer = null;
+const clienteInput = document.getElementById('clienteInput');
+const rutClienteInput = document.getElementById('rutCliente');
+const nombreProyectoInput = document.getElementById('nombreProyecto');
+const folioProyectoInput = document.getElementById('folioProyecto');
+const estadoGuardado = document.getElementById('estadoGuardado');
+let clienteSeleccionado = null; // {id, rut, nombre}
+
+let materialesCatalog = [];
+let tapacantosCatalog = [];
+
+const corpusParts = [
+  { name: 'Lateral', build: (p) => { const g = new THREE.Group(); const l = createBox(p.thickness, p.height, p.depth, mainMaterial); l.position.x = -p.width / 2 + p.thickness / 2; addFrontEdgeBand(l, p.thickness, p.height, p.depth); g.add(l); const r = createBox(p.thickness, p.height, p.depth, mainMaterial); r.position.x = p.width / 2 - p.thickness / 2; addFrontEdgeBand(r, p.thickness, p.height, p.depth); g.add(r); return g; } },
+  { name: 'Base/Techo', build: (p) => { const g = new THREE.Group(); const b = createBox(p.width - 2 * p.thickness, p.thickness, p.depth, mainMaterial); b.position.y = -p.height / 2 + p.thickness / 2; addFrontEdgeBand(b, p.width - 2 * p.thickness, p.thickness, p.depth); g.add(b); const t = createBox(p.width - 2 * p.thickness, p.thickness, p.depth, mainMaterial); t.position.y = p.height / 2 - p.thickness / 2; addFrontEdgeBand(t, p.width - 2 * p.thickness, p.thickness, p.depth); g.add(t); return g; } }
+];
+
+const moduleConfigs = {
+  'kitchen_cabinet': {
+    name: 'Mueble Aéreo de Cocina (2 Puertas)',
+    controlPanels: ['generic-controls', 'shelf-controls', 'kitchen-controls', 'advanced-kitchen-controls'],
+    parts: [
+      ...corpusParts,
+      { name: 'Amarre', build: (p) => { const g = new THREE.Group(); const h = 100; const a = createBox(p.width - 2 * p.thickness, h, p.thickness, mainMaterial); const b = a.clone(); b.position.set(0, -p.height/2 + h/2, -p.depth/2 + p.thickness/2); g.add(b); const t = a.clone(); t.position.set(0, p.height/2 - h/2, -p.depth/2 + p.thickness/2); g.add(t); return g; }},
+      { name: 'Fondo', build: (p) => { if (!p.addBack) return new THREE.Group(); const h = p.height - 2 * 100; const f = createBox(p.width - 2 * p.thickness, h, 3, backMaterial); f.position.z = -p.depth/2 + p.thickness + 3/2; return f; }},
+  { name: 'Estante', build: (p) => { if (p.shelfCount < 1) return new THREE.Group(); const s = createBox(p.width - 2 * p.thickness, p.thickness, p.depth - p.thickness, mainMaterial); s.position.z = p.thickness / 2; addFrontEdgeBand(s, p.width - 2 * p.thickness, p.thickness, p.depth - p.thickness); return s; }},
+      { name: 'Puerta', build: (p) => {
+          const g = new THREE.Group();
+          const gap = 2; const autoWidth = p.width / 2 - gap;
+          const leftDoorW = parseFloat(document.getElementById('left-door-width').value) || autoWidth;
+          const rightDoorW = parseFloat(document.getElementById('right-door-width').value) || autoWidth;
+          const doorH = parseFloat(document.getElementById('door-height').value) || p.height - (2 * gap);
+          const leftDoor = createBox(leftDoorW, doorH, p.thickness, doorMaterial);
+          const leftPivot = new THREE.Group(); leftPivot.position.set(-p.width / 2, 0, p.depth / 2);
+          leftDoor.position.x = leftDoorW / 2; leftPivot.add(leftDoor); g.add(leftPivot);
+          const rightDoor = createBox(rightDoorW, doorH, p.thickness, doorMaterial);
+          const rightPivot = new THREE.Group(); rightPivot.position.set(p.width / 2, 0, p.depth / 2);
+          rightDoor.position.x = -rightDoorW / 2; rightPivot.add(rightDoor); g.add(rightPivot);
+          leftDoor.children[0].userData = { pivot: leftPivot, isOpen: false, type: 'door', side: 'left' };
+          rightDoor.children[0].userData = { pivot: rightPivot, isOpen: false, type: 'door', side: 'right' };
+          clickableObjects.push(leftDoor.children[0], rightDoor.children[0]);
+          return g;
+      }}
+    ]
+  },
+  'kitchen_cabinet_single': {
+    name: 'Mueble Aéreo de Cocina (1 Puerta)',
+    controlPanels: ['generic-controls', 'shelf-controls', 'kitchen-controls', 'advanced-kitchen-controls'],
+    parts: [
+      ...corpusParts,
+      { name: 'Amarre', build: (p) => { const g = new THREE.Group(); const h = 100; const a = createBox(p.width - 2 * p.thickness, h, p.thickness, mainMaterial); const b = a.clone(); b.position.set(0, -p.height/2 + h/2, -p.depth/2 + p.thickness/2); g.add(b); const t = a.clone(); t.position.set(0, p.height/2 - h/2, -p.depth/2 + p.thickness/2); g.add(t); return g; }},
+      { name: 'Fondo', build: (p) => { if (!p.addBack) return new THREE.Group(); const h = p.height - 2 * 100; const f = createBox(p.width - 2 * p.thickness, h, 3, backMaterial); f.position.z = -p.depth/2 + p.thickness + 3/2; return f; }},
+  { name: 'Estante', build: (p) => { if (p.shelfCount < 1) return new THREE.Group(); const s = createBox(p.width - 2 * p.thickness, p.thickness, p.depth - p.thickness, mainMaterial); s.position.z = p.thickness / 2; addFrontEdgeBand(s, p.width - 2 * p.thickness, p.thickness, p.depth - p.thickness); return s; }},
+      { name: 'Puerta Única', build: (p) => {
+          const g = new THREE.Group(); const gap = 2; const autoWidth = p.width - (2 * gap);
+          const doorW = parseFloat(document.getElementById('left-door-width').value) || autoWidth;
+          const doorH = parseFloat(document.getElementById('door-height').value) || p.height - (2 * gap);
+          const door = createBox(doorW, doorH, p.thickness, doorMaterial);
+          const pivot = new THREE.Group(); pivot.position.set(-p.width / 2, 0, p.depth / 2);
+          door.position.x = doorW / 2; pivot.add(door); g.add(pivot);
+          door.children[0].userData = { pivot: pivot, isOpen: false, type: 'door', side: 'left' };
+          clickableObjects.push(door.children[0]);
+          return g;
+      }}
+    ]
+  },
+  'shelf_simple': { name: 'Estantería Simple', controlPanels: ['generic-controls', 'shelf-controls'], parts: [ ...corpusParts, { name: 'Estante', build: (p) => { const g = new THREE.Group(); const h = p.height - (2 * p.thickness); const s = h / (p.shelfCount + 1); for (let i = 1; i <= p.shelfCount; i++) { const shelf = createBox(p.width - 2 * p.thickness, p.thickness, p.depth, shelfMaterial); shelf.position.y = (-h / 2) + (i * s); addFrontEdgeBand(shelf, p.width - 2 * p.thickness, p.thickness, p.depth); g.add(shelf); } return g; }} ] },
+  'shelf_editable': { name: 'Estantería Editable', controlPanels: ['generic-controls', 'shelf-controls', 'advanced-shelf-controls', 'advanced-divider-controls'], parts: [ ...corpusParts, { name: 'Estante', build: (p) => { const g = new THREE.Group(); const innerW = p.width - 2 * p.thickness; const stops = [0, ...(p.verticalDividers||[]).map(d=>d.positionX), innerW].sort((a,b)=>a-b); p.shelvesData.forEach(d => { if (stops.length<=2){ const s = createBox(innerW, p.thickness, p.depth, shelfMaterial); s.position.y = (-p.height / 2) + p.thickness + d.positionY; addFrontEdgeBand(s, innerW, p.thickness, p.depth); g.add(s); } else { for (let i=0;i<stops.length-1;i++){ const segW = stops[i+1] - stops[i] - (i>0 ? p.thickness : 0); if (segW > 0){ const x = -p.width/2 + p.thickness + stops[i] + (i>0 ? p.thickness/2 : 0) + segW/2; const seg = createBox(segW, p.thickness, p.depth, shelfMaterial); seg.position.set(x, (-p.height / 2) + p.thickness + d.positionY, 0); addFrontEdgeBand(seg, segW, p.thickness, p.depth); g.add(seg); } } } }); return g; }} ] },
+  'shelf_divided': { name: 'Estantería con Divisiones', controlPanels: ['generic-controls', 'shelf-controls', 'advanced-divider-controls'], parts: [ ...corpusParts, { name: 'Estante', build: (p) => { const g = new THREE.Group(); const stops = [0, ...p.verticalDividers.map(d => d.positionX), p.width - p.thickness * 2].sort((a, b) => a - b); const h = p.height - (2 * p.thickness); const spacing = h / (p.shelfCount + 1); for (let j = 1; j <= p.shelfCount; j++) { const y = (-h / 2) + (j * spacing); for (let i = 0; i < stops.length - 1; i++) { const w = stops[i+1] - stops[i] - (i > 0 ? p.thickness : 0); if (w > 0) { const x = -p.width/2 + p.thickness + stops[i] + (i > 0 ? p.thickness/2 : 0) + w/2; const seg = createBox(w, p.thickness, p.depth, shelfMaterial); seg.position.set(x, y, 0); addFrontEdgeBand(seg, w, p.thickness, p.depth); g.add(seg); }}} return g; }}, { name: 'Divisor Vertical', build: (p) => { const g = new THREE.Group(); p.verticalDividers.forEach(d => { const div = createBox(p.thickness, p.height - 2 * p.thickness, p.depth, mainMaterial); div.position.x = -p.width/2 + p.thickness + d.positionX; addFrontEdgeBand(div, p.thickness, p.height - 2 * p.thickness, p.depth); g.add(div); }); return g; }} ] },
+  'shelf_custom': { name: 'Estantería Personalizada', controlPanels: ['generic-controls', 'shelf-controls', 'advanced-shelf-controls', 'advanced-divider-controls'], parts: [ ...corpusParts, { name: 'Estante', build: (p) => { const g = new THREE.Group(); const stops = [0, ...p.verticalDividers.map(d => d.positionX), p.width - p.thickness * 2].sort((a, b) => a - b); p.shelvesData.forEach(shelfData => { const y = (-p.height / 2) + p.thickness + shelfData.positionY; for (let i = 0; i < stops.length - 1; i++) { const w = stops[i+1] - stops[i] - (i > 0 ? p.thickness : 0); if (w > 0) { const x = -p.width/2 + p.thickness + stops[i] + (i > 0 ? p.thickness/2 : 0) + w/2; const seg = createBox(w, p.thickness, p.depth, shelfMaterial); seg.position.set(x, y, 0); addFrontEdgeBand(seg, w, p.thickness, p.depth); g.add(seg); }}}); return g; }}, { name: 'Divisor Vertical', build: (p) => { const g = new THREE.Group(); p.verticalDividers.forEach(d => { const div = createBox(p.thickness, p.height - 2 * p.thickness, p.depth, mainMaterial); div.position.x = -p.width/2 + p.thickness + d.positionX; addFrontEdgeBand(div, p.thickness, p.height - 2 * p.thickness, p.depth); g.add(div); }); return g; }} ] }
+};
+
+let currentParams = {};
+let clickableObjects = [];
+let textToExport = '';
+
+function updateFurniture(isPartialUpdate = false) {
+  while (furnitureGroup.children.length) furnitureGroup.remove(furnitureGroup.children[0]);
+  clickableObjects = [];
+  const selectedModuleKey = moduleSelector.value;
+  const config = moduleConfigs[selectedModuleKey];
+  document.querySelectorAll('.control-panel').forEach(p => p.style.display = 'none');
+  if (!config) return;
+  config.controlPanels.forEach(panelId => { const panel = document.getElementById(panelId); if (panel) panel.style.display = 'block'; });
+  const rightDoorLabel = document.querySelector('label[for="right-door-width"]');
+  const rightDoorInput = document.getElementById('right-door-width');
+  if (selectedModuleKey === 'kitchen_cabinet_single') {
+    if (rightDoorLabel) rightDoorLabel.style.display = 'none';
+    if (rightDoorInput) rightDoorInput.style.display = 'none';
+  } else {
+    if (rightDoorLabel) rightDoorLabel.style.display = 'block';
+    if (rightDoorInput) rightDoorInput.style.display = 'block';
+  }
+  currentParams = getDimensions(isPartialUpdate, selectedModuleKey);
+  if (config.controlPanels.includes('advanced-shelf-controls') && !isPartialUpdate) generateShelfPositionControls();
+  if (config.controlPanels.includes('advanced-divider-controls') && !isPartialUpdate) generateDividerPositionControls();
+  buildFromConfig(config);
+}
+
+function buildFromConfig(config) {
+  generateCutList(config);
+  config.parts.forEach(part => { if (part.build) { const objects3D = part.build(currentParams); furnitureGroup.add(objects3D); } });
+}
+
+function getDimensions(isPartialUpdate = false, moduleKey) {
+  const p = {
+    width: parseFloat(document.getElementById('width').value) || 800,
+    height: parseFloat(document.getElementById('height').value) || 1800,
+    depth: parseFloat(document.getElementById('depth').value) || 400,
+    thickness: parseFloat(document.getElementById('thickness').value) || 18,
+    shelfCount: parseInt(shelfCountInput.value) || 0,
+  };
+  if (moduleKey.includes('kitchen_cabinet')) p.addBack = document.getElementById('add-back').checked;
+  const shelfCountChanged = !currentParams.shelvesData || p.shelfCount !== (currentParams.shelvesData || []).length;
+  if (shelfCountChanged || !isPartialUpdate) {
+    p.shelvesData = [];
+    const innerHeight = p.height - (2 * p.thickness);
+    const availableSpace = innerHeight - (p.shelfCount * p.thickness);
+    const spacing = availableSpace / (p.shelfCount + 1);
+    for (let i = 0; i < p.shelfCount; i++) {
+      p.shelvesData.push({ id: i + 1, positionY: spacing * (i + 1) + p.thickness * i });
+    }
+  } else {
+    p.shelvesData = currentParams.shelvesData;
+  }
+  if (!isPartialUpdate) p.verticalDividers = currentParams.verticalDividers || [];
+  else p.verticalDividers = currentParams.verticalDividers;
+  return p;
+}
+
+function generateShelfPositionControls() { /* Placeholder: UI dinámica si se requiere */ }
+function generateDividerPositionControls() {
+  const c = document.getElementById('divider-positions-container');
+  if (!c) return;
+  const p = currentParams || {};
+  const innerW = (p.width||0) - 2 * (p.thickness||0);
+  const items = (p.verticalDividers||[]).map((d, idx)=>{
+    const mm = Math.max(0, Math.min(innerW, Math.round(d.positionX)));
+    return `<div class="d-flex align-items-center gap-2 mb-2">
+      <span class="badge bg-light text-secondary">Divisor ${idx+1}</span>
+      <span class="small text-muted">${mm} mm</span>
+      <input type="range" class="form-range flex-grow-1" min="0" max="${innerW}" step="5" value="${mm}" data-divider-index="${idx}">
+      <button type="button" class="btn btn-sm btn-outline-danger" data-action="rm-divider" data-index="${idx}"><i class="ri-close-line"></i></button>
+    </div>`;
+  }).join('');
+  const helpers = `<div class="d-flex flex-wrap gap-2 mb-2">
+    <button type="button" class="btn btn-sm btn-outline-primary" id="btnEqui2">Dividir en 2</button>
+    <button type="button" class="btn btn-sm btn-outline-primary" id="btnEqui3">Dividir en 3</button>
+  </div>`;
+  c.innerHTML = helpers + items;
+  // Listeners
+  c.querySelectorAll('input[type="range"]').forEach(r=>{
+    r.addEventListener('input', (ev)=>{
+      const i = parseInt(ev.target.getAttribute('data-divider-index'));
+      const val = parseInt(ev.target.value);
+      if (!Number.isNaN(i) && currentParams.verticalDividers && currentParams.verticalDividers[i]){
+        currentParams.verticalDividers[i].positionX = val;
+        updateFurniture(true);
+        triggerAutoCreateOrSave();
+      }
+    });
+  });
+  c.querySelectorAll('button[data-action="rm-divider"]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const i = parseInt(btn.getAttribute('data-index'));
+      if (!Number.isNaN(i)){
+        currentParams.verticalDividers.splice(i,1);
+        updateFurniture();
+        triggerAutoCreateOrSave();
+        generateDividerPositionControls();
+      }
+    });
+  });
+  const equi2 = document.getElementById('btnEqui2');
+  const equi3 = document.getElementById('btnEqui3');
+  if (equi2) equi2.addEventListener('click', ()=>{ setEqualDivisions(2); });
+  if (equi3) equi3.addEventListener('click', ()=>{ setEqualDivisions(3); });
+}
+
+function setEqualDivisions(segmentCount){
+  const p = currentParams || {};
+  const innerW = (p.width||0) - 2 * (p.thickness||0);
+  const neededDividers = Math.max(0, segmentCount - 1);
+  currentParams.verticalDividers = [];
+  for (let i=1;i<=neededDividers;i++){
+    const pos = Math.round(innerW * (i/(segmentCount)));
+    currentParams.verticalDividers.push({ positionX: pos });
+  }
+  updateFurniture();
+  triggerAutoCreateOrSave();
+  generateDividerPositionControls();
+}
+
+function createBox(w, h, d, material) {
+  const g = new THREE.Group();
+  const geo = new THREE.BoxGeometry(w, h, d);
+  const m = new THREE.Mesh(geo, material);
+  const e = new THREE.EdgesGeometry(geo);
+  const l = new THREE.LineSegments(e, edgeMaterial);
+  g.add(m, l);
+  return g;
+}
+
+function addFrontEdgeBand(group, w, h, d) {
+  // Agrega una tira delgada en el frente (+Z) para simular tapacanto frontal
+  const thickness = 2;
+  const bandGroup = new THREE.Group();
+  const geo = new THREE.BoxGeometry(w, h, thickness);
+  const mesh = new THREE.Mesh(geo, tapacantoMaterial);
+  bandGroup.add(mesh);
+  bandGroup.position.z = d/2 + (thickness/2) - 0.01;
+  group.add(bandGroup);
+}
+
+function generateCutList(config) {
+  const p = currentParams; let html = '<ul class="mb-0">'; textToExport = 'Lista de Corte:\n\n';
+  const addPart = (name, count, w, h) => {
+    if (count > 0 && w > 0 && h > 0) { const line = `${count} x ${name}: ${w.toFixed(0)} x ${h.toFixed(0)} mm`; html += `<li>${line}</li>`; textToExport += `- ${line}\n`; }
+  };
+  addPart('Lateral', 2, p.depth, p.height);
+  addPart('Base/Techo', 2, p.width - 2 * p.thickness, p.depth);
+  if (config.name === 'Mueble Aéreo de Cocina (2 Puertas)') {
+    const gap = 2; const doorH = parseFloat(document.getElementById('door-height').value) || p.height - (2 * gap);
+    const autoWidth = p.width / 2 - gap; const leftDoorW = parseFloat(document.getElementById('left-door-width').value) || autoWidth; const rightDoorW = parseFloat(document.getElementById('right-door-width').value) || autoWidth;
+    addPart('Amarre', 2, p.width - 2 * p.thickness, 100);
+    if (p.addBack) addPart('Fondo (3mm)', 1, p.width - 2 * p.thickness, p.height - 200);
+    if (p.shelfCount > 0) addPart('Estante', p.shelfCount, p.width - 2 * p.thickness, p.depth - p.thickness);
+    addPart('Puerta Izquierda', 1, leftDoorW, doorH); addPart('Puerta Derecha', 1, rightDoorW, doorH);
+  } else if (config.name === 'Mueble Aéreo de Cocina (1 Puerta)') {
+    const gap = 2; const doorH = parseFloat(document.getElementById('door-height').value) || p.height - (2 * gap);
+    const autoWidth = p.width - (2 * gap); const doorW = parseFloat(document.getElementById('left-door-width').value) || autoWidth;
+    addPart('Amarre', 2, p.width - 2 * p.thickness, 100);
+    if (p.addBack) addPart('Fondo (3mm)', 1, p.width - 2 * p.thickness, p.height - 200);
+    if (p.shelfCount > 0) addPart('Estante', p.shelfCount, p.width - 2 * p.thickness, p.depth - p.thickness);
+    addPart('Puerta', 1, doorW, doorH);
+  } else {
+    const moduleName = config.name;
+    if (moduleName.includes('Divisiones') || moduleName.includes('Personalizada')) {
+      if (p.verticalDividers && p.verticalDividers.length > 0) addPart('Divisor Vertical', p.verticalDividers.length, p.depth, p.height - 2 * p.thickness);
+      if (p.shelfCount > 0) {
+        const stops = [0, ...p.verticalDividers.map(d => d.positionX), p.width - p.thickness * 2].sort((a, b) => a - b);
+        for (let i = 0; i < stops.length - 1; i++) {
+          const segmentWidth = stops[i+1] - stops[i] - (i > 0 ? p.thickness : 0);
+          addPart(`Segmento Estante`, p.shelfCount, segmentWidth, p.depth);
+        }
+      }
+    } else {
+      addPart('Estante', p.shelfCount, p.width - 2 * p.thickness, p.depth);
+    }
+  }
+  html += '</ul>';
+  cutListDiv.innerHTML = html;
+}
+
+function exportToFile() { const blob = new Blob([textToExport], { type: 'text/plain' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = 'lista_de_corte.txt'; link.click(); URL.revokeObjectURL(link.href); }
+
+function onMouseClick(event) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  const mouse = new THREE.Vector2();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+  const raycaster = new THREE.Raycaster();
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(clickableObjects, true);
+  if (intersects.length > 0) {
+    const clickedObject = intersects[0].object;
+    if (clickedObject.userData && clickedObject.userData.pivot) {
+      const { pivot, isOpen, type, side } = clickedObject.userData;
+      if (type === 'door') {
+        const angle = side === 'left' ? -Math.PI / 1.8 : Math.PI / 1.8;
+        const targetRotation = { y: isOpen ? 0 : angle };
+        new TWEEN.Tween(pivot.rotation).to(targetRotation, 500).easing(TWEEN.Easing.Quadratic.Out).start();
+        clickedObject.userData.isOpen = !isOpen;
+      }
+    }
+  }
+}
+
+function animate() { requestAnimationFrame(animate); TWEEN.update(); controls.update(); renderer.render(scene, camera); }
+
+allInputs.forEach(input => { input.addEventListener('input', () => updateFurniture(false)); });
+if (addDividerBtn) addDividerBtn.addEventListener('click', () => {
+  const p = currentParams || {};
+  const innerW = (p.width||0) - 2 * (p.thickness||0);
+  currentParams.verticalDividers = currentParams.verticalDividers || [];
+  const n = currentParams.verticalDividers.length;
+  // Insertar siguiente divisor para tender a espacios iguales: posición = innerW * (n+1)/(n+2)
+  const pos = Math.round(innerW * ((n+1)/(n+2)));
+  currentParams.verticalDividers.push({ positionX: pos });
+  updateFurniture();
+  triggerAutoCreateOrSave();
+  generateDividerPositionControls();
+});
+window.addEventListener('click', onMouseClick, false);
+
+// Responsivo al redimensionar
+window.addEventListener('resize', () => {
+  const w = viewer.clientWidth; const h = viewer.clientHeight;
+  camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h);
+});
+
+updateFurniture();
+animate();
+
+// ======= Carga de catálogos (Materiales/Tapacantos) y guardado =======
+async function loadCatalogs() {
+  try {
+    const [matsRes, tapsRes] = await Promise.all([
+      fetch('{% url "config3d_materiales_json" %}'),
+      fetch('{% url "config3d_tapacantos_json" %}')
+    ]);
+    const mats = await matsRes.json(); const taps = await tapsRes.json();
+    if (mats.success) materialesCatalog = mats.materiales; else materialesCatalog = [];
+    if (taps.success) tapacantosCatalog = taps.tapacantos; else tapacantosCatalog = [];
+    // Poblar selects
+    materialSelect.innerHTML = materialesCatalog.map(m => `<option value="${m.id}" data-color="${m.color}" data-espesor="${m.espesor}">${m.nombre} (${m.espesor}mm)</option>`).join('');
+    tapacantoSelect.innerHTML = ['<option value="">(Sin tapacanto)</option>'].concat(tapacantosCatalog.map(t => `<option value="${t.id}" data-color="${t.color}">${t.nombre}</option>`)).join('');
+    // Set material inicial
+    const m0 = materialesCatalog[0];
+    if (m0) {
+      mainMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color(m0.color) });
+      document.getElementById('thickness').value = m0.espesor;
+      updateFurniture();
+    }
+  } catch (e) {
+    console.error('Error cargando catálogos', e);
+  }
+}
+
+materialSelect.addEventListener('change', () => {
+  const opt = materialSelect.options[materialSelect.selectedIndex];
+  const col = opt.getAttribute('data-color');
+  const esp = opt.getAttribute('data-espesor');
+  if (col) mainMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color(col) });
+  if (esp) document.getElementById('thickness').value = esp;
+  updateFurniture();
+});
+
+tapacantoSelect.addEventListener('change', () => {
+  const opt = tapacantoSelect.options[tapacantoSelect.selectedIndex];
+  const col = opt ? opt.getAttribute('data-color') : null;
+  if (col) tapacantoMaterial = new THREE.MeshLambertMaterial({ color: new THREE.Color(col) });
+  updateFurniture(true);
+});
+
+exportBtn.addEventListener('click', exportToFile);
+
+saveProjectBtn.textContent = 'Guardar y salir';
+saveProjectBtn.addEventListener('click', async () => {
+  // Guardar y recargar para limpiar campos (sin optimizar ni PDF)
+  try {
+    if (!proyectoId){
+      const ok = await createProjectIfNeeded();
+      if (!ok){
+        // Pedir datos mínimos si no se pudo crear automáticamente
+        const nombreProyecto = prompt('Nombre del proyecto:', nombreProyectoInput.value||'Proyecto');
+        if (!nombreProyecto) return;
+        const clienteRut = prompt('RUT del cliente:', rutClienteInput.value||'');
+        const clienteNombre = prompt('Nombre del cliente:', clienteInput.value||'');
+        if (!clienteRut || !clienteNombre) return;
+        nombreProyectoInput.value = nombreProyecto; rutClienteInput.value = clienteRut; clienteInput.value = clienteNombre;
+        const ok2 = await createProjectIfNeeded();
+        if (!ok2){ alert('No se pudo crear el proyecto automáticamente.'); return; }
+      }
+    }
+    await autosave();
+    setGuardando('Guardado. Saliendo...');
+    setTimeout(()=>{ window.location.reload(); }, 800);
+  } catch(e){ console.error(e); alert('Error al guardar: '+(e.message||e)); }
+});
+
+goOptimizerBtn.addEventListener('click', async () => {
+  // Mantener animación, crear/guardar proyecto, y abrir el optimizador con overlay persistente
+  try {
+    // Mostrar animación inmediatamente
+    showProcess('stage-cut','Preparando optimizador…');
+    // Setear bandera ANTES de salir para que el overlay aparezca apenas cargue el optimizador
+    try { sessionStorage.setItem('cfg3d_loading_pid', String(proyectoId || '')); } catch(_e) {}
+    // Asegurar proyecto creado y guardado
+    if (!proyectoId){
+      const ok = await createProjectIfNeeded();
+      if (!ok){ hideProcess(); alert('Completa Cliente y RUT para crear el proyecto primero.'); return; }
+    }
+    await autosave();
+
+    // Ejecutar optimización rápida (si falla, el optimizador hará fallback a optimizar)
+    try {
+      const cfg = buildConfiguracionPayload();
+      const mat = cfg.material || {};
+      const tap = cfg.tapacanto || {};
+      const payload = {
+        proyecto_id: proyectoId,
+        material_index: 1,
+        configuracion_material: {
+          material_id: mat.id,
+          ancho_custom: mat.ancho,
+          largo_custom: mat.largo,
+          margen_x: 10,
+          margen_y: 10,
+          desperdicio_sierra: 3,
+          tapacanto_codigo: tap.codigo || '',
+          tapacanto_nombre: tap.nombre || ''
+        },
+        piezas: toOptimizerPieces(cfg.cut_list)
+      };
+      await fetch('{% url "optimizar_material" %}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    } catch(_e) { /* fallback en optimizador */ }
+
+    // Redirigir al optimizador con el proyecto cargado; el overlay del optimizador se encargará de ocultarse al terminar
+    const abrirUrl = '{% url "optimizador_abrir" 0 %}'.replace('/0/', `/${proyectoId}/`);
+    window.location.href = abrirUrl;
+  } catch(e){ console.error(e); hideProcess(); alert('No se pudo abrir el optimizador: '+(e.message||e)); }
+});
+
+function buildConfiguracionPayload() {
+  const selectedMatId = materialSelect.value ? parseInt(materialSelect.value) : null;
+  const selectedMat = materialesCatalog.find(m => m.id === selectedMatId) || null;
+  const selectedTapId = tapacantoSelect.value ? parseInt(tapacantoSelect.value) : null;
+  const selectedTap = tapacantosCatalog.find(t => t.id === selectedTapId) || null;
+  const config = moduleConfigs[moduleSelector.value];
+  const p = currentParams;
+  return {
+    modulo: { key: moduleSelector.value, name: config ? config.name : '' },
+    params: p,
+    material: selectedMat,
+    tapacanto: selectedTap,
+    cut_list: computeCutListDetailed(config)
+  };
+}
+
+function computeCutListDetailed(config) {
+  const p = currentParams; const items = [];
+  items.push({ nombre: 'Lateral', cantidad: 2, ancho: p.depth, alto: p.height, tapacantos: { derecha: true } });
+  items.push({ nombre: 'Base/Techo', cantidad: 2, ancho: p.width - 2*p.thickness, alto: p.depth, tapacantos: { arriba: true } });
+  const name = (config && config.name) || '';
+  if (name.includes('Cocina')) {
+    if (p.addBack) items.push({ nombre: 'Fondo (3mm)', cantidad: 1, ancho: p.width - 2*p.thickness, alto: p.height - 200, tapacantos: {} });
+    if (p.shelfCount > 0) items.push({ nombre: 'Estante', cantidad: p.shelfCount, ancho: p.width - 2*p.thickness, alto: p.depth - p.thickness, tapacantos: { arriba: true } });
+  } else if (name.includes('Estantería')) {
+    if (p.shelfCount > 0) {
+      const innerW = p.width - 2 * p.thickness;
+      const stops = [0, ...(p.verticalDividers||[]).map(d=>d.positionX), innerW].sort((a,b)=>a-b);
+      if (stops.length<=2){
+        items.push({ nombre: 'Estante', cantidad: p.shelfCount, ancho: innerW, alto: p.depth, tapacantos: { arriba: true } });
+      } else {
+        for (let i=0;i<stops.length-1;i++){
+          const segW = stops[i+1] - stops[i] - (i>0 ? p.thickness : 0);
+          if (segW>0){ items.push({ nombre: 'Segmento Estante', cantidad: p.shelfCount, ancho: segW, alto: p.depth, tapacantos: { arriba: true } }); }
+        }
+      }
+    }
+  }
+  return items;
+}
+
+// ====== Cliente: búsqueda y helpers (reutiliza endpoint general) ======
+// ====== Utilidades de proceso/optimización PDF ======
+function showProcess(stageClass, text){
+  const ov = document.getElementById('process-overlay');
+  const box = ov?.querySelector('.board-anim');
+  const txt = document.getElementById('process-text');
+  if (ov){ ov.classList.remove('d-none'); }
+  if (box){ box.classList.remove('stage-cut','stage-pdf'); if (stageClass) box.classList.add(stageClass); }
+  if (txt){ txt.textContent = text || 'Procesando…'; }
+}
+function hideProcess(){ const ov = document.getElementById('process-overlay'); if (ov){ ov.classList.add('d-none'); } }
+
+function toOptimizerPieces(items){
+  // Mapea la lista de cortes del configurador a formato del optimizador
+  return (items||[]).map(it=>({
+    nombre: it.nombre,
+    ancho: it.ancho,
+    largo: it.alto, // mapear alto -> largo para optimizador
+    cantidad: it.cantidad||1,
+    veta_libre: false,
+    tapacantos: it.tapacantos || {}
+  }));
+}
+
+async function optimizarYGenerarPdf(){
+  if (!proyectoId) return false;
+  try{
+    const cfg = buildConfiguracionPayload();
+    const mat = cfg.material || {};
+    const tap = cfg.tapacanto || {};
+    showProcess('stage-cut','Generando optimización…');
+    const payload = {
+      proyecto_id: proyectoId,
+      material_index: 1,
+      configuracion_material: {
+        material_id: mat.id,
+        ancho_custom: mat.ancho,
+        largo_custom: mat.largo,
+        margen_x: 10,
+        margen_y: 10,
+        desperdicio_sierra: 3,
+        tapacanto_codigo: tap.codigo || '',
+        tapacanto_nombre: tap.nombre || ''
+      },
+      piezas: toOptimizerPieces(cfg.cut_list)
+    };
+    // Ejecutar optimización
+    const resp = await fetch('{% url "optimizar_material" %}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await resp.json();
+    if (!data || data.success === false){ throw new Error(data && data.message || 'Error al optimizar'); }
+    // Generar PDF
+    showProcess('stage-pdf','Generando PDF…');
+    const pdfUrl = '{% url "exportar_pdf" 0 %}'.replace('/0/', `/${proyectoId}/`) + '?fast=1&force=1';
+    await fetch(pdfUrl, { method: 'GET' });
+    return true;
+  }catch(e){ console.error(e); showProcess('', 'Error en proceso'); setTimeout(hideProcess, 1200); return false; }
+}
+
+loadCatalogs();
+clienteInput.addEventListener('input', (e)=>{
+  const v = e.target.value.trim();
+  // Autogenerar nombre si vacío
+  if (!nombreProyectoInput.value) generarNombreProyecto();
+  buscarClientes(v);
+  clienteSeleccionado = null; // hasta confirmar selección exacta
+  triggerAutoCreateOrSave();
+});
+clienteInput.addEventListener('change', ()=>{
+  // Intentar casar con opción exacta del datalist
+  const datalist = document.getElementById('clientesDatalist');
+  const opts = datalist ? datalist.querySelectorAll('option') : [];
+  const val = clienteInput.value.trim();
+  opts.forEach(opt=>{
+    if (opt.value === val && opt.dataset.id){
+      clienteSeleccionado = { id: parseInt(opt.dataset.id), nombre: opt.value, rut: opt.dataset.rut||'' };
+      if (opt.dataset.rut){ rutClienteInput.value = opt.dataset.rut; }
+      rutClienteInput.disabled = true;
+    }
+  });
+  if (!clienteSeleccionado){ rutClienteInput.disabled = false; }
+  generarNombreProyecto();
+  triggerAutoCreateOrSave();
+});
+
+rutClienteInput.addEventListener('input', ()=>{ formatearRUT(rutClienteInput); triggerAutoCreateOrSave(); });
+nombreProyectoInput.addEventListener('input', ()=>{ triggerAutoCreateOrSave(); });
+
+function buscarClientes(q){
+  const query = (q||'').trim(); if (query.length < 3){ document.getElementById('clientesDatalist').innerHTML=''; return; }
+  window.clearTimeout(window.__cliDeb);
+  window.__cliDeb = setTimeout(async ()=>{
+    try{
+      const resp = await fetch(`{% url 'buscar_clientes_ajax' %}?q=${encodeURIComponent(query)}`);
+      const data = await resp.json();
+      const dl = document.getElementById('clientesDatalist');
+      dl.innerHTML = '';
+      (data.clientes||[]).forEach(c=>{
+        const o = document.createElement('option');
+        o.value = c.nombre; o.dataset.id = c.id; o.dataset.rut = c.rut||''; dl.appendChild(o);
+      });
+      if (!data.clientes || data.clientes.length===0){ const o = document.createElement('option'); o.value='[NUEVO CLIENTE]'; dl.appendChild(o); }
+    }catch(e){ console.error('buscarClientes',e); }
+  }, 250);
+}
+
+function generarNombreProyecto(){
+  const cli = clienteInput.value || 'Proyecto';
+  const fecha = new Date().toLocaleDateString('es-CL');
+  if (!nombreProyectoInput.value || nombreProyectoInput.value.includes(' - ')){
+    nombreProyectoInput.value = `${cli} - ${fecha}`;
+  }
+}
+
+function formatearRUT(input){
+  let v = (input.value||'').replace(/[^0-9kK]/g,'').replace(/k/g,'K');
+  if (v.length>=2){ const cuerpo=v.slice(0,-1).replace(/\B(?=(\d{3})+(?!\d))/g,'.'); const dv=v.slice(-1); v = cuerpo+'-'+dv; }
+  input.value = v;
+}
+
+// ====== Auto-crear y Autosave ======
+function setGuardando(txt){ estadoGuardado.textContent = txt || ''; }
+
+async function createProjectIfNeeded(){
+  if (proyectoId) return true;
+  // Reunir datos de cliente
+  let payload = { nombre: nombreProyectoInput.value || 'Proyecto', descripcion: 'Proyecto desde Configurador 3D', configuracion: buildConfiguracionPayload() };
+  if (clienteSeleccionado && clienteSeleccionado.id){ payload.cliente_id = clienteSeleccionado.id; }
+  else {
+    const nombreCli = (clienteInput.value||'').trim(); const rutCli = (rutClienteInput.value||'').trim();
+    if (!nombreCli || rutCli.length < 3) return false; // requerimos al menos algo válido para crear
+    payload.cliente_nombre = nombreCli; payload.cliente_rut = rutCli;
+  }
+  setGuardando('Creando proyecto…');
+  try{
+    const resp = await fetch('{% url "crear_proyecto_optimizacion" %}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+    const data = await resp.json();
+    if (data.success){
+      proyectoId = data.proyecto_id; proyectoFolio = data.folio||''; folioProyectoInput.value = proyectoFolio; setGuardando('Guardado');
+      return true;
+    } else { setGuardando(data.message||'Error al crear'); return false; }
+  }catch(e){ console.error(e); setGuardando('Error al crear'); return false; }
+}
+
+async function autosave(){
+  if (!proyectoId) return;
+  setGuardando('Guardando…');
+  try{
+    const resp = await fetch('{% url "config3d_autosave" %}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ proyecto_id: proyectoId, nombre: nombreProyectoInput.value||'', configuracion: buildConfiguracionPayload() }) });
+    const data = await resp.json();
+    if (data.success){ setGuardando('Guardado'); }
+    else { setGuardando(data.message||'Error al guardar'); }
+  }catch(e){ console.error(e); setGuardando('Error al guardar'); }
+}
+
+function triggerAutoCreateOrSave(){
+  // Se llama en cambios de campos; crea si no existe; luego autosave con debounce
+  createProjectIfNeeded().then((ok)=>{
+    if (ok){
+      clearTimeout(autosaveTimer);
+      autosaveTimer = setTimeout(autosave, 500);
+    }
+  });
+}
+
+// Conectar autosave a cambios de controles relevantes
+[...document.querySelectorAll('#controls input, #controls select, #module-type')].forEach(el=>{
+  el.addEventListener('input', ()=>{ triggerAutoCreateOrSave(); });
+  el.addEventListener('change', ()=>{ triggerAutoCreateOrSave(); });
+});
+
+loadCatalogs();
+</script>
+{% endblock %}

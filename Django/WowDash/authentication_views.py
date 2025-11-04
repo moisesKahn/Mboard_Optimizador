@@ -13,14 +13,15 @@ def forgotPassword(request):
 @ensure_csrf_cookie
 def signin(request):
     if request.method == 'POST':
-        username = request.POST['username']
-        password = request.POST['password']
+        # Normalizar el usuario (espacios accidentales). No modificar la contraseña.
+        username = (request.POST.get('username') or '').strip()
+        password = request.POST.get('password') or ''
         user = authenticate(request, username=username, password=password)
         # Fallback: permitir login por email si se ingresó un correo
         if user is None and '@' in username:
             try:
                 from django.contrib.auth.models import User
-                candidate = User.objects.filter(email__iexact=username).first()
+                candidate = User.objects.filter(email__iexact=username.strip()).first()
                 if candidate:
                     user = authenticate(request, username=candidate.username, password=password)
             except Exception:

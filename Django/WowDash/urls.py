@@ -40,6 +40,7 @@ from WowDash import operator_views
 from WowDash import chat_views
 from WowDash import search_views
 from WowDash import api_views
+from WowDash import configurador_views
 from WowDash import operator_views
 from WowDash import api_views
 
@@ -186,6 +187,13 @@ urlpatterns = [
     path('login/', auth_views.LoginView.as_view(template_name='authentication/signin.html'), name='login'),
     path('logout/', authentication_views.signout, name='logout'),
     path('accounts/login/', auth_views.LoginView.as_view(template_name='authentication/signin.html'), name='accounts_login'),
+
+# herramientas / super admin
+    path('herramientas/configurador-3d/', configurador_views.configurador_3d, name='configurador_3d'),
+    path('herramientas/configurador-3d/materiales-json/', configurador_views.materiales_json, name='config3d_materiales_json'),
+    path('herramientas/configurador-3d/tapacantos-json/', configurador_views.tapacantos_json, name='config3d_tapacantos_json'),
+    path('herramientas/configurador-3d/autosave/', configurador_views.configurador_autosave, name='config3d_autosave'),
+    path('herramientas/configurador-3d/exportar-pdf/<int:proyecto_id>/', configurador_views.configurador_pdf, name='config3d_exportar_pdf'),
 
 # blog routes
     path('blog/add-blog', blog_views.addBlog, name='addBlog'),
