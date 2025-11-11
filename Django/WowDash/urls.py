@@ -83,12 +83,16 @@ urlpatterns = [
     path('materiales/tableros/eliminar/<int:tablero_id>/', material_views.delete_tablero, name='delete_tablero'),
     path('materiales/tableros/search/', material_views.tableros_search_ajax, name='tableros_search_ajax'),
     path('materiales/tableros/importar', material_views.importar_tableros_csv, name='importar_tableros_csv'),
+    path('materiales/tableros/plantilla.csv', material_views.descargar_plantilla_tableros, name='descargar_plantilla_tableros'),
+    path('materiales/tableros/plantilla_excel.csv', material_views.descargar_plantilla_tableros_excel, name='descargar_plantilla_tableros_excel'),
     path('materiales/tapacantos/', material_views.tapacantos_list, name='tapacantos'),
     path('materiales/tapacantos/agregar/', material_views.add_tapacanto, name='add_tapacanto'),
     path('materiales/tapacantos/editar/<int:tapacanto_id>/', material_views.edit_tapacanto, name='edit_tapacanto'),
     path('materiales/tapacantos/eliminar/<int:tapacanto_id>/', material_views.delete_tapacanto, name='delete_tapacanto'),
     path('materiales/tapacantos/search/', material_views.tapacantos_search_ajax, name='tapacantos_search_ajax'),
     path('materiales/tapacantos/importar', material_views.importar_tapacantos_csv, name='importar_tapacantos_csv'),
+    path('materiales/tapacantos/plantilla.csv', material_views.descargar_plantilla_tapacantos, name='descargar_plantilla_tapacantos'),
+    path('materiales/tapacantos/plantilla_excel.csv', material_views.descargar_plantilla_tapacantos_excel, name='descargar_plantilla_tapacantos_excel'),
 
 # optimizador routes
     path('optimizador/', optimizer_views.optimizador_home, name='optimizador_home'),  # clásico por defecto

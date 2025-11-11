@@ -9,17 +9,59 @@
             <iconify-icon icon="solar:plus-outline" class="text-xl"></iconify-icon>
             Agregar Tablero
         </a>
-        <input type="file" id="importFileTableros" accept=".csv,.xlsx" class="d-none">
+                <input type="file" id="importFileTableros" accept=".csv" class="d-none">
         <button type="button" class="btn btn-sm btn-success-600 radius-8 d-flex align-items-center gap-1" onclick="document.getElementById('importFileTableros').click()">
             <iconify-icon icon="solar:import-outline" class="text-xl"></iconify-icon>
             Importar Tableros
         </button>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-secondary radius-8 d-flex align-items-center gap-1 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <iconify-icon icon="solar:download-linear" class="text-xl"></iconify-icon>
+                        Descargar plantilla
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'descargar_plantilla_tableros' %}">CSV estándar (,)</a></li>
+                        <li><a class="dropdown-item" href="{% url 'descargar_plantilla_tableros_excel' %}">CSV para Excel (;)</a></li>
+                    </ul>
+                </div>
     </div>
 </div>
+
+<!-- Modal de opciones de importación -->
+<div class="modal fade" id="modalOpcionesImport" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Importar tableros</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>¿Cómo deseas aplicar la importación?</p>
+                <p class="mb-2"><strong>Registros detectados:</strong> <span id="importPreviewCountTableros">0</span></p>
+                <ul class="mb-3">
+                    <li><strong>Reemplazar</strong>: desactiva la lista actual y carga solo los del archivo.</li>
+                    <li><strong>Agregar</strong>: mantiene la lista actual y agrega/actualiza por código.</li>
+                </ul>
+                <div class="small text-muted">
+                    Formato esperado CSV: codigo,nombre,tipo,espesor_mm,ancho_mm,largo_mm,precio_tablero,stock.
+                    La organización se asigna automáticamente según tu usuario.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btnImportReplace">Reemplazar</button>
+                <button type="button" class="btn btn-success" id="btnImportAppend">Agregar</button>
+            </div>
+        </div>
+    </div>
+ </div>
 
 <div class="card basic-data-table">
     <div class="card-header">
         <h5 class="card-title mb-0">Gestión de Tableros</h5>
+        <div class="text-muted small mt-2">
+            Columnas requeridas: <code>codigo</code>, <code>nombre</code>, <code>tipo</code>, <code>espesor_mm</code>, <code>ancho_mm</code>, <code>largo_mm</code>, <code>precio_tablero</code>, <code>stock</code>. El ancho debe ser la medida mayor. La organización se asigna automáticamente. Si en Excel ves todo en una sola celda, usa la opción “CSV para Excel (;)” al descargar.
+        </div>
         <div class="mt-3">
             <div class="row g-3">
                 <div class="col-md-4">
@@ -187,29 +229,41 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 // Importación CSV/XLSX de tableros en cliente (validación básica: ancho debe ser la mayor medida)
+let _importTextTableros = null;
+let _importDelimiter = ',';
 document.getElementById('importFileTableros').addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     const ext = file.name.split('.').pop().toLowerCase();
-    if (!['csv'].includes(ext)) { alert('Por ahora se admite CSV (separador coma).'); return; }
+    if (!['csv'].includes(ext)) { alert('Por ahora se admite CSV.'); return; }
     const text = await file.text();
+    _importTextTableros = text;
     // Formato esperado CSV con encabezados: codigo,nombre,tipo,espesor_mm,ancho_mm,largo_mm,precio_m2,stock
     // Alternativamente puede usar precio_tablero (CLP) en vez de precio_m2, y se deriva el otro valor.
     const rows = text.split(/\r?\n/).filter(r => r.trim().length);
     const header = rows.shift();
-    const cols = header.split(',').map(h => h.trim().toLowerCase());
-    const baseRequired = ['codigo','nombre','tipo','espesor_mm','ancho_mm','largo_mm','stock'];
+    // Detectar delimitador (coma o punto y coma)
+    const delim = (header.includes(';') && (!header.includes(',') || header.split(';').length >= header.split(',').length)) ? ';' : ',';
+    _importDelimiter = delim;
+    const cols = header.split(delim).map(h => h.trim().toLowerCase());
+    const baseRequired = ['codigo','nombre','tipo'];
     const hasPrecioM2 = cols.includes('precio_m2');
     const hasPrecioTab = cols.includes('precio_tablero');
     const missing = baseRequired.filter(k => !cols.includes(k));
-    if (!hasPrecioM2 && !hasPrecioTab) missing.push('precio_m2 o precio_tablero');
+    const hasEspesor = cols.includes('espesor_mm') || cols.includes('espesor');
+    const hasAncho = cols.includes('ancho_mm') || cols.includes('ancho');
+    const hasLargo = cols.includes('largo_mm') || cols.includes('largo');
+    if (!hasEspesor) missing.push('espesor_mm');
+    if (!hasAncho) missing.push('ancho_mm');
+    if (!hasLargo) missing.push('largo_mm');
+    if (!hasPrecioM2 && !hasPrecioTab) missing.push('precio_tablero (o precio_m2)');
     if (missing.length) { alert('Faltan columnas en CSV: ' + missing.join(', ')); return; }
     const idx = Object.fromEntries(cols.map((c,i)=>[c,i]));
     const errores = [];
     const items = rows.map((r, line) => {
-        const parts = r.split(',');
-        const ancho = parseFloat(parts[idx['ancho_mm']]||'0');
-        const largo = parseFloat(parts[idx['largo_mm']]||'0');
+        const parts = r.split(delim);
+        const ancho = parseFloat((parts[idx['ancho_mm']] ?? parts[idx['ancho']])||'0');
+        const largo = parseFloat((parts[idx['largo_mm']] ?? parts[idx['largo']])||'0');
         const mayor = Math.max(ancho, largo); const menor = Math.min(ancho, largo);
         if (!(mayor>0 && menor>0)) { errores.push(`Línea ${line+2}: medidas inválidas`); }
         if (mayor !== ancho) { errores.push(`Línea ${line+2}: el ancho debe ser la medida mayor (ancho=${ancho}, largo=${largo})`); }
@@ -218,19 +272,40 @@ document.getElementById('importFileTableros').addEventListener('change', async (
         if (!hasPrecioM2 && hasPrecioTab) {
             const areaM2 = (mayor*menor)/1_000_000; precio_m2 = areaM2>0 ? (precio_tablero/areaM2) : 0;
         }
-        return { linea: line+2, codigo: parts[idx['codigo']], nombre: parts[idx['nombre']], tipo: parts[idx['tipo']], espesor: parseFloat(parts[idx['espesor_mm']]), ancho: mayor, largo: menor, precio_m2, stock: parseInt(parts[idx['stock']]||'0',10) };
+        return { linea: line+2, codigo: parts[idx['codigo']], nombre: parts[idx['nombre']], tipo: parts[idx['tipo']], espesor: parseFloat((parts[idx['espesor_mm']] ?? parts[idx['espesor']])||'0'), ancho: mayor, largo: menor, precio_m2, stock: parseInt((parts[idx['stock']]||'0'),10) };
     });
     if (errores.length) { alert('No se puede importar:\n' + errores.join('\n')); return; }
-    // Aquí deberíamos enviar al servidor via fetch POST para guardar; por ahora, solo vista previa rápida
-    // Enviar al backend
-    const res = await fetch(`{% url 'importar_tableros_csv' %}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }, body: text });
+    // Mostrar modal de opciones (reemplazar o agregar)
+    const countEl = document.getElementById('importPreviewCountTableros');
+    if (countEl) countEl.textContent = rows.length.toString();
+    const modalEl = document.getElementById('modalOpcionesImport');
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+});
+
+async function ejecutarImportTableros(mode) {
+    if (!_importTextTableros) return;
+    const url = new URL(`{% url 'importar_tableros_csv' %}`, window.location.origin);
+    url.searchParams.set('mode', mode);
+    const res = await fetch(url.toString(), { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }, body: _importTextTableros });
     const data = await res.json();
     if (data.success) {
-        alert(`Importación exitosa. Creados: ${data.creados}, Actualizados: ${data.actualizados}`);
+        alert(`Importación (${mode}) exitosa. Creados: ${data.creados}, Actualizados: ${data.actualizados}`);
         location.reload();
     } else {
         alert('Errores en importación:\n' + (data.errores ? data.errores.join('\n') : data.message));
     }
+}
+
+document.getElementById('btnImportReplace').addEventListener('click', ()=>{
+    const modalEl = document.getElementById('modalOpcionesImport');
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+    ejecutarImportTableros('replace');
+});
+document.getElementById('btnImportAppend').addEventListener('click', ()=>{
+    const modalEl = document.getElementById('modalOpcionesImport');
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+    ejecutarImportTableros('append');
 });
 </script>
 

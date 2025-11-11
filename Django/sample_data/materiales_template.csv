@@ -1,5 +1,5 @@
-codigo,nombre,tipo,espesor,ancho,largo,precio_m2,stock,proveedor,organizacion_codigo
-MEL-001,Melamina Blanco,melamina,18,1830,2750,14500,50,Supplier SA,ORG_GENERAL
-MDF-015,MDF crudo,mdf,15,1830,2440,11000,30,Tableros Ltda,ORG_GENERAL
-OSB-11,OSB estándar,osb,11,1220,2440,9000,20,Forest Corp,ORG_GENERAL
-TER-18,Terciado pino,terciado,18,1220,2440,13500,15,Maderas Uno,ORG_GENERAL
+codigo,nombre,tipo,espesor_mm,ancho_mm,largo_mm,precio_tablero,stock
+MEL-001,Melamina Blanco,melamina,18,1830,2750,72971,50
+MDF-015,MDF crudo,mdf,15,1830,2440,49117,30
+OSB-11,OSB estándar,osb,11,1220,2440,26791,20
+TER-18,Terciado pino,terciado,18,1220,2440,40187,15

@@ -15,8 +15,7 @@ from django.utils import timezone
 
 @login_required
 def configurador_3d(request):
-    """Vista del Configurador 3D. Solo accesible para superusuarios."""
-    # Permitir acceso a: superusuario, super_admin u org_admin
+    """Vista del Configurador 3D. Solo accesible para superusuarios/administradores de organización."""
     allowed = False
     try:
         perfil = getattr(request.user, 'usuarioperfiloptimizador', None)
@@ -25,7 +24,6 @@ def configurador_3d(request):
     except Exception:
         allowed = request.user.is_superuser
     if not allowed:
-        # Responder con una página 403 estilizada
         return render(request, "403.html", status=403)
     return render(request, "tools/configurador_3d.html")
 

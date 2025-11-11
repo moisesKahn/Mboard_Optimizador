@@ -1,15 +1,17 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponseBadRequest, FileResponse, Http404, HttpResponse
 from django.views.decorators.http import require_POST
 import csv
 import io
+import os
 from django.db.models import Q
 from django.template.loader import render_to_string
 from core.models import Material, Tapacanto, UsuarioPerfilOptimizador
 from core.forms import MaterialForm, TapacantoForm
 from core.auth_utils import get_auth_context, is_support, is_org_admin, is_agent, is_subordinador
+from django.conf import settings
 
 def _deny_if_readonly_role(request):
     """Devuelve (denied:bool, response) si el rol no puede escribir Materiales/Tapacantos"""
@@ -96,10 +98,9 @@ def tableros_list(request):
     end = start + page_size
     materiales = materiales[start:end]
     total_pages = (total + page_size - 1) // page_size
-
     # Obtener tipos únicos para el filtro
     tipos_materiales = Material.TIPOS_MATERIAL
-    
+
     context = {
         "title": "Lista de Tableros",
         "subTitle": "Tableros",
@@ -125,22 +126,19 @@ def add_tablero(request):
     organizacion_usuario, error_response = get_user_organization(request)
     if error_response:
         return error_response
-    
+
     if request.method == 'POST':
         form = MaterialForm(request.POST)
         if form.is_valid():
             material = form.save(commit=False)
-            
-            # Super Admins pueden crear materiales para cualquier organización
-            # Por ahora, asignar a la primera organización disponible
-            if organizacion_usuario is None:  # Super Admin
+            # Super Admin asigna a primera org por simplicidad
+            if organizacion_usuario is None:
                 from core.models import Organizacion
                 primera_org = Organizacion.objects.first()
                 material.organizacion = primera_org
                 messages.info(request, f'Material asignado a organización: {primera_org.nombre}')
             else:
                 material.organizacion = organizacion_usuario
-                
             material.save()
             messages.success(request, 'Material agregado exitosamente.')
             return redirect('tableros')
@@ -148,7 +146,7 @@ def add_tablero(request):
             messages.error(request, 'Por favor corrige los errores del formulario.')
     else:
         form = MaterialForm()
-    
+
     context = {
         "title": "Agregar Tablero",
         "subTitle": "Nuevo Tablero",
@@ -469,6 +467,27 @@ def tapacantos_search_ajax(request):
     })
 
 @login_required
+def descargar_plantilla_tableros(request):
+    """Descarga el CSV de plantilla para importar Tableros."""
+    ruta = settings.BASE_DIR / 'sample_data' / 'materiales_template.csv'
+    if not os.path.exists(ruta):
+        raise Http404('Plantilla de tableros no encontrada')
+    # FileResponse maneja lectura eficiente y cabeceras adecuadas
+    response = FileResponse(open(ruta, 'rb'), content_type='text/csv')
+    response["Content-Disposition"] = 'attachment; filename="plantilla_tableros.csv"'
+    return response
+
+@login_required
+def descargar_plantilla_tapacantos(request):
+    """Descarga el CSV de plantilla para importar Tapacantos."""
+    ruta = settings.BASE_DIR / 'sample_data' / 'tapacantos_template.csv'
+    if not os.path.exists(ruta):
+        raise Http404('Plantilla de tapacantos no encontrada')
+    response = FileResponse(open(ruta, 'rb'), content_type='text/csv')
+    response["Content-Disposition"] = 'attachment; filename="plantilla_tapacantos.csv"'
+    return response
+
+@login_required
 @require_POST
 def importar_tableros_csv(request):
     """Importa tableros (Material) desde CSV subido (texto en request.body)"""
@@ -479,20 +498,46 @@ def importar_tableros_csv(request):
     if error_response:
         return JsonResponse({'success': False, 'message': 'Organización inválida'})
     try:
+        # Determinar organización destino
+        if organizacion_usuario is None:
+            from core.models import Organizacion
+            org_target = Organizacion.objects.first()
+        else:
+            org_target = organizacion_usuario
+
+        # Modo de importación: append (por defecto) o replace
+        mode = (request.GET.get('mode') or 'append').lower()
+        if mode not in ('append', 'replace'):
+            mode = 'append'
+
         payload = request.body.decode('utf-8', errors='ignore')
+        # Detectar delimitador automáticamente para soportar "," y ";"
+        sample = payload[:1024]
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=[',',';','\t'])
+            delimiter = dialect.delimiter
+        except Exception:
+            delimiter = ','
         f = io.StringIO(payload)
-        reader = csv.DictReader(f)
-        required = {'codigo','nombre','tipo','espesor_mm','ancho_mm','largo_mm'}
-        if not required.issubset({c.lower() for c in reader.fieldnames}):
+        reader = csv.DictReader(f, delimiter=delimiter)
+        fieldnames = [c.lower() for c in (reader.fieldnames or [])]
+        # Aceptar alias: espesor/espesor_mm, ancho/ancho_mm, largo/largo_mm
+        def has_any(*names):
+            return any(n in fieldnames for n in names)
+        if not (has_any('codigo') and has_any('nombre') and has_any('tipo') and has_any('espesor_mm','espesor') and has_any('ancho_mm','ancho') and has_any('largo_mm','largo')):
             return JsonResponse({'success': False, 'message': 'Columnas requeridas faltantes'}, status=400)
+        # Si es reemplazo, desactivar todos los materiales actuales del org
+        if mode == 'replace':
+            Material.objects.filter(organizacion=org_target, activo=True).update(activo=False)
         creados = 0; actualizados = 0; errores = []
         for i, row in enumerate(reader, start=2):
             try:
                 codigo = row.get('codigo') or row.get('CODIGO')
                 nombre = row.get('nombre') or row.get('NOMBRE')
                 tipo = (row.get('tipo') or '').lower()
-                espesor = float(row.get('espesor_mm') or 0)
-                a = float(row.get('ancho_mm') or 0); b = float(row.get('largo_mm') or 0)
+                espesor = float(row.get('espesor_mm') or row.get('espesor') or 0)
+                a = float((row.get('ancho_mm') or row.get('ancho') or 0) or 0)
+                b = float((row.get('largo_mm') or row.get('largo') or 0) or 0)
                 mayor, menor = (max(a,b), min(a,b))
                 if menor <= 0:
                     raise ValueError('Medidas inválidas')
@@ -508,18 +553,13 @@ def importar_tableros_csv(request):
                 else:
                     precio_m2 = 0
                 stock = int(row.get('stock') or 0)
-                defaults = dict(nombre=nombre, tipo=tipo, espesor=espesor, ancho=mayor, largo=menor, precio_m2=precio_m2, stock=stock)
-                if organizacion_usuario is None:
-                    from core.models import Organizacion
-                    org = Organizacion.objects.first()
-                else:
-                    org = organizacion_usuario
-                mat, created = Material.objects.update_or_create(codigo=codigo, organizacion=org, defaults=defaults)
+                defaults = dict(nombre=nombre, tipo=tipo, espesor=espesor, ancho=mayor, largo=menor, precio_m2=precio_m2, stock=stock, activo=True)
+                mat, created = Material.objects.update_or_create(codigo=codigo, organizacion=org_target, defaults=defaults)
                 if created: creados += 1
                 else: actualizados += 1
             except Exception as e:
                 errores.append(f'Línea {i}: {e}')
-        return JsonResponse({'success': len(errores)==0, 'creados': creados, 'actualizados': actualizados, 'errores': errores})
+        return JsonResponse({'success': len(errores)==0, 'creados': creados, 'actualizados': actualizados, 'errores': errores, 'mode': mode})
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=400)
 
@@ -531,33 +571,78 @@ def importar_tapacantos_csv(request):
     if error_response:
         return JsonResponse({'success': False, 'message': 'Organización inválida'})
     try:
+        # Determinar organización destino
+        if organizacion_usuario is None:
+            from core.models import Organizacion
+            org_target = Organizacion.objects.first()
+        else:
+            org_target = organizacion_usuario
+
+        # Modo de importación: append o replace
+        mode = (request.GET.get('mode') or 'append').lower()
+        if mode not in ('append', 'replace'):
+            mode = 'append'
+
         payload = request.body.decode('utf-8', errors='ignore')
+        sample = payload[:1024]
+        try:
+            dialect = csv.Sniffer().sniff(sample, delimiters=[',',';','\t'])
+            delimiter = dialect.delimiter
+        except Exception:
+            delimiter = ','
         f = io.StringIO(payload)
-        reader = csv.DictReader(f)
-        required = {'codigo','nombre','color','ancho_mm','espesor_mm','valor_por_metro'}
-        if not required.issubset({c.lower() for c in reader.fieldnames}):
+        reader = csv.DictReader(f, delimiter=delimiter)
+        fieldnames = [c.lower() for c in (reader.fieldnames or [])]
+        def has_any(*names):
+            return any(n in fieldnames for n in names)
+        if not (has_any('codigo') and has_any('nombre') and has_any('color') and has_any('ancho_mm','ancho') and has_any('espesor_mm','espesor') and has_any('valor_por_metro','precio_metro')):
             return JsonResponse({'success': False, 'message': 'Columnas requeridas faltantes'}, status=400)
+        # Si es replace, desactivar los existentes del org
+        if mode == 'replace':
+            Tapacanto.objects.filter(organizacion=org_target, activo=True).update(activo=False)
         creados = 0; actualizados = 0; errores = []
         for i, row in enumerate(reader, start=2):
             try:
                 codigo = row.get('codigo')
                 nombre = row.get('nombre')
                 color = row.get('color')
-                ancho = float(row.get('ancho_mm') or 0)
-                espesor = float(row.get('espesor_mm') or 0)
-                valor = float(row.get('valor_por_metro') or 0)
+                ancho = float(row.get('ancho_mm') or row.get('ancho') or 0)
+                espesor = float(row.get('espesor_mm') or row.get('espesor') or 0)
+                valor = float(row.get('valor_por_metro') or row.get('precio_metro') or 0)
                 stock_metros = float(row.get('stock_metros') or 0)
-                defaults = dict(nombre=nombre, color=color, ancho=ancho, espesor=espesor, precio_metro=valor, stock_metros=stock_metros)
-                if organizacion_usuario is None:
-                    from core.models import Organizacion
-                    org = Organizacion.objects.first()
-                else:
-                    org = organizacion_usuario
-                tap, created = Tapacanto.objects.update_or_create(codigo=codigo, organizacion=org, defaults=defaults)
+                defaults = dict(nombre=nombre, color=color, ancho=ancho, espesor=espesor, precio_metro=valor, stock_metros=stock_metros, activo=True)
+                tap, created = Tapacanto.objects.update_or_create(codigo=codigo, organizacion=org_target, defaults=defaults)
                 if created: creados += 1
                 else: actualizados += 1
             except Exception as e:
                 errores.append(f'Línea {i}: {e}')
-        return JsonResponse({'success': len(errores)==0, 'creados': creados, 'actualizados': actualizados, 'errores': errores})
+        return JsonResponse({'success': len(errores)==0, 'creados': creados, 'actualizados': actualizados, 'errores': errores, 'mode': mode})
     except Exception as e:
         return JsonResponse({'success': False, 'message': str(e)}, status=400)
+
+@login_required
+def descargar_plantilla_tableros_excel(request):
+    """Descarga una variante separada por punto y coma para Excel en español."""
+    ruta = settings.BASE_DIR / 'sample_data' / 'materiales_template.csv'
+    if not os.path.exists(ruta):
+        raise Http404('Plantilla de tableros no encontrada')
+    with open(ruta, 'r', encoding='utf-8') as f:
+        contenido = f.read()
+    # Instrucción para Excel y reemplazo de delimitador
+    contenido = 'sep=;\n' + contenido.replace(',', ';')
+    response = HttpResponse(contenido, content_type='text/csv; charset=utf-8')
+    response["Content-Disposition"] = 'attachment; filename="plantilla_tableros_excel.csv"'
+    return response
+
+@login_required
+def descargar_plantilla_tapacantos_excel(request):
+    """Variante separada por punto y coma para Excel en español."""
+    ruta = settings.BASE_DIR / 'sample_data' / 'tapacantos_template.csv'
+    if not os.path.exists(ruta):
+        raise Http404('Plantilla de tapacantos no encontrada')
+    with open(ruta, 'r', encoding='utf-8') as f:
+        contenido = f.read()
+    contenido = 'sep=;\n' + contenido.replace(',', ';')
+    response = HttpResponse(contenido, content_type='text/csv; charset=utf-8')
+    response["Content-Disposition"] = 'attachment; filename="plantilla_tapacantos_excel.csv"'
+    return response

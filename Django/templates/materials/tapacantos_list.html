@@ -9,17 +9,56 @@
             <iconify-icon icon="solar:plus-outline" class="text-xl"></iconify-icon>
             Agregar Tapacanto
         </a>
-        <input type="file" id="importFileTapacantos" accept=".csv,.xlsx" class="d-none">
+    <input type="file" id="importFileTapacantos" accept=".csv" class="d-none">
         <button type="button" class="btn btn-sm btn-success-600 radius-8 d-flex align-items-center gap-1" onclick="document.getElementById('importFileTapacantos').click()">
             <iconify-icon icon="solar:import-outline" class="text-xl"></iconify-icon>
             Importar Tapacantos
         </button>
+                <div class="btn-group">
+                    <button type="button" class="btn btn-sm btn-secondary radius-8 d-flex align-items-center gap-1 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                        <iconify-icon icon="solar:download-linear" class="text-xl"></iconify-icon>
+                        Descargar plantilla
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'descargar_plantilla_tapacantos' %}">CSV estándar (,)</a></li>
+                        <li><a class="dropdown-item" href="{% url 'descargar_plantilla_tapacantos_excel' %}">CSV para Excel (;)</a></li>
+                    </ul>
+                </div>
+        
+    </div>
+</div>
+
+<!-- Modal opciones importación tapacantos -->
+<div class="modal fade" id="modalOpcionesImportTapacantos" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Importar tapacantos</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Elige cómo aplicar la importación:</p>
+                <ul class="mb-3">
+                    <li><strong>Reemplazar</strong>: desactiva todos los tapacantos actuales y carga solo los del archivo.</li>
+                    <li><strong>Agregar</strong>: agrega nuevos y actualiza coincidencias por código.</li>
+                </ul>
+                <div class="small text-muted">Formato CSV: codigo,nombre,color,ancho_mm,espesor_mm,valor_por_metro,stock_metros (stock_metros opcional).</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-warning" id="btnImportReplaceTapacantos">Reemplazar</button>
+                <button type="button" class="btn btn-success" id="btnImportAppendTapacantos">Agregar</button>
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="card basic-data-table">
     <div class="card-header">
         <h5 class="card-title mb-0">Gestión de Tapacantos</h5>
+        <div class="text-muted small mt-2">
+            Columnas requeridas: <code>codigo</code>, <code>nombre</code>, <code>color</code>, <code>ancho_mm</code>, <code>espesor_mm</code>, <code>valor_por_metro</code>, <code>stock_metros</code> (opcional). La organización se asigna automáticamente. Si en Excel ves todo en una sola celda, usa la opción “CSV para Excel (;)”.
+        </div>
         <div class="mt-3">
             <div class="row g-3">
                 <div class="col-md-6">
@@ -145,6 +184,7 @@ function confirmDelete(button) {
 }
 
 // Importación CSV/XLSX de tapacantos (valor por metro)
+let _importTapacantosText = null;
 document.addEventListener('DOMContentLoaded', () => {
     const input = document.getElementById('importFileTapacantos');
     if (!input) return;
@@ -157,42 +197,62 @@ document.addEventListener('DOMContentLoaded', () => {
             window.location.href = url.toString();
         });
     }
-        input.addEventListener('change', async (e) => {
+    input.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
         const ext = file.name.split('.').pop().toLowerCase();
-        if (!['csv'].includes(ext)) { alert('Por ahora se admite CSV (separador coma).'); return; }
+        if (!['csv'].includes(ext)) { alert('Por ahora se admite CSV.'); return; }
         const text = await file.text();
-        // Formato esperado CSV con encabezados: codigo,nombre,color,ancho_mm,espesor_mm,valor_por_metro[,stock_metros]
+        _importTapacantosText = text;
         const rows = text.split(/\r?\n/).filter(r => r.trim().length);
         const header = rows.shift();
-        const cols = header.split(',').map(h => h.trim().toLowerCase());
+        const delim = (header.includes(';') && (!header.includes(',') || header.split(';').length >= header.split(',').length)) ? ';' : ',';
+        const cols = header.split(delim).map(h => h.trim().toLowerCase());
         const required = ['codigo','nombre','color','ancho_mm','espesor_mm','valor_por_metro'];
         const missing = required.filter(k => !cols.includes(k));
         if (missing.length) { alert('Faltan columnas en CSV: ' + missing.join(', ')); return; }
         const idx = Object.fromEntries(cols.map((c,i)=>[c,i]));
         const errores = [];
-        const items = rows.map((r, line) => {
-                const parts = r.split(',');
-                const ancho = parseFloat(parts[idx['ancho_mm']]||'0');
-                const espesor = parseFloat(parts[idx['espesor_mm']]||'0');
-                const valor = parseFloat(parts[idx['valor_por_metro']]||'0');
-            const stock = cols.includes('stock_metros') ? parseFloat(parts[idx['stock_metros']]||'0') : 0;
-                if (!(ancho>0 && espesor>0 && valor>=0 && stock>=0)) {
-                        errores.push(`Línea ${line+2}: valores inválidos`);
-                }
-                return { codigo: parts[idx['codigo']], nombre: parts[idx['nombre']], color: parts[idx['color']], ancho, espesor, precio_metro: valor, stock_metros: stock };
+        rows.forEach((r, line) => {
+          const parts = r.split(delim);
+          const ancho = parseFloat(parts[idx['ancho_mm']]||'0');
+          const espesor = parseFloat(parts[idx['espesor_mm']]||'0');
+          const valor = parseFloat(parts[idx['valor_por_metro']]||'0');
+          const stock = cols.includes('stock_metros') ? parseFloat(parts[idx['stock_metros']]||'0') : 0;
+          if (!(ancho>0 && espesor>0 && valor>=0 && stock>=0)) {
+            errores.push(`Línea ${line+2}: valores inválidos`);
+          }
         });
         if (errores.length) { alert('No se puede importar:\n' + errores.join('\n')); return; }
-        const res = await fetch(`{% url 'importar_tapacantos_csv' %}`, { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }, body: text });
-        const data = await res.json();
-        if (data.success) {
-            alert(`Importación exitosa. Creados: ${data.creados}, Actualizados: ${data.actualizados}`);
-            location.reload();
-        } else {
-            alert('Errores en importación:\n' + (data.errores ? data.errores.join('\n') : data.message));
-        }
+        const modalEl = document.getElementById('modalOpcionesImportTapacantos');
+        const modal = new bootstrap.Modal(modalEl);
+        modal.show();
     });
+});
+
+async function ejecutarImportTapacantos(mode) {
+    if (!_importTapacantosText) return;
+    const url = new URL(`{% url 'importar_tapacantos_csv' %}`, window.location.origin);
+    url.searchParams.set('mode', mode);
+    const res = await fetch(url.toString(), { method: 'POST', headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }, body: _importTapacantosText });
+    const data = await res.json();
+    if (data.success) {
+        alert(`Importación (${mode}) exitosa. Creados: ${data.creados}, Actualizados: ${data.actualizados}`);
+        location.reload();
+    } else {
+        alert('Errores en importación:\n' + (data.errores ? data.errores.join('\n') : data.message));
+    }
+}
+
+document.getElementById('btnImportReplaceTapacantos')?.addEventListener('click', ()=>{
+    const modalEl = document.getElementById('modalOpcionesImportTapacantos');
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+    ejecutarImportTapacantos('replace');
+});
+document.getElementById('btnImportAppendTapacantos')?.addEventListener('click', ()=>{
+    const modalEl = document.getElementById('modalOpcionesImportTapacantos');
+    bootstrap.Modal.getInstance(modalEl)?.hide();
+    ejecutarImportTapacantos('append');
 });
 </script>
 

@@ -1,4 +1,3 @@
-from django.views.decorators.http import require_POST
 import re
 from django.contrib.auth import authenticate
 from django.http import JsonResponse, HttpRequest
@@ -34,8 +33,11 @@ def _claims_for_user(user: User):
 
 
 @csrf_exempt
-@require_POST
 def auth_login(request: HttpRequest):
+    # Si se accede por GET desde el navegador, redirigir a la página de login HTML
+    if request.method != 'POST':
+        from django.shortcuts import redirect
+        return redirect('signin')
     try:
         import json
         data = json.loads(request.body or '{}')
