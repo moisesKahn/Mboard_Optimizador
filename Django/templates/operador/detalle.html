@@ -84,12 +84,14 @@
       list.innerHTML = '<div class="text-muted">Sin piezas en el diseño.</div>';
       return;
     }
-    list.innerHTML = piezas.map(p=>{
+    const total = piezas.length;
+    list.innerHTML = piezas.map((p, i)=>{
       const st = p.estado || 'pendiente';
       const pid = p.pieza_id;
+      const etiquetaNum = ` (${i+1}/${total})`;
       return `<div class="d-flex justify-content-between align-items-center py-1 border-bottom" data-row-pieza-id="${pid}">
         <div class="me-2">
-          <div><strong>${p.nombre||pid}</strong></div>
+          <div><strong>${p.nombre||pid}</strong> <span class="text-muted">${etiquetaNum}</span></div>
           <div class="text-muted">${p.ancho}×${p.largo} mm · (${p.x},${p.y})</div>
         </div>
         <div class="d-flex align-items-center gap-2">
