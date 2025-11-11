@@ -213,9 +213,9 @@
                             <tr>
                                 <th style="width: 50px; max-width: 50px; min-width: 50px; text-align: center;">Nº</th>
                                 <th style="width: 110px; max-width: 110px; min-width: 110px; text-align: center;">Cant.</th>
-                                <th style="min-width: 150px;">Pieza</th>
-                                <th style="width: 120px; max-width: 120px; min-width: 120px; text-align: center;">Ancho</th>
-                                <th style="width: 120px; max-width: 120px; min-width: 120px; text-align: center;">Alto</th>
+                                <th style="min-width: 150px;">Nombre de la pieza <span class="text-muted small">(ej: Pieza 1)</span></th>
+                                <th style="width: 120px; max-width: 120px; min-width: 120px; text-align: center;">Ancho (mm) <span class="text-muted small">(EJ: 600)</span></th>
+                                <th style="width: 120px; max-width: 120px; min-width: 120px; text-align: center;">Alto (mm) <span class="text-muted small">(EJ: 400)</span></th>
                                 <th style="width: 50px; max-width: 50px; min-width: 50px; text-align: center;">
                                     V.L.
                                     <div class="form-check d-inline-block ms-1 align-middle" title="Marcar/Desmarcar veta libre en todas las piezas">
@@ -239,20 +239,20 @@
                                            value="1" min="1">
                                 </td>
                                 <td>
-                                    <input type="text" class="form-control form-control-sm" 
-                                           value="Pieza 1"
-                                           placeholder="Nombre de la pieza"
+                     <input type="text" class="form-control form-control-sm" 
+                         value="Pieza 1"
+                         placeholder="ej: Pieza 1"
                                            data-es-predeterminado="true"
                                            onfocus="manejarFocoPieza(this)"
                                            onblur="manejarBlurPieza(this)">
                                 </td>
                                 <td>
-                                    <input type="number" class="form-control form-control-sm" 
-                                           placeholder="600">
+                     <input type="number" class="form-control form-control-sm" 
+                         placeholder="EJ: 600" aria-label="Ancho en milímetros" min="1">
                                 </td>
                                 <td>
-                                    <input type="number" class="form-control form-control-sm" 
-                                           placeholder="400">
+                     <input type="number" class="form-control form-control-sm" 
+                         placeholder="EJ: 400" aria-label="Alto en milímetros" min="1">
                                 </td>
                                 <td class="text-center">
                                     <input type="checkbox" class="form-check-input veta-checkbox" onchange="updateVetaLibreMaster()">
@@ -320,7 +320,7 @@
 
 <!-- Botón Optimizar abajo del segmento de piezas -->
 <div class="my-3 text-end">
-    <button class="btn btn-primary" onclick="optimizarPiezas()">
+    <button id="btnOptimizar" class="btn btn-primary" onclick="optimizarPiezas()" disabled>
         <i class="fas fa-magic"></i> Optimizar
     </button>
     <button id="btnDescargarPDF" class="btn btn-outline-secondary ms-2" onclick="descargarPDF()">
@@ -416,6 +416,13 @@
     // Estado por material (pestaña): piezas y último resultado
     const materialState = {}; // { [index]: { piezas: [...], resultado: {...} } }
     let _dirty = false; // cambios sin optimizar en el material/proyecto actual
+    // Habilita el botón Optimizar solo cuando hay al menos una pieza con ancho/alto válidos
+    document.addEventListener('input', function(e){
+        if (!document.getElementById('btnOptimizar')) return;
+        const piezas = piezasFromDOM();
+        const ok = piezas.some(p => Number(p.ancho)>0 && Number(p.alto)>0 && Number(p.cantidad)>0);
+        document.getElementById('btnOptimizar').disabled = !ok;
+    });
     let activeMaterialIndex = 1;
     // Visualización manual
     let modoManual = false;
@@ -1114,20 +1121,20 @@
                        value="1" min="1">
             </td>
             <td>
-                <input type="text" class="form-control form-control-sm" 
-                       value="Pieza ${contadorPiezas}" 
-                       placeholder="Nombre de la pieza"
-                       data-es-predeterminado="true"
-                       onfocus="manejarFocoPieza(this)"
-                       onblur="manejarBlurPieza(this)">
+          <input type="text" class="form-control form-control-sm" 
+              value="Pieza ${contadorPiezas}" 
+              placeholder="ej: Pieza ${contadorPiezas}" title="Nombre de la pieza (si lo dejas vacío se usará 'Pieza ${contadorPiezas}')"
+              data-es-predeterminado="true"
+              onfocus="manejarFocoPieza(this)"
+              onblur="manejarBlurPieza(this)">
             </td>
             <td>
-                <input type="number" class="form-control form-control-sm" 
-                       placeholder="600">
+          <input type="number" class="form-control form-control-sm" 
+              placeholder="EJ: 600" min="1" title="Ingresa ancho en mm" required>
             </td>
             <td>
-                <input type="number" class="form-control form-control-sm" 
-                       placeholder="400">
+          <input type="number" class="form-control form-control-sm" 
+              placeholder="EJ: 400" min="1" title="Ingresa alto en mm" required>
             </td>
             <td class="text-center">
                 <input type="checkbox" class="form-check-input veta-checkbox" onchange="updateVetaLibreMaster()">
@@ -2461,7 +2468,7 @@
             console.log('Recopilando piezas...');
             const piezas = recopilarPiezasDeTabla();
             if (piezas.length === 0) {
-                alert('No hay piezas para optimizar. Asegúrate de ingresar las dimensiones de las piezas.');
+                alert('No hay piezas para optimizar. Asegúrate de ingresar las dimensiones de las piezas (Ancho y Alto en mm).');
                 return;
             }
 
