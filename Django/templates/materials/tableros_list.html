@@ -14,16 +14,10 @@
             <iconify-icon icon="solar:import-outline" class="text-xl"></iconify-icon>
             Importar Tableros
         </button>
-                <div class="btn-group">
-                    <button type="button" class="btn btn-sm btn-secondary radius-8 d-flex align-items-center gap-1 dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
-                        <iconify-icon icon="solar:download-linear" class="text-xl"></iconify-icon>
-                        Descargar plantilla
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end">
-                        <li><a class="dropdown-item" href="{% url 'descargar_plantilla_tableros' %}">CSV estándar (,)</a></li>
-                        <li><a class="dropdown-item" href="{% url 'descargar_plantilla_tableros_excel' %}">CSV para Excel (;)</a></li>
-                    </ul>
-                </div>
+                        <a href="{% url 'descargar_plantilla_tableros_excel' %}" class="btn btn-sm btn-secondary radius-8 d-flex align-items-center gap-1">
+                                <iconify-icon icon="solar:download-linear" class="text-xl"></iconify-icon>
+                                Descargar plantilla (CSV para Excel)
+                        </a>
     </div>
 </div>
 
@@ -60,7 +54,7 @@
     <div class="card-header">
         <h5 class="card-title mb-0">Gestión de Tableros</h5>
         <div class="text-muted small mt-2">
-            Columnas requeridas: <code>codigo</code>, <code>nombre</code>, <code>tipo</code>, <code>espesor_mm</code>, <code>ancho_mm</code>, <code>largo_mm</code>, <code>precio_tablero</code>, <code>stock</code>. El ancho debe ser la medida mayor. La organización se asigna automáticamente. Si en Excel ves todo en una sola celda, usa la opción “CSV para Excel (;)” al descargar.
+            Columnas requeridas: <code>codigo</code>, <code>nombre</code>, <code>tipo</code>, <code>espesor_mm</code>, <code>ancho_mm</code>, <code>largo_mm</code>, <code>precio_tablero</code>, <code>stock</code>. El ancho debe ser la medida mayor. La organización se asigna automáticamente. La plantilla se descarga en formato CSV para Excel (;) para que cada dato vaya en su columna.
         </div>
         <div class="mt-3">
             <div class="row g-3">
