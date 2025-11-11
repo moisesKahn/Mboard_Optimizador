@@ -83,6 +83,11 @@
                                     <div class="col-sm-6">
                                         <label class="form-label">Rol del Sistema <span class="text-danger">*</span></label>
                                         {{ perfil_form.rol }}
+                                        {% with viewer=request.user.usuarioperfiloptimizador %}
+                                        {% if viewer and viewer.rol == 'org_admin' %}
+                                            <small class="text-secondary-light d-block mt-1">Roles disponibles: agente, subordinador u operador.</small>
+                                        {% endif %}
+                                        {% endwith %}
                                         {% if perfil_form.rol.errors %}
                                             <div class="text-danger mt-1">{{ perfil_form.rol.errors.0 }}</div>
                                         {% endif %}
@@ -98,10 +103,17 @@
                                     
                                     <div class="col-sm-6">
                                         <label class="form-label">Organización</label>
-                                        {{ perfil_form.organizacion }}
-                                        {% if perfil_form.organizacion.errors %}
-                                            <div class="text-danger mt-1">{{ perfil_form.organizacion.errors.0 }}</div>
+                                        {% with viewer=request.user.usuarioperfiloptimizador %}
+                                        {% if viewer and viewer.rol == 'org_admin' and viewer.organizacion and not viewer.organizacion.is_general %}
+                                            <!-- Mostrar como solo lectura para org_admin -->
+                                            <input type="text" class="form-control" value="{{ viewer.organizacion.nombre }} ({{ viewer.organizacion.codigo }})" readonly>
+                                        {% else %}
+                                            {{ perfil_form.organizacion }}
+                                            {% if perfil_form.organizacion.errors %}
+                                                <div class="text-danger mt-1">{{ perfil_form.organizacion.errors.0 }}</div>
+                                            {% endif %}
                                         {% endif %}
+                                        {% endwith %}
                                     </div>
                                     
                                     <!-- Estados -->

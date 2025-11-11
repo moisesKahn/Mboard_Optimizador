@@ -8,7 +8,7 @@ from django.db import transaction
 from django.utils import timezone
 from core.models import UsuarioPerfilOptimizador, AuditLog
 from core.forms import UsuarioForm, UsuarioPerfilForm
-from core.auth_utils import get_auth_context, is_support
+from core.auth_utils import get_auth_context, is_support, is_org_admin
 
 def _audit(request, verb: str, target_user: User):
     """Registrar auditoría para acciones sobre usuarios"""
@@ -37,11 +37,24 @@ def _audit(request, verb: str, target_user: User):
 def addUser(request):
     """Agregar nuevo usuario"""
     ctx = get_auth_context(request)
-    if not is_support(ctx):
-        return HttpResponseForbidden('Solo Soporte puede crear usuarios')
+    # Permitir creación a Soporte (super_admin / organización general) y a org_admin.
+    if not (is_support(ctx) or is_org_admin(ctx)):
+        return HttpResponseForbidden('Solo Soporte o Administrador de Organización puede crear usuarios')
     if request.method == 'POST':
         user_form = UsuarioForm(request.POST)
         perfil_form = UsuarioPerfilForm(request.POST)
+
+        # Ajustes de permisos para org_admin: forzar organización y limitar roles
+        if is_org_admin(ctx) and not is_support(ctx):
+            try:
+                # Limitar los roles que puede asignar (sin super_admin ni org_admin)
+                allowed_roles = ['agente', 'subordinador', 'operador']
+                perfil_form.fields['rol'].choices = [c for c in UsuarioPerfilOptimizador.ROLES if c[0] in allowed_roles]
+                # Forzar organización y deshabilitar campo
+                if 'organizacion' in perfil_form.fields:
+                    perfil_form.fields['organizacion'].disabled = True
+            except Exception:
+                pass
         
         if user_form.is_valid() and perfil_form.is_valid():
             try:
@@ -56,6 +69,12 @@ def addUser(request):
                     # Crear perfil
                     perfil = perfil_form.save(commit=False)
                     perfil.user = user
+                    # Forzar organización si org_admin
+                    if is_org_admin(ctx) and not is_support(ctx):
+                        perfil.organizacion_id = ctx.get('organization_id')
+                        # Evitar elevación de rol por manipulación del POST
+                        if perfil.rol not in ['agente', 'subordinador', 'operador']:
+                            perfil.rol = 'agente'
                     try:
                         # Si el modelo tiene must_change_password, marcarlo
                         if hasattr(perfil, 'must_change_password'):
@@ -74,6 +93,15 @@ def addUser(request):
     else:
         user_form = UsuarioForm()
         perfil_form = UsuarioPerfilForm()
+        if is_org_admin(ctx) and not is_support(ctx):
+            try:
+                allowed_roles = ['agente', 'subordinador', 'operador']
+                perfil_form.fields['rol'].choices = [c for c in UsuarioPerfilOptimizador.ROLES if c[0] in allowed_roles]
+                if 'organizacion' in perfil_form.fields:
+                    perfil_form.fields['organizacion'].initial = ctx.get('organization_id')
+                    perfil_form.fields['organizacion'].disabled = True
+            except Exception:
+                pass
     
     context = {
         "title": "Agregar Usuario",
@@ -202,9 +230,20 @@ def usersList(request):
 def editUser(request, user_id):
     """Editar usuario existente"""
     ctx = get_auth_context(request)
-    if not is_support(ctx):
-        return HttpResponseForbidden('Solo Soporte puede editar usuarios')
+    # Soporte puede editar cualquier usuario. org_admin solo usuarios de su organización (no super_admin / organización general)
     user = get_object_or_404(User, pk=user_id)
+    if not is_support(ctx):
+        if not is_org_admin(ctx):
+            return HttpResponseForbidden('Solo Soporte o Administrador de Organización puede editar usuarios')
+        # Validar que el usuario objetivo pertenece a la misma organización y no es super_admin
+        try:
+            target_perfil = user.usuarioperfiloptimizador
+            # Bloquear edición de super_admin o usuarios fuera de la organización
+            if target_perfil.rol == 'super_admin' or target_perfil.organizacion_id != ctx.get('organization_id'):
+                return HttpResponseForbidden('No autorizado para editar este usuario')
+        except UsuarioPerfilOptimizador.DoesNotExist:
+            # Si no tiene perfil aún y somos org_admin, no permitir (solo soporte puede crear/adjuntar perfil global)
+            return HttpResponseForbidden('No autorizado para editar este usuario')
     
     # Obtener o crear perfil
     try:
@@ -215,6 +254,16 @@ def editUser(request, user_id):
     if request.method == 'POST':
         user_form = UsuarioForm(request.POST, instance=user)
         perfil_form = UsuarioPerfilForm(request.POST, instance=perfil)
+        # Ajustes de permisos para org_admin
+        if is_org_admin(ctx) and not is_support(ctx):
+            try:
+                allowed_roles = ['agente', 'subordinador', 'operador']
+                perfil_form.fields['rol'].choices = [c for c in UsuarioPerfilOptimizador.ROLES if c[0] in allowed_roles]
+                # Deshabilitar organización para evitar cambios
+                if 'organizacion' in perfil_form.fields:
+                    perfil_form.fields['organizacion'].disabled = True
+            except Exception:
+                pass
         
         if user_form.is_valid() and perfil_form.is_valid():
             try:
@@ -229,6 +278,11 @@ def editUser(request, user_id):
                     # Actualizar perfil
                     perfil = perfil_form.save(commit=False)
                     perfil.user = user
+                    if is_org_admin(ctx) and not is_support(ctx):
+                        # Forzar organización y evitar elevación de rol
+                        perfil.organizacion_id = ctx.get('organization_id')
+                        if perfil.rol not in ['agente', 'subordinador', 'operador']:
+                            perfil.rol = 'agente'
                     perfil.save()
                     _audit(request, 'UPDATE_USER', user)
                     
@@ -241,6 +295,14 @@ def editUser(request, user_id):
     else:
         user_form = UsuarioForm(instance=user)
         perfil_form = UsuarioPerfilForm(instance=perfil)
+        if is_org_admin(ctx) and not is_support(ctx):
+            try:
+                allowed_roles = ['agente', 'subordinador', 'operador']
+                perfil_form.fields['rol'].choices = [c for c in UsuarioPerfilOptimizador.ROLES if c[0] in allowed_roles]
+                if 'organizacion' in perfil_form.fields:
+                    perfil_form.fields['organizacion'].disabled = True
+            except Exception:
+                pass
     
     context = {
         "title": "Editar Usuario",
@@ -389,9 +451,17 @@ def delete_user(request, user_id):
     if request.method == 'POST':
         try:
             ctx = get_auth_context(request)
-            if not is_support(ctx):
-                return JsonResponse({'success': False, 'message': 'Solo Soporte puede eliminar usuarios.'}, status=403)
             user = get_object_or_404(User, pk=user_id)
+            # Permisos: soporte puede eliminar cualquiera; org_admin solo dentro de su organización y sin eliminar super_admin
+            if not is_support(ctx):
+                if not is_org_admin(ctx):
+                    return JsonResponse({'success': False, 'message': 'Solo Soporte o Admin de Organización puede eliminar usuarios.'}, status=403)
+                try:
+                    target_perfil = user.usuarioperfiloptimizador
+                    if target_perfil.rol == 'super_admin' or target_perfil.organizacion_id != ctx.get('organization_id'):
+                        return JsonResponse({'success': False, 'message': 'No autorizado para eliminar este usuario.'}, status=403)
+                except UsuarioPerfilOptimizador.DoesNotExist:
+                    return JsonResponse({'success': False, 'message': 'No autorizado para eliminar este usuario.'}, status=403)
             
             # No permitir eliminar al usuario actual
             if user == request.user:

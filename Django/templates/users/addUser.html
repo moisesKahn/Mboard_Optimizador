@@ -34,15 +34,29 @@
                         <form method="post" id="formAddUser">
                             {% csrf_token %}
                             <div class="row gy-3">
+                                {% with viewer=request.user.usuarioperfiloptimizador %}
                                 <div class="col-sm-6">
                                     <label class="form-label">Organización <span class="text-danger">*</span></label>
-                                    {{ perfil_form.organizacion }}
-                                    {% if perfil_form.organizacion.errors %}<div class="text-danger mt-1">{{ perfil_form.organizacion.errors.0 }}</div>{% endif %}
+                                    {% if viewer and viewer.rol == 'org_admin' and viewer.organizacion and not viewer.organizacion.is_general %}
+                                        <!-- Org admin: ocultar selector y mostrar solo lectura -->
+                                        <input type="text" class="form-control" value="{{ viewer.organizacion.nombre }} ({{ viewer.organizacion.codigo }})" readonly>
+                                        <!-- Proveer código de organización para JS -->
+                                        <input type="hidden" id="org_code" value="{{ viewer.organizacion.codigo }}">
+                                    {% else %}
+                                        {{ perfil_form.organizacion }}
+                                        {% if perfil_form.organizacion.errors %}<div class="text-danger mt-1">{{ perfil_form.organizacion.errors.0 }}</div>{% endif %}
+                                    {% endif %}
                                 </div>
+                                {% endwith %}
 
                                 <div class="col-sm-6">
                                     <label class="form-label">Rol del Sistema <span class="text-danger">*</span></label>
                                     {{ perfil_form.rol }}
+                                    {% with viewer=request.user.usuarioperfiloptimizador %}
+                                    {% if viewer and viewer.rol == 'org_admin' %}
+                                        <small class="text-secondary-light d-block mt-1">Roles disponibles para administración de organización: agente, subordinador u operador.</small>
+                                    {% endif %}
+                                    {% endwith %}
                                     {% if perfil_form.rol.errors %}<div class="text-danger mt-1">{{ perfil_form.rol.errors.0 }}</div>{% endif %}
                                 </div>
 
@@ -62,7 +76,13 @@
                                     <label class="form-label">Nombre de Usuario <span class="text-danger">*</span></label>
                                     {{ user_form.username }}
                                     {% if user_form.username.errors %}<div class="text-danger mt-1">{{ user_form.username.errors.0 }}</div>{% endif %}
-                                    <small class="text-secondary-light">Se generará automáticamente al elegir organización y nombre</small>
+                                    {% with viewer=request.user.usuarioperfiloptimizador %}
+                                        {% if viewer and viewer.rol == 'org_admin' %}
+                                            <small class="text-secondary-light">Se generará automáticamente como CODORG_InicialApellido (p.ej. ABC_JPerez)</small>
+                                        {% else %}
+                                            <small class="text-secondary-light">Se generará automáticamente al elegir organización y nombre</small>
+                                        {% endif %}
+                                    {% endwith %}
                                 </div>
 
                                 <div class="col-sm-6">
@@ -115,6 +135,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     const orgSelect = document.querySelector('#id_organizacion');
+    const orgCodeHidden = document.querySelector('#org_code');
     const firstName = document.querySelector('#id_first_name');
     const lastName = document.querySelector('#id_last_name');
     const usernameInput = document.querySelector('#id_username');
@@ -123,7 +144,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function generateCredentials() {
         try {
-            const orgCode = orgSelect ? getOrgCodeFromOption(orgSelect).trim() : '';
+            let orgCode = '';
+            if (orgSelect && orgSelect.tagName === 'SELECT' && orgSelect.options.length) {
+                orgCode = getOrgCodeFromOption(orgSelect).trim();
+            } else if (orgCodeHidden) {
+                orgCode = (orgCodeHidden.value || '').trim();
+            }
             const fn = firstName ? firstName.value.trim() : '';
             const ln = lastName ? lastName.value.trim() : '';
             if (!orgCode || !fn || !ln) return;

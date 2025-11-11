@@ -14,6 +14,16 @@
     #cfg3dOverlay .spinner { width: 42px; height: 42px; border: 3px solid #cfd8dc; border-top-color: #1976d2; border-radius: 50%; margin: 0 auto 10px; animation: spin 0.9s linear infinite; }
     @keyframes spin { to { transform: rotate(360deg); } }
     #cfg3dOverlay.show { display: flex; }
+    /* Placeholders más claros para inputs de ejemplo (EJ: 600/400) */
+    .placeholder-ejemplo::placeholder {
+        color: #9aa0a6 !important; /* gris claro */
+        opacity: .75; /* un poco más transparente */
+    }
+    /* Fallback por si se agregan filas sin clase explicitamente */
+    #piezasTableBody input::placeholder {
+        color: #9aa0a6;
+        opacity: .75;
+    }
 </style>
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
     <h6 class="fw-semibold mb-0">Optimizador de Materiales</h6>
@@ -213,7 +223,7 @@
                             <tr>
                                 <th style="width: 50px; max-width: 50px; min-width: 50px; text-align: center;">Nº</th>
                                 <th style="width: 110px; max-width: 110px; min-width: 110px; text-align: center;">Cant.</th>
-                                <th style="min-width: 150px;">Nombre de la pieza <span class="text-muted small">(ej: Pieza 1)</span></th>
+                                <th style="min-width: 150px;">Nombre de la pieza <span class="text-muted small">(EJ: Pieza 1 – si lo dejas vacío se usará automáticamente)</span></th>
                                 <th style="width: 120px; max-width: 120px; min-width: 120px; text-align: center;">Ancho (mm) <span class="text-muted small">(EJ: 600)</span></th>
                                 <th style="width: 120px; max-width: 120px; min-width: 120px; text-align: center;">Alto (mm) <span class="text-muted small">(EJ: 400)</span></th>
                                 <th style="width: 50px; max-width: 50px; min-width: 50px; text-align: center;">
@@ -241,17 +251,17 @@
                                 <td>
                      <input type="text" class="form-control form-control-sm" 
                          value="Pieza 1"
-                         placeholder="ej: Pieza 1"
+                         placeholder="EJ: Pieza 1 (auto si vacío)"
                                            data-es-predeterminado="true"
                                            onfocus="manejarFocoPieza(this)"
                                            onblur="manejarBlurPieza(this)">
                                 </td>
                                 <td>
-                     <input type="number" class="form-control form-control-sm" 
+                     <input type="number" class="form-control form-control-sm placeholder-ejemplo" 
                          placeholder="EJ: 600" aria-label="Ancho en milímetros" min="1">
                                 </td>
                                 <td>
-                     <input type="number" class="form-control form-control-sm" 
+                     <input type="number" class="form-control form-control-sm placeholder-ejemplo" 
                          placeholder="EJ: 400" aria-label="Alto en milímetros" min="1">
                                 </td>
                                 <td class="text-center">
@@ -1129,11 +1139,11 @@
               onblur="manejarBlurPieza(this)">
             </td>
             <td>
-          <input type="number" class="form-control form-control-sm" 
+          <input type="number" class="form-control form-control-sm placeholder-ejemplo" 
               placeholder="EJ: 600" min="1" title="Ingresa ancho en mm" required>
             </td>
             <td>
-          <input type="number" class="form-control form-control-sm" 
+          <input type="number" class="form-control form-control-sm placeholder-ejemplo" 
               placeholder="EJ: 400" min="1" title="Ingresa alto en mm" required>
             </td>
             <td class="text-center">
