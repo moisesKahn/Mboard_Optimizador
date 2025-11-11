@@ -81,7 +81,7 @@
                       <span>Optimizador</span>
                   </a>
               </li>
-              {% if user.is_superuser %}
+              {% if user.is_superuser or user.usuarioperfiloptimizador.rol == 'super_admin' or user.usuarioperfiloptimizador.rol == 'org_admin' %}
               <li>
                   <a href="{% url 'configurador_3d' %}">
                       <iconify-icon icon="mdi:cube-outline" class="menu-icon"></iconify-icon>

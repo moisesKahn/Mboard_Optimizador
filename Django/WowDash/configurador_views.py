@@ -16,9 +16,17 @@ from django.utils import timezone
 @login_required
 def configurador_3d(request):
     """Vista del Configurador 3D. Solo accesible para superusuarios."""
-    if not request.user.is_superuser:
-        # Puedes cambiar a redirect('notFound') si prefieres una página 404 estilizada
-        return HttpResponseForbidden("No estás autorizado para ver esta página.")
+    # Permitir acceso a: superusuario, super_admin u org_admin
+    allowed = False
+    try:
+        perfil = getattr(request.user, 'usuarioperfiloptimizador', None)
+        rol = getattr(perfil, 'rol', None)
+        allowed = request.user.is_superuser or rol in ('super_admin', 'org_admin')
+    except Exception:
+        allowed = request.user.is_superuser
+    if not allowed:
+        # Responder con una página 403 estilizada
+        return render(request, "403.html", status=403)
     return render(request, "tools/configurador_3d.html")
 
 

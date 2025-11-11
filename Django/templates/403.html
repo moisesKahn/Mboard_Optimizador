@@ -1,0 +1,21 @@
+{% extends './layout/layout.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-40">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-body p-24 text-center">
+        <div class="mb-16">
+          <iconify-icon icon="mdi:lock-alert-outline" class="text-danger" style="font-size: 56px;"></iconify-icon>
+        </div>
+        <h4 class="mb-8">Acceso denegado</h4>
+        <p class="text-secondary-light mb-16">
+          No tienes permisos para acceder a esta sección. Si necesitas acceso al Configurador 3D,
+          pide a un administrador que te asigne el rol correspondiente (super_admin u org_admin).
+        </p>
+        <a href="{% url 'index' %}" class="btn btn-primary">Volver al panel</a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
