@@ -3,6 +3,10 @@ __pycache__/
 *.py[cod]
 *.pyo
 *.pyd
+.python-version
+.mypy_cache/
+.ruff_cache/
+.pytype/
 .env
 .venv
 .venv*/
@@ -18,20 +22,27 @@ ENV/
 *.sqlite3
 media/
 staticfiles/
+logs/
+local_settings.py
 
 # VS Code
 .vscode/
 .settings/
+.idea/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # Coverage & test
 htmlcov/
 .coverage
+.coverage.*
+coverage.xml
 .tox/
 .pytest_cache/
+.hypothesis/
 
 # Node
 node_modules/
@@ -40,6 +51,7 @@ node_modules/
 build/
 dist/
 *.egg-info/
+pip-wheel-metadata/
 
 # Local configs
 *.local
@@ -47,6 +59,7 @@ dist/
 *.tmp
 **/.env
 **/.env.local
+**/.ipynb_checkpoints/
 
 # Cache
 .cache/
