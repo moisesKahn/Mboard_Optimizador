@@ -43,6 +43,7 @@ from WowDash import api_views
 from WowDash import configurador_views
 from WowDash import operator_views
 from WowDash import api_views
+from WowDash import autoservicio_views
 
 urlpatterns = [
     # API (mínima)
@@ -107,6 +108,13 @@ urlpatterns = [
     path('optimizador/exportar-entrada/<int:proyecto_id>/', optimizer_views.exportar_json_entrada, name='exportar_json_entrada'),
     path('optimizador/exportar-salida/<int:proyecto_id>/', optimizer_views.exportar_json_salida, name='exportar_json_salida'),
         path('optimizador/forzar-optimizacion/<int:proyecto_id>/', optimizer_views.forzar_optimizacion, name='forzar_optimizacion'),
+    # Ruta legacy exportar_pdf eliminada (usar exportar_pdf_snapshot / exportar_pdf_snapshot_cached)
+    # Nuevas rutas PDF rápidas (snapshot HTML)
+    path('optimizador/exportar-pdf-snapshot/<int:proyecto_id>/', optimizer_views.exportar_pdf_snapshot, name='exportar_pdf_snapshot'),
+    path('optimizador/exportar-pdf-snapshot-cached/<int:proyecto_id>/', optimizer_views.exportar_pdf_snapshot_cached, name='exportar_pdf_snapshot_cached'),
+    path('optimizador/exportar-pdf-json/<int:proyecto_id>/', optimizer_views.exportar_pdf_json, name='exportar_pdf_json'),
+    # Ruta legacy reintroducida para compatibilidad (algunas plantillas aún usan reverse('exportar_pdf'))
+    # Delegamos al método antiguo por ahora; se puede redirigir a snapshot/json más adelante.
     path('optimizador/exportar-pdf/<int:proyecto_id>/', optimizer_views.exportar_pdf, name='exportar_pdf'),
     path('optimizador/guardar-layout-manual/', optimizer_views.guardar_layout_manual, name='guardar_layout_manual'),
     path('optimizador/proyectos/', optimizer_views.proyectos_optimizador, name='proyectos_optimizador'),
@@ -117,6 +125,18 @@ urlpatterns = [
     # Nota: Evitar colisión de nombre con la API general en core_views
     path('optimizador/buscar-clientes/', optimizer_views.buscar_clientes_ajax, name='opt_buscar_clientes_ajax'),
     path('optimizador/crear-cliente/', optimizer_views.crear_cliente_ajax, name='crear_cliente_ajax'),
+    # Optimizador autoservicio dedicado
+    path('autoservicio/optimizador/', optimizer_views.optimizador_autoservicio, name='optimizador_autoservicio'),
+    path('autoservicio/portada-pdf/<int:proyecto_id>/', optimizer_views.autoservicio_portada_pdf, name='autoservicio_portada_pdf'),
+
+    # Autoservicio routes
+    path('autoservicio/', autoservicio_views.autoservicio_landing, name='autoservicio_landing'),
+    path('autoservicio/hub/', autoservicio_views.autoservicio_hub, name='autoservicio_hub'),
+    path('autoservicio/mis-proyectos/', autoservicio_views.autoservicio_mis_proyectos, name='autoservicio_mis_proyectos'),
+    path('autoservicio/finalizar/<int:proyecto_id>/', autoservicio_views.autoservicio_finalizar_proyecto, name='autoservicio_finalizar_proyecto'),
+    path('autoservicio/api/buscar-rut/', autoservicio_views.autoservicio_buscar_rut, name='autoservicio_buscar_rut'),
+    path('autoservicio/api/crear-cliente/', autoservicio_views.autoservicio_crear_cliente, name='autoservicio_crear_cliente'),
+    path('autoservicio/logout-cliente/', autoservicio_views.autoservicio_logout_cliente, name='autoservicio_logout_cliente'),
 
 # operador routes
     path('operador/', operator_views.operador_home, name='operador_home'),

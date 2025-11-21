@@ -34,47 +34,35 @@
                       <span>Cerrar Sesión</span>
                   </a>
               </li>
+            {% elif rol == 'autoservicio' %}
+              <!-- Menú reducido para Autoservicio (unificado: usa /optimizador/) -->
+              <li>
+                  <a href="{% url 'optimizador_home' %}">
+                      <iconify-icon icon="solar:widget-2-outline" class="menu-icon"></iconify-icon>
+                      <span>Optimizador</span>
+                  </a>
+              </li>
+              <li>
+                  <a href="{% url 'configurador_3d' %}">
+                      <iconify-icon icon="mdi:cube-outline" class="menu-icon"></iconify-icon>
+                      <span>Configurador 3D</span>
+                  </a>
+              </li>
+              <li>
+                  <a href="/autoservicio/mis-proyectos/">
+                      <iconify-icon icon="hugeicons:invoice-03" class="menu-icon"></iconify-icon>
+                      <span>Mis Proyectos</span>
+                  </a>
+              </li>
+              <li>
+                  <a href="{% url 'logout' %}">
+                      <iconify-icon icon="solar:logout-2-outline" class="menu-icon"></iconify-icon>
+                      <span>Cerrar Sesión</span>
+                  </a>
+              </li>
             {% else %}
               <!-- Menú completo para otros roles -->
-              <li>
-                  <a href="{% url 'index' %}">
-                      <iconify-icon icon="solar:home-smile-angle-outline" class="menu-icon"></iconify-icon>
-                      <span>Panel</span>
-                  </a>
-              </li>
-              {% if user.is_superuser or user.usuarioperfiloptimizador.rol == 'super_admin' or user.usuarioperfiloptimizador.organizacion.is_general %}
-              <li>
-                  <a href="{% url 'chat' %}">
-                      <iconify-icon icon="bi:chat-dots" class="menu-icon"></iconify-icon>
-                      <span>Chat</span>
-                  </a>
-              </li>
-              {% else %}
-              <li>
-                  <a href="javascript:void(0)" class="disabled-link" title="En desarrollo">
-                      <iconify-icon icon="bi:chat-dots" class="menu-icon"></iconify-icon>
-                      <span>Chat (En desarrollo)</span>
-                  </a>
-              </li>
-              {% endif %}
-              <li>
-                  <a href="{% url 'proyectos' %}">
-                      <iconify-icon icon="hugeicons:invoice-03" class="menu-icon"></iconify-icon>
-                      <span>Proyectos</span>
-                  </a>
-              </li>
-              <li>
-                  <a href="{% url 'calendar' %}">
-                      <iconify-icon icon="solar:calendar-outline" class="menu-icon"></iconify-icon>
-                      <span>Calendario</span>
-                  </a>
-              </li>
-              <li>
-                  <a href="{% url 'usersList' %}">
-                      <iconify-icon icon="solar:users-group-two-rounded-outline" class="menu-icon"></iconify-icon>
-                      <span>Usuarios</span>
-                  </a>
-              </li>
+              <!-- Reordenado: Optimizador primero -->
               <li>
                   <a href="{% url 'optimizador_home' %}">
                       <iconify-icon icon="solar:widget-2-outline" class="menu-icon"></iconify-icon>
@@ -89,6 +77,18 @@
                   </a>
               </li>
               {% endif %}
+              <li>
+                  <a href="{% url 'proyectos' %}">
+                      <iconify-icon icon="hugeicons:invoice-03" class="menu-icon"></iconify-icon>
+                      <span>Proyectos</span>
+                  </a>
+              </li>
+              <li>
+                  <a href="{% url 'usersList' %}">
+                      <iconify-icon icon="solar:users-group-two-rounded-outline" class="menu-icon"></iconify-icon>
+                      <span>Usuarios</span>
+                  </a>
+              </li>
               <li>
                   <a href="{% url 'clientes_lista' %}">
                       <iconify-icon icon="solar:users-group-rounded-outline" class="menu-icon"></iconify-icon>
@@ -110,12 +110,6 @@
                       <li><a href="{% url 'tableros' %}"><i class="ri-circle-fill circle-icon text-primary-600 w-auto"></i> Tableros</a></li>
                       <li><a href="{% url 'tapacantos' %}"><i class="ri-circle-fill circle-icon text-warning-main w-auto"></i> Tapacantos</a></li>
                   </ul>
-              </li>
-              <li>
-                  <a href="{% url 'faqs' %}">
-                      <iconify-icon icon="solar:question-circle-outline" class="menu-icon"></iconify-icon>
-                      <span>Preguntas frecuentes</span>
-                  </a>
               </li>
               <li>
                   <a href="{% url 'logout' %}">

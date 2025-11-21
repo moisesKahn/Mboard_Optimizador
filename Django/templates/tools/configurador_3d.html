@@ -722,10 +722,12 @@ async function optimizarYGenerarPdf(){
     const resp = await fetch('{% url "optimizar_material" %}', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
     const data = await resp.json();
     if (!data || data.success === false){ throw new Error(data && data.message || 'Error al optimizar'); }
-    // Generar PDF
+    // Generar PDF (inicia animación de fase PDF)
     showProcess('stage-pdf','Generando PDF…');
-    const pdfUrl = '{% url "exportar_pdf" 0 %}'.replace('/0/', `/${proyectoId}/`) + '?fast=1&force=1';
+    const pdfCtrl = (window.OptimizerAnim? OptimizerAnim.start('#optimizerAnimOverlay','pdf') : null);
+    const pdfUrl = '{% url "exportar_pdf_json" 0 %}'.replace('/0/', `/${proyectoId}/`) + '?fast=1&force=1';
     await fetch(pdfUrl, { method: 'GET' });
+    if(pdfCtrl) pdfCtrl.finish();
     return true;
   }catch(e){ console.error(e); showProcess('', 'Error en proceso'); setTimeout(hideProcess, 1200); return false; }
 }
@@ -842,6 +844,26 @@ function triggerAutoCreateOrSave(){
   el.addEventListener('change', ()=>{ triggerAutoCreateOrSave(); });
 });
 
+// Inicializar catálogos
 loadCatalogs();
+// Override showProcess para enganchar animación en optimización
+const __origShowProcess = window.showProcess || function(){};
+window.showProcess = function(stage,msg){
+  __origShowProcess(stage,msg);
+  if(stage==='stage-cut' && window.OptimizerAnim){
+    // iniciar animación de ensamblado
+    if(!window.__optAnimCtrl){ window.__optAnimCtrl = OptimizerAnim.start('#optimizerAnimOverlay','opt'); }
+  }
+};
+// hideProcess debe detener animaciones
+const __origHideProcess = window.hideProcess || function(){};
+window.hideProcess = function(){
+  __origHideProcess();
+  if(window.__optAnimCtrl){ window.__optAnimCtrl.finish(); window.__optAnimCtrl=null; }
+};
 </script>
+<!-- Overlay Animación Optimización / PDF -->
+<link rel="stylesheet" href="/static/css/optimizer_anim.css">
+<div id="optimizerAnimOverlay"><canvas></canvas><div class="oa-label">Optimizando…</div></div>
+<script src="/static/js/optimizer_anim.js"></script>
 {% endblock %}

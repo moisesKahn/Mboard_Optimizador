@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Autoservicio - Identificación</title>
+    <link rel="stylesheet" href="/static/css/optimizer_anim.css">
+    <style>
+        body { font-family: system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:#f8f9fa; margin:0; display:flex; min-height:100vh; }
+        /* Caja principal completamente simétrica (misma separación en todos los lados) */
+        .wrap { margin:auto; width:100%; max-width:640px; background:#fff; border:1px solid #e5e7eb; border-radius:16px; padding:40px; box-shadow:0 10px 30px rgba(0,0,0,.08); box-sizing:border-box; }
+        h1 { margin:0 0 12px; font-size:28px; font-weight:600; text-align:center; }
+        .lead { text-align:center; }
+        .rut-box { margin-top:24px; display:flex; flex-direction:column; align-items:center; }
+        .rut-box input { font-size:20px; padding:16px 20px; width:100%; max-width:520px; border:1px solid #cbd5e1; border-radius:12px; font-weight:500; box-sizing:border-box; }
+        .rut-box input:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.25); }
+        .estado { margin-top:12px; font-size:14px; color:#555; min-height:20px; }
+        .cliente-info { margin-top:20px; background:#f1f5f9; padding:14px 16px; border-radius:10px; font-size:15px; }
+        .acciones { margin-top:24px; display:flex; gap:16px; flex-wrap:wrap; }
+        .btn { cursor:pointer; background:#2563eb; color:#fff; border:none; padding:16px 26px; font-size:16px; border-radius:12px; font-weight:600; letter-spacing:.5px; display:inline-flex; align-items:center; gap:8px; }
+        .btn.secondary { background:#64748b; }
+        .btn:disabled { background:#94a3b8; cursor:not-allowed; }
+        .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.5); display:none; align-items:center; justify-content:center; }
+        .modal { background:#fff; border-radius:16px; padding:30px 34px; width:100%; max-width:520px; box-shadow:0 10px 28px rgba(0,0,0,.28); }
+        .modal h2 { margin:0 0 14px; font-size:22px; }
+        .modal form .field { margin-bottom:14px; }
+        .modal form input, .modal form textarea { width:100%; padding:12px 14px; font-size:15px; border:1px solid #cbd5e1; border-radius:10px; }
+        .modal form input:focus, .modal form textarea:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 3px rgba(37,99,235,.22); }
+        .x { position:absolute; top:10px; right:12px; cursor:pointer; font-size:20px; }
+        .footer { margin-top:40px; font-size:12px; text-align:center; color:#64748b; }
+    </style>
+</head>
+<body>
+<div class="wrap" aria-live="polite">
+    <h1>Portal Autoservicio</h1>
+    <p class="lead">Ingrese su RUT para continuar</p>
+    <div class="rut-box">
+        <input type="text" id="rutInput" placeholder="Ej: 12.345.678-9" autocomplete="off" aria-label="RUT del Cliente">
+        <div class="estado" id="rutEstado"></div>
+    </div>
+    {% if cliente %}
+    <div class="cliente-info" id="clienteInfo">
+        <strong>Cliente identificado:</strong><br>
+        {{ cliente.nombre }} ({{ cliente.rut }})
+    </div>
+    <div class="acciones">
+        <a class="btn" href="/autoservicio/hub/">Continuar</a>
+        <a class="btn secondary" href="/autoservicio/logout-cliente/">Cambiar Cliente</a>
+    </div>
+    {% else %}
+    <div class="acciones" id="accionesInicial" style="display:none;">
+        <button class="btn" id="btnNuevoCliente" type="button">Crear Nuevo Cliente</button>
+    </div>
+    {% endif %}
+    <div class="footer">Inactividad mayor a {{ inactividad_min }} minutos reinicia la identificación.</div>
+</div>
+
+<div class="modal-backdrop" id="modalNuevoCliente" aria-hidden="true">
+    <div class="modal">
+        <div class="x" onclick="cerrarModal()">×</div>
+        <h2>Nuevo Cliente</h2>
+        <form id="formNuevoCliente">
+            <div class="field">
+                <label>RUT *</label>
+                <input type="text" name="rut" id="rutNuevo" required>
+            </div>
+            <div class="field">
+                <label>Nombre *</label>
+                <input type="text" name="nombre" required>
+            </div>
+            <div class="field">
+                <label>Correo</label>
+                <input type="email" name="email" placeholder="opcional">
+            </div>
+            <div class="field">
+                <label>Teléfono</label>
+                <input type="text" name="telefono" placeholder="opcional">
+            </div>
+            <div class="field">
+                <label>Dirección</label>
+                <textarea name="direccion" rows="2" placeholder="opcional"></textarea>
+            </div>
+            <div class="acciones">
+                <button class="btn" type="submit">Guardar Cliente</button>
+                <button class="btn secondary" type="button" onclick="cerrarModal()">Cancelar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const rutInput = document.getElementById('rutInput');
+const rutEstado = document.getElementById('rutEstado');
+const accionesInicial = document.getElementById('accionesInicial');
+const modal = document.getElementById('modalNuevoCliente');
+const formNuevo = document.getElementById('formNuevoCliente');
+const rutNuevo = document.getElementById('rutNuevo');
+
+function formatearRut(raw){
+    let v = raw.replace(/[^0-9kK]/g,'');
+    v = v.replace(/k/g,'K');
+    if (v.length > 1){
+        const cuerpo = v.slice(0,-1); const dv = v.slice(-1);
+        const cuerpoFmt = cuerpo.replace(/\B(?=(\d{3})+(?!\d))/g,'.');
+        return cuerpoFmt + '-' + dv;
+    }
+    return v;
+}
+
+rutInput.addEventListener('input', () => {
+    rutInput.value = formatearRut(rutInput.value);
+    const rut = rutInput.value.trim();
+    if (!rut){
+        rutEstado.textContent = '';
+        accionesInicial.style.display='none';
+        return;
+    }
+    rutEstado.textContent = 'Buscando cliente…';
+    fetch(`/autoservicio/api/buscar-rut/?rut=${encodeURIComponent(rut)}`)
+        .then(r=>r.json())
+        .then(d=>{
+            if (d.found){
+                rutEstado.innerHTML = `<span style='color:#065f46'>Encontrado: ${d.cliente.nombre}</span>`;
+                accionesInicial.style.display='none';
+                // Recargar para mostrar bloque cliente
+                setTimeout(()=>{ window.location.reload(); }, 600);
+            } else {
+                rutEstado.innerHTML = `<span style='color:#7c2d12'>No existe. Puede crearlo.</span>`;
+                accionesInicial.style.display='flex';
+            }
+        })
+        .catch(_e=>{ rutEstado.textContent = 'Error buscando'; });
+});
+
+document.getElementById('btnNuevoCliente')?.addEventListener('click', ()=>{
+    rutNuevo.value = rutInput.value.trim();
+    abrirModal();
+});
+
+function abrirModal(){ modal.style.display='flex'; modal.setAttribute('aria-hidden','false'); }
+function cerrarModal(){ modal.style.display='none'; modal.setAttribute('aria-hidden','true'); }
+
+formNuevo?.addEventListener('submit', e=>{
+    e.preventDefault();
+    const fd = new FormData(formNuevo);
+    rutEstado.textContent = 'Creando cliente…';
+    // Obtener CSRF desde cookie para POST seguro
+    function getCookie(name){
+        const v = document.cookie.split(';').map(c=>c.trim()).find(c=>c.startsWith(name+'='));
+        return v ? decodeURIComponent(v.split('=')[1]) : '';
+    }
+    const csrftoken = getCookie('csrftoken');
+    fetch('/autoservicio/api/crear-cliente/', { method:'POST', headers:{'X-CSRFToken': csrftoken}, body:fd })
+        .then(r=>r.json())
+        .then(d=>{
+            if (d.created){
+                rutEstado.innerHTML = `<span style='color:#065f46'>Cliente creado: ${d.cliente.nombre}</span>`;
+                cerrarModal();
+                setTimeout(()=>{ window.location.reload(); }, 700);
+            } else {
+                rutEstado.textContent = d.error || 'Error';
+            }
+        })
+        .catch(_e=>{ rutEstado.textContent = 'Error creando'; });
+});
+
+// Inactividad simple: reinicio de cliente se maneja server-side al cargar; aquí solo podríamos opcionalmente avisar.
+</script>
+</body>
+</html>

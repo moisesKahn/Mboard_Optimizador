@@ -1,3 +1,21 @@
+## PDF rápido (Snapshot) del Optimizador
+
+Se reemplazó el flujo legacy pesado (ReportLab reconstruyendo layouts) por un mecanismo rápido basado en HTML → WeasyPrint.
+
+Resumen del flujo:
+1. Tras una optimización, se fija la visualización (`data-locked="1"`) y se guarda un snapshot HTML por material.
+2. El botón PDF empaqueta todos los materiales optimizados: `{ titulo, eficiencia, layout_html, piezas[] }` y hace POST a `exportar-pdf-snapshot/<proyecto_id>/`.
+3. El backend compacta el HTML, genera el PDF con WeasyPrint y guarda caché (`materiales_snapshot.json`, `snapshot.html`).
+4. Descargas posteriores usan `exportar-pdf-snapshot-cached/<proyecto_id>/` sin reenviar datos ni recalcular optimización.
+
+Ventajas:
+- No dispara nueva optimización (usa resultado existente).
+- Multi-material en un solo PDF.
+- Segunda descarga instantánea (usa caché en disco).
+
+Fallback: La ruta legacy `exportar-pdf` se mantiene como respaldo, pero la UI usa la nueva por defecto.
+
+Si se reoptimiza un material, se desbloquea su contenedor, se vuelve a renderizar y se actualiza el snapshot correspondiente antes de la siguiente exportación.
 # Mboard Optimizador
 
 Panel de optimización de materiales multi–organización (Django) con chat en tiempo real por polling, control de accesos por rol, gestión de materiales (tableros y tapacantos), exportación a PDF y UI moderna.

@@ -231,6 +231,8 @@ class UsuarioPerfilOptimizador(models.Model):
         ('agente', 'Agente'),  # AGENTE
         ('subordinador', 'Subordinador'),  # SUBORDINADOR (solo lectura en materiales)
         ('operador', 'Operador'),  # OPERADOR (nuevo)
+        ('supervisor', 'Supervisor'),  # SUPERVISOR (ver proyectos y métricas, sin administración global)
+        ('autoservicio', 'Autoservicio'),  # AUTOSERVICIO (portal restringido de cliente)
     ]
     user = models.OneToOneField(User, on_delete=models.CASCADE, verbose_name="Usuario")
     rol = models.CharField(max_length=20, choices=ROLES, default='agente', verbose_name="Rol")

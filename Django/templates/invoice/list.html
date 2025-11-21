@@ -100,7 +100,7 @@
                         </select>
                     </td>
                     <td>
-                        <a href="{% url 'exportar_pdf' proyecto.id %}" target="_blank" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" title="Ver/descargar PDF">
+                        <a href="{% url 'exportar_pdf_json' proyecto.id %}" target="_blank" class="w-32-px h-32-px bg-primary-light text-primary-600 rounded-circle d-inline-flex align-items-center justify-content-center" title="Ver/descargar PDF">
                             <iconify-icon icon="iconamoon:eye-light"></iconify-icon>
                         </a>
                         <a href="{% url 'optimizador_abrir' proyecto.id %}" class="w-32-px h-32-px bg-success-focus text-success-main rounded-circle d-inline-flex align-items-center justify-content-center">

@@ -212,7 +212,8 @@
                 e.preventDefault();
                 const id = a.getAttribute('data-id');
                 const url = `{% url 'preview_proyecto_json' 0 %}`.replace('/0/','/'+id+'/');
-                const pdfUrl = `{% url 'exportar_pdf' 0 %}`.replace('/0/','/'+id+'/');
+                // Cambiado a nueva ruta JSON PDF
+                const pdfUrl = `{% url 'exportar_pdf_json' 0 %}`.replace('/0/','/'+id+'/');
                 const openUrl = `{% url 'optimizador_abrir' 0 %}`.replace('/0/','/'+id+'/');
                 try{
                         qs('#previewContent').textContent = 'Cargando…';

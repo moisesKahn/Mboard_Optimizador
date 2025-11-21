@@ -92,6 +92,8 @@ MIDDLEWARE = [
     'WowDash.middleware.NoCacheMiddleware',
     # Middleware para exponer la request/usuario actual a señales (audit)
     'core.middleware.RequestUserMiddleware',
+    # Aislar flujo de autoservicio
+    'core.middleware.AutoServicioIsolationMiddleware',
 ]
 
 ROOT_URLCONF = 'WowDash.urls'

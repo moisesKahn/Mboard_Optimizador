@@ -1,0 +1,73 @@
+{% extends 'layout/base.html' %}
+{% load static %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="mb-0">Mis Proyectos (Cliente: {{ cliente.nombre }} - {{ cliente.rut }})</h5>
+    <div class="d-flex gap-2">
+      <a href="/autoservicio/hub/" class="btn btn-outline-secondary btn-sm">Volver</a>
+      <a href="/optimizador/" class="btn btn-primary btn-sm">Nuevo Proyecto</a>
+    </div>
+  </div>
+  {% if proyectos %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Estado</th>
+          <th>Folio Público</th>
+          <th>Creado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in proyectos %}
+        <tr data-proyecto-id="{{ p.id }}">
+          <td>{{ p.id }}</td>
+          <td>{{ p.nombre }}</td>
+          <td>
+            {% if p.estado == 'completado' %}
+              <span class="badge bg-success">Completado</span>
+            {% elif p.estado == 'optimizado' %}
+              <span class="badge bg-primary">Optimizado</span>
+            {% elif p.estado == 'borrador' %}
+              <span class="badge bg-secondary">Borrador</span>
+            {% else %}
+              <span class="badge bg-light text-dark">{{ p.estado }}</span>
+            {% endif %}
+          </td>
+          <td>{{ p.public_id|default:'-' }}</td>
+          <td>{{ p.fecha_creacion|date:'d-m-Y H:i' }}</td>
+          <td class="text-nowrap">
+            <a class="btn btn-sm btn-outline-primary" href="/optimizador/abrir/{{ p.id }}/" title="Abrir en optimizador">Abrir</a>
+            {% if p.estado != 'completado' %}
+            <button class="btn btn-sm btn-success ms-1" onclick="finalizarProyecto('{{ p.id }}')">Finalizar</button>
+            {% endif %}
+            {% if p.resultado_optimizacion %}
+            <a class="btn btn-sm btn-outline-secondary ms-1" href="/autoservicio/portada-pdf/{{ p.id }}/" target="_blank">Portada PDF</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <div class="alert alert-info">Aún no hay proyectos. Crea el primero.</div>
+  {% endif %}
+</div>
+<script>
+function finalizarProyecto(id){
+  if(!confirm('¿Finalizar este proyecto? Esta acción lo marcará como completado.')) return;
+  fetch(`/autoservicio/finalizar/${id}/`, {credentials:'same-origin'})
+    .then(r=>r.json())
+    .then(data=>{
+      alert(data.message || 'Actualizado');
+      if(data.success){ location.reload(); }
+    })
+    .catch(()=>alert('Error al finalizar'));
+}
+</script>
+{% endblock %}

@@ -16,6 +16,10 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter, landscape
 from reportlab.lib.units import mm
 from reportlab.lib.utils import ImageReader
+try:
+    from weasyprint import HTML as WEASY_HTML
+except Exception:
+    WEASY_HTML = None
 from django.templatetags.static import static
 from django.utils.text import slugify
 from django.contrib.staticfiles import finders
@@ -262,6 +266,91 @@ def optimizador_home_clasico(request):
     }
     return render(request, 'optimizador/home.html', context)
 
+@login_required
+def optimizador_autoservicio(request):
+    """Optimización restringida para flujo autoservicio: reutiliza template principal con flags.
+    Requiere que el usuario tenga rol autoservicio y cliente identificado en sesión.
+    """
+    perfil = getattr(request.user, 'usuarioperfiloptimizador', None)
+    if not (perfil and perfil.rol == 'autoservicio'):
+        return redirect('/')
+    from WowDash.autoservicio_views import SESSION_KEY_CLIENTE
+    cliente_id = request.session.get(SESSION_KEY_CLIENTE)
+    if not cliente_id:
+        return redirect('/autoservicio/')
+    cliente = Cliente.objects.filter(id=cliente_id).first()
+    if not cliente:
+        request.session.pop(SESSION_KEY_CLIENTE, None)
+        return redirect('/autoservicio/')
+    ctx = get_auth_context(request)
+    # Limitar materiales al org si aplica
+    materiales_qs = Material.objects.all()
+    tapacantos_qs = Tapacanto.objects.all()
+    if not (ctx.get('organization_is_general') or ctx.get('is_support')):
+        materiales_qs = materiales_qs.filter(organizacion_id=ctx.get('organization_id')) if hasattr(Material, 'organizacion') else materiales_qs
+        tapacantos_qs = tapacantos_qs.filter(organizacion_id=ctx.get('organization_id')) if hasattr(Tapacanto, 'organizacion') else tapacantos_qs
+    # Fallback: si filtros devolvieron vacío, usar primeros materiales/tapacantos globales para evitar select vacío
+    mats_list = list(materiales_qs[:50])
+    if not mats_list:
+        mats_list = list(Material.objects.all()[:50])
+    taps_list = list(tapacantos_qs[:50])
+    if not taps_list:
+        taps_list = list(Tapacanto.objects.all()[:50])
+    context = {
+        'title': 'Optimizador Autoservicio',
+        'subTitle': 'Proyecto Nuevo',
+        'cliente_autoservicio': cliente,
+        'autoservicio': True,
+        'tableros': mats_list,
+        'tapacantos': taps_list,
+    }
+    return render(request, 'optimizador/home.html', context)
+
+@login_required
+def autoservicio_portada_pdf(request, proyecto_id: int):
+    """Genera sólo la portada PDF resumida para un proyecto (flujo autoservicio)."""
+    perfil = getattr(request.user, 'usuarioperfiloptimizador', None)
+    if not (perfil and perfil.rol == 'autoservicio'):
+        return HttpResponse('Forbidden', status=403)
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    # Validar que el proyecto pertenezca al cliente actual (por RUT / cliente id)
+    from WowDash.autoservicio_views import SESSION_KEY_CLIENTE
+    cliente_id = request.session.get(SESSION_KEY_CLIENTE)
+    if not cliente_id or proyecto.cliente_id != cliente_id:
+        return HttpResponse('Forbidden', status=403)
+    # Crear PDF en memoria con resumen
+    from io import BytesIO
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=letter)
+    c.setTitle("Resumen Proyecto Autoservicio")
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(40, 750, "Resumen Proyecto Autoservicio")
+    c.setFont("Helvetica", 12)
+    y = 710
+    def line(txt):
+        nonlocal y
+        c.drawString(40, y, txt)
+        y -= 20
+    line(f"Proyecto ID: {proyecto.id}")
+    line(f"Cliente: {proyecto.cliente.nombre} ({proyecto.cliente.rut})")
+    line(f"Nombre Proyecto: {proyecto.nombre}")
+    line(f"Fecha: {timezone.now().strftime('%Y-%m-%d %H:%M')}")
+    # Materiales / métricas si existen en relaciones
+    mats = getattr(proyecto, 'materiales_utilizados', []).all() if hasattr(proyecto, 'materiales_utilizados') else []
+    if mats:
+        line("Materiales utilizados:")
+        for m in mats[:20]:
+            line(f" - {getattr(m.material,'nombre','Material')} | Tableros: {m.cantidad_tableros} | Eficiencia: {m.eficiencia}%")
+    else:
+        line("Materiales: (sin detalles registrados)")
+    c.showPage()
+    c.save()
+    pdf = buffer.getvalue()
+    buffer.close()
+    resp = HttpResponse(pdf, content_type='application/pdf')
+    resp['Content-Disposition'] = f'attachment; filename="portada-proyecto-{proyecto.id}.pdf"'
+    return resp
+
 # ------------------------------
 # Renderizado de PDF desde resultado
 # ------------------------------
@@ -337,6 +426,12 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
         'kerf_min_lw': 0.6,         # grosor mínimo del kerf (puntos PDF)
         'kerf_max_lw': 3.0,         # grosor máximo del kerf (puntos PDF)
         'kerf_scale': 1.0,          # factor multiplicador extra del grosor del kerf
+        'draw_kerf': False,         # dibujar líneas de corte por kerf (desactivado por defecto)
+        'draw_kerf_invisible': False,# trazar kerf invisible (color de fondo)
+        'piece_border_lw': 0.8,     # grosor del borde de cada pieza (puntos PDF)
+        'piece_border_gray': 0.0,   # color gris del borde (0=negro)
+        'snap_step': 0.5,           # cuadrícula de alineación en puntos PDF para evitar desajustes
+        'piece_grid': False,        # dibujar rejilla de bordes por columnas/filas (off por defecto)
     }
     _opts = dict(PDF_OPTS_DEFAULT)
     try:
@@ -1010,8 +1105,20 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                 if PROFILE:
                     _prof['boards_hatch_useful_s'] += (_t.perf_counter() - _tu0)
 
+            # Cuadrícula de alineación para evitar artefactos de anti-alias
+            snap_step = float(_opts.get('snap_step', 0.5))
+            def _q(v: float) -> float:
+                try:
+                    return round(v / snap_step) * snap_step
+                except Exception:
+                    return v
+
+            raw_xs = []
+            raw_ys = []
             for pieza in piezas_tab:
                 aN = int(pieza.get('ancho',0)); lN = int(pieza.get('largo',0))
+                rot_flag = bool(pieza.get('rotada'))
+                # Dimensiones para conteo por tipo (independiente de orientación)
                 kN = (pieza.get('nombre'), min(aN,lN), max(aN,lN))
                 corridas_global_por_tipo[kN] = corridas_global_por_tipo.get(kN, 0) + 1
                 running_tipo = pieza.get('indiceUnidad') or corridas_global_por_tipo[kN]
@@ -1019,7 +1126,10 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
 
                 # Normalización robusta de coordenadas a relativas al área útil
                 px_mm = float(pieza.get('x',0)); py_mm = float(pieza.get('y',0))
-                pw_mm = float(pieza.get('ancho',0)); ph_mm = float(pieza.get('largo',0))
+                # Usar las dimensiones tal como vienen en JSON; 'rotada' solo afecta la etiqueta/orientación.
+                pa0 = float(aN); pl0 = float(lN)
+                pw_mm = pa0
+                ph_mm = pl0
                 mx_val = float(margen_x); my_val = float(margen_y)
                 def _fits(rx, ry, eps=2.0):
                     return (
@@ -1043,16 +1153,27 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                 py = py_rel_mm * scale
                 w = pw_mm * scale
                 h = ph_mm * scale
-                x = tX + offX + px
-                y = tY + offYBL + (effH - (py + h))
+                # Posición superior-izquierda de la pieza en puntos PDF (snapped)
+                x_raw = tX + offX + px
+                y_raw = tY + offYBL + (effH - (py + h))
+                x0 = _q(x_raw)
+                y0 = _q(y_raw)
+                x1 = _q(x_raw + w)
+                y1 = _q(y_raw + h)
+                x = x0; y = y0; w = max(0.0, x1 - x0); h = max(0.0, y1 - y0)
+                # Guardar bordes RAW para canónico posterior
+                x0_raw = x_raw; x1_raw = x_raw + w
+                y0_raw = y_raw; y1_raw = y_raw + h
+                raw_xs.extend([x0_raw, x1_raw]); raw_ys.extend([y0_raw, y1_raw])
 
                 # Guardar geometría y metadatos mínimos para el dibujado posterior
                 piezas_geom.append({
                     'x': x, 'y': y, 'w': w, 'h': h,
+                    'x0_raw': x0_raw, 'x1_raw': x1_raw, 'y0_raw': y0_raw, 'y1_raw': y1_raw,
                     'nombre': str(pieza.get('nombre','Pieza')),
-                    'pa': int(pieza.get('ancho',0)),
-                    'pl': int(pieza.get('largo',0)),
-                    'rotada': bool(pieza.get('rotada')),
+                    'pa': int(aN),
+                    'pl': int(lN),
+                    'rotada': rot_flag,
                     'running_tipo': running_tipo,
                     'total_tipo': total_tipo,
                     'taps': pieza.get('tapacantos') or {},
@@ -1060,8 +1181,8 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
 
                 # Registrar bordes para líneas de corte globales y segmentos útiles (solo sobre rango de piezas)
                 try:
-                    rx0 = round(float(x), 2); rx1 = round(float(x + w), 2)
-                    ry0 = round(float(y), 2); ry1 = round(float(y + h), 2)
+                    rx0 = _q(float(x)); rx1 = _q(float(x + w))
+                    ry0 = _q(float(y)); ry1 = _q(float(y + h))
                     _cut_xs.add(rx0); _cut_xs.add(rx1)
                     _cut_ys.add(ry0); _cut_ys.add(ry1)
                     _vert_segments.setdefault(rx0, []).append((ry0, ry1))
@@ -1071,73 +1192,130 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                 except Exception:
                     pass
 
-            # Dibujar líneas de corte (kerf) como segmentos continuos SOLO donde hay piezas;
-            # trazo continuo (sin dash) y grosor proporcional al kerf.
+            # Unificar coordenadas a valores canónicos (columnas/filas) para evitar solapes
             try:
-                _tk0 = _t.perf_counter() if PROFILE else None
-                p.saveState()
-                # Grosor del kerf en puntos PDF
-                try:
-                    kerf_mm = float((mat.get('config') or {}).get('kerf', mat.get('desperdicio_sierra', 0)) or 0)
-                except Exception:
-                    kerf_mm = 0.0
-                # Grosor parametrizable
-                k_min = float(_opts.get('kerf_min_lw', 0.6))
-                k_max = float(_opts.get('kerf_max_lw', 3.0))
-                k_scale = float(_opts.get('kerf_scale', 1.0))
-                lw = max(k_min, min(k_max, kerf_mm * float(scale) * k_scale))
-                p.setLineWidth(lw)
-                p.setStrokeGray(0.15)
-                # Sin dash: línea normal continua
-                # Limitar a área útil para no marcar en puro desperdicio
-                x_min = tX + offX + 0.1
-                x_max = tX + offX + effW - 0.1
-                y_min = tY + offYBL + 0.1
-                y_max = tY + offYBL + effH - 0.1
-                # Helper: fusionar intervalos sin unir huecos visibles
-                def merge_intervals(intervals, eps=0.8):
-                    if not intervals:
+                canon_eps = max(float(_opts.get('snap_step', 0.5)) * 0.75, 0.3)
+                def build_canonical(vals, eps):
+                    if not vals:
                         return []
-                    ivs = sorted([(min(a,b), max(a,b)) for a,b in intervals], key=lambda t: t[0])
-                    merged = []
-                    cs, ce = ivs[0]
-                    for s,e in ivs[1:]:
-                        if s <= ce + eps:  # solape o muy pegado -> fusionar
-                            ce = max(ce, e)
+                    arr = sorted(float(v) for v in vals)
+                    groups = []
+                    cur = [arr[0]]
+                    for v in arr[1:]:
+                        if abs(v - cur[-1]) <= eps:
+                            cur.append(v)
                         else:
-                            merged.append((cs, ce))
-                            cs, ce = s, e
-                    merged.append((cs, ce))
-                    return merged
+                            groups.append(cur); cur = [v]
+                    groups.append(cur)
+                    step = float(_opts.get('snap_step', 0.5))
+                    reps = []
+                    for gvals in groups:
+                        m = sum(gvals)/len(gvals)
+                        reps.append(round(m/step)*step)
+                    return reps
+                canon_xs = build_canonical(raw_xs, canon_eps)
+                canon_ys = build_canonical(raw_ys, canon_eps)
+                import bisect as _bs
+                def nearest(sorted_vals, v):
+                    if not sorted_vals:
+                        return v
+                    i = _bs.bisect_left(sorted_vals, v)
+                    if i == 0:
+                        return sorted_vals[0]
+                    if i == len(sorted_vals):
+                        return sorted_vals[-1]
+                    a = sorted_vals[i-1]; b = sorted_vals[i]
+                    return a if abs(v-a) <= abs(v-b) else b
 
-                # Verticales: dibujar cada intervalo fusionado dentro del área útil
-                for cx, segs in _vert_segments.items():
-                    if cx <= x_min or cx >= x_max:
-                        continue  # evitar bordes
-                    for s,e in merge_intervals(segs):
-                        y0 = max(y_min, s)
-                        y1 = min(y_max, e)
-                        if y1 - y0 > 0.5:
-                            p.line(cx, y0, cx, y1)
-                # Horizontales
-                for cy, segs in _horiz_segments.items():
-                    if cy <= y_min or cy >= y_max:
-                        continue
-                    for s,e in merge_intervals(segs):
-                        x0 = max(x_min, s)
-                        x1 = min(x_max, e)
-                        if x1 - x0 > 0.5:
-                            p.line(x0, cy, x1, cy)
-                p.restoreState()
+                # Recalcular geometría de piezas y segmentos con coordenadas canónicas
+                _vert_segments.clear(); _horiz_segments.clear()
+                for g in piezas_geom:
+                    x0c = nearest(canon_xs, g['x0_raw']); x1c = nearest(canon_xs, g['x1_raw'])
+                    y0c = nearest(canon_ys, g['y0_raw']); y1c = nearest(canon_ys, g['y1_raw'])
+                    if x1c < x0c: x0c, x1c = x1c, x0c
+                    if y1c < y0c: y0c, y1c = y1c, y0c
+                    g['x'] = x0c; g['y'] = y0c; g['w'] = max(0.0, x1c - x0c); g['h'] = max(0.0, y1c - y0c)
+                    _vert_segments.setdefault(x0c, []).append((y0c, y1c))
+                    _vert_segments.setdefault(x1c, []).append((y0c, y1c))
+                    _horiz_segments.setdefault(y0c, []).append((x0c, x1c))
+                    _horiz_segments.setdefault(y1c, []).append((x0c, x1c))
             except Exception:
+                pass
+
+            # Dibujar líneas de corte (kerf)
+            # - visible si draw_kerf=True
+            # - invisible (color de fondo) si draw_kerf_invisible=True
+            if bool(_opts.get('draw_kerf', False)) or bool(_opts.get('draw_kerf_invisible', False)):
                 try:
+                    _tk0 = _t.perf_counter() if PROFILE else None
+                    p.saveState()
+                    # Grosor del kerf en puntos PDF
+                    try:
+                        kerf_mm = float((mat.get('config') or {}).get('kerf', mat.get('desperdicio_sierra', 0)) or 0)
+                    except Exception:
+                        kerf_mm = 0.0
+                    # Grosor parametrizable
+                    k_min = float(_opts.get('kerf_min_lw', 0.6))
+                    k_max = float(_opts.get('kerf_max_lw', 3.0))
+                    k_scale = float(_opts.get('kerf_scale', 1.0))
+                    lw = max(k_min, min(k_max, kerf_mm * float(scale) * k_scale))
+                    p.setLineWidth(lw)
+                    if bool(_opts.get('draw_kerf', False)):
+                        p.setStrokeGray(0.15)  # visible, gris oscuro
+                    else:
+                        # invisible: color de fondo del área útil (gris muy claro / blanco)
+                        # Usamos blanco para minimizar cualquier huella visual.
+                        p.setStrokeGray(1.0)
+                    # Sin dash: línea normal continua
+                    # Limitar a área útil para no marcar en puro desperdicio
+                    x_min = tX + offX + 0.1
+                    x_max = tX + offX + effW - 0.1
+                    y_min = tY + offYBL + 0.1
+                    y_max = tY + offYBL + effH - 0.1
+                    # Helper: fusionar intervalos sin unir huecos visibles
+                    def merge_intervals(intervals, eps=0.8):
+                        if not intervals:
+                            return []
+                        ivs = sorted([(min(a,b), max(a,b)) for a,b in intervals], key=lambda t: t[0])
+                        merged = []
+                        cs, ce = ivs[0]
+                        for s,e in ivs[1:]:
+                            if s <= ce + eps:  # solape o muy pegado -> fusionar
+                                ce = max(ce, e)
+                            else:
+                                merged.append((cs, ce))
+                                cs, ce = s, e
+                        merged.append((cs, ce))
+                        return merged
+
+                    # Verticales: dibujar cada intervalo fusionado dentro del área útil
+                    for cx, segs in _vert_segments.items():
+                        if cx <= x_min or cx >= x_max:
+                            continue  # evitar bordes
+                        for s,e in merge_intervals(segs):
+                            y0 = max(y_min, s)
+                            y1 = min(y_max, e)
+                            if y1 - y0 > 0.5:
+                                p.line(cx, y0, cx, y1)
+                    # Horizontales
+                    for cy, segs in _horiz_segments.items():
+                        if cy <= y_min or cy >= y_max:
+                            continue
+                        for s,e in merge_intervals(segs):
+                            x0 = max(x_min, s)
+                            x1 = min(x_max, e)
+                            if x1 - x0 > 0.5:
+                                p.line(x0, cy, x1, cy)
                     p.restoreState()
                 except Exception:
-                    pass
-            if PROFILE:
-                _prof['boards_kerf_s'] += (_t.perf_counter() - _tk0)
+                    try:
+                        p.restoreState()
+                    except Exception:
+                        pass
+                if PROFILE:
+                    _prof['boards_kerf_s'] += (_t.perf_counter() - _tk0)
 
-            # 2) DIBUJAR PIEZAS y etiquetas/tapacantos por ENCIMA del kerf
+            # 2) DIBUJAR PIEZAS y etiquetas/tapacantos por ENCIMA
             _tp0 = _t.perf_counter() if PROFILE else None
             for g in piezas_geom:
                 x, y, w, h = g['x'], g['y'], g['w'], g['h']
@@ -1148,9 +1326,15 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                 total_tipo = g['total_tipo']
                 taps = g['taps']
 
-                # Rectángulo de la pieza: sin borde; relleno blanco que tapa hachura y kerf
+                # Rectángulo de la pieza: relleno blanco + borde fino independiente del kerf
                 p.setFillGray(1.0)
-                p.rect(x, y, w, h, stroke=0, fill=1)
+                p.setStrokeGray(float(_opts.get('piece_border_gray', 0.0)))
+                p.setLineWidth(float(_opts.get('piece_border_lw', 0.8)))
+                try:
+                    p.setLineCap(0); p.setLineJoin(0)
+                except Exception:
+                    pass
+                p.rect(x, y, w, h, stroke=1, fill=1)
 
                 # Etiquetas mínimas
                 rot = ' ↻' if rot_flag else ''
@@ -1196,7 +1380,7 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
                     except Exception:
                         pass
 
-                # Medidas en lados
+                # Medidas en lados (usar valores del JSON directo; la rotación solo gira el texto)
                 label_w = f"{pa} mm"; label_h = f"{pl} mm"
                 try:
                     from reportlab.pdfbase.pdfmetrics import stringWidth
@@ -1249,6 +1433,47 @@ def _pdf_from_result(proyecto, resultado, opts: dict | None = None):
             if PROFILE:
                 _prof['boards_pieces_s'] += (_t.perf_counter() - _tp0)
                 _prof['pieces_count'] += len(piezas_geom)
+
+            # 3) DIBUJAR REJILLA (opcional). Si kerf visible activo, no dibujar rejilla.
+            if (not bool(_opts.get('draw_kerf', False))) and bool(_opts.get('piece_grid', False)):
+                try:
+                    p.saveState()
+                    p.setStrokeGray(float(_opts.get('piece_border_gray', 0.0)))
+                    p.setLineWidth(float(_opts.get('piece_border_lw', 0.8)))
+                    try:
+                        p.setLineCap(0)   # butt cap: sin sobresalir
+                        p.setLineJoin(0)  # miter join: esquinas nítidas
+                    except Exception:
+                        pass
+                    def merge_intervals(intervals, eps=0.2):
+                        """Fusiona intervalos [a,b] que se solapan o están muy cerca."""
+                        if not intervals:
+                            return []
+                        ivs = sorted([(min(a, b), max(a, b)) for a, b in intervals], key=lambda t: t[0])
+                        merged = []
+                        cs, ce = ivs[0]
+                        for s, e in ivs[1:]:
+                            if s <= ce + eps:
+                                ce = max(ce, e)
+                            else:
+                                merged.append((cs, ce))
+                                cs, ce = s, e
+                        merged.append((cs, ce))
+                        return merged
+                    # Verticales
+                    for cx, segs in _vert_segments.items():
+                        for s,e in merge_intervals(segs):
+                            if e - s > 0.3:
+                                p.line(cx, s, cx, e)
+                    # Horizontales
+                    for cy, segs in _horiz_segments.items():
+                        for s,e in merge_intervals(segs):
+                            if e - s > 0.3:
+                                p.line(s, cy, e, cy)
+                    p.restoreState()
+                except Exception:
+                    try: p.restoreState()
+                    except Exception: pass
 
             # En esta sección ya no se imprime tabla inferior; se dedica toda la página al tablero
             p.showPage()
@@ -1544,6 +1769,13 @@ def optimizador_home_nuevo(request):
 @login_required
 def optimizador_home(request):
     """Vista principal del optimizador. Por ahora redirige a la versión clásica."""
+    # Unificación de acceso: si rol autoservicio, delegar a vista especializada
+    try:
+        perfil = getattr(request.user, 'usuarioperfiloptimizador', None)
+        if perfil and getattr(perfil, 'rol', None) == 'autoservicio':
+            return optimizador_autoservicio(request)
+    except Exception:
+        pass
     return optimizador_home_clasico(request)
 
 def optimizador_home_test(request):
@@ -1596,6 +1828,30 @@ def crear_proyecto_optimizacion(request):
             descripcion = data.get('descripcion', '')
             # Solo guardar configuración si viene explícitamente; evitar guardar el payload completo
             configuracion = data.get('configuracion') if isinstance(data.get('configuracion'), (dict, list)) else None
+
+            # Forzar cliente por sesión si flujo autoservicio
+            try:
+                perfil = getattr(request.user, 'usuarioperfiloptimizador', None)
+                if perfil and perfil.rol == 'autoservicio':
+                    from WowDash.autoservicio_views import SESSION_KEY_CLIENTE
+                    session_cliente_id = request.session.get(SESSION_KEY_CLIENTE)
+                    if not session_cliente_id:
+                        return JsonResponse({'success': False, 'message': 'Sesión autoservicio sin cliente asociado.'}, status=403)
+                    # Si vino otro cliente_id distinto, se ignora y se fuerza el de sesión
+                    if cliente_id and cliente_id != session_cliente_id:
+                        # Log opcional de discrepancia
+                        AuditLog.objects.create(
+                            actor=request.user,
+                            organizacion=getattr(perfil, 'organizacion', None),
+                            verb='WARN',
+                            target_model='Proyecto',
+                            target_id='-1',
+                            target_repr='autoservicio_pre_create',
+                            changes={'override_cliente_id': session_cliente_id, 'incoming_cliente_id': cliente_id}
+                        ) if 'AuditLog' in globals() else None
+                    cliente_id = session_cliente_id
+            except Exception:
+                pass
 
             # Si no llega cliente_id, intentar crear/buscar por nombre+rut
             if not cliente_id:
@@ -1712,6 +1968,28 @@ def optimizar_material(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
+            # Idempotencia: si viene desde frontend con tableros y firma igual a la última, devolver sin cambios
+            try:
+                tableros_in = data.get('tableros')
+                if isinstance(tableros_in, list) and tableros_in:
+                    # Construir firma estable
+                    sig_parts = []
+                    for t in tableros_in[:50]:
+                        piezas_sig = []
+                        for p in (t.get('piezas') or [])[:1000]:
+                            piezas_sig.append(f"{p.get('nombre','')}@{p.get('x')}:{p.get('y')}:{p.get('ancho')}x{p.get('largo') or p.get('alto')}:{int(bool(p.get('rotada')))}")
+                        sig_parts.append(f"T{t.get('numero')}|{','.join(piezas_sig)}")
+                    layout_signature = hashlib.sha256(('|'.join(sig_parts)).encode('utf-8')).hexdigest()
+                    last_sig = request.session.get('last_layout_signature')
+                    last_sig_ts = request.session.get('last_layout_sig_ts') or 0
+                    now_ts = time.time()
+                    if last_sig and last_sig == layout_signature and (now_ts - last_sig_ts) < 5:
+                        # Responder éxito sin recalcular ni actualizar folio/version
+                        return JsonResponse({'success': True, 'idempotent': True, 'mensaje': 'Layout repetido (omitido)', 'folio': None})
+                    request.session['last_layout_signature'] = layout_signature
+                    request.session['last_layout_sig_ts'] = now_ts
+            except Exception:
+                pass
             
             # Obtener configuración del material
             config = data['configuracion_material']
@@ -1753,8 +2031,69 @@ def optimizar_material(request):
                     'tapacantos': pieza.get('tapacantos', [])
                 })
             
-            # Ejecutar optimización
-            resultado = engine.optimizar_piezas(piezas_procesadas)
+            # Si el frontend ya realizó la optimización y envía "tableros", evitar recomputar para no duplicar costo.
+            resultado = None
+            try:
+                frontend_tableros = data.get('tableros')
+                if isinstance(frontend_tableros, list) and frontend_tableros:
+                    # Sanitizar estructura básica de tableros y piezas
+                    tableros_sanitizados = []
+                    total_piece_area_mm2 = 0
+                    for t in frontend_tableros[:200]:  # límite defensivo
+                        piezas_t = []
+                        for p in (t.get('piezas') or [])[:2000]:  # límite defensivo
+                            try:
+                                ancho_p = float(p.get('ancho') or p.get('width') or 0)
+                                alto_p = float(p.get('alto') if p.get('alto') is not None else (p.get('largo') if p.get('largo') is not None else p.get('height') or 0))
+                                if ancho_p <= 0 or alto_p <= 0:
+                                    continue
+                                total_piece_area_mm2 += ancho_p * alto_p
+                                piezas_t.append({
+                                    'nombre': (p.get('nombre') or '').strip(),
+                                    'ancho': int(ancho_p),
+                                    'largo': int(alto_p),
+                                    'x': float(p.get('x') or 0),
+                                    'y': float(p.get('y') or 0),
+                                    'rotada': bool(p.get('rotada')),
+                                    'indiceUnidad': p.get('indiceUnidad'),
+                                    'totalUnidades': p.get('totalUnidades'),
+                                    'tapacantos': p.get('tapacantos') if isinstance(p.get('tapacantos'), dict) else {'arriba': False, 'derecha': False, 'abajo': False, 'izquierda': False}
+                                })
+                            except Exception:
+                                continue
+                        if piezas_t:
+                            tableros_sanitizados.append({
+                                'numero': t.get('numero') or (len(tableros_sanitizados) + 1),
+                                'ancho': float(t.get('ancho') or ancho_tablero),
+                                'largo': float(t.get('alto') or t.get('largo') or largo_tablero),
+                                'piezas': piezas_t,
+                                'eficiencia_tablero': t.get('eficiencia_tablero')  # opcional
+                            })
+                    # Calcular métricas agregadas si hay tableros válidos
+                    if tableros_sanitizados:
+                        area_total_mm2 = 0
+                        for tb in tableros_sanitizados:
+                            area_total_mm2 += tb['ancho'] * tb['largo']
+                        area_utilizada_mm2 = total_piece_area_mm2
+                        eficiencia = (area_utilizada_mm2 / area_total_mm2 * 100) if area_total_mm2 > 0 else 0
+                        resultado = {
+                            'tableros': tableros_sanitizados,
+                            'area_total': round(area_total_mm2 / 1_000_000, 6),  # m²
+                            'area_utilizada': round(area_utilizada_mm2 / 1_000_000, 6),  # m²
+                            'eficiencia': round(eficiencia, 4),
+                            'margenes': {'margen_x': margen_x, 'margen_y': margen_y},
+                            'desperdicio_sierra': desperdicio_sierra,
+                            'tablero_ancho_original': ancho_tablero,
+                            'tablero_largo_original': largo_tablero,
+                            'tiempo_optimizacion': 0,
+                            'origen': 'frontend'
+                        }
+            except Exception:
+                resultado = None
+            if resultado is None:
+                # Ejecutar optimización en backend (fuente de verdad)
+                resultado = engine.optimizar_piezas(piezas_procesadas)
+                resultado['origen'] = 'backend'
             # Conservar entrada original de piezas para futura rehidratación fiel de la grilla
             try:
                 resultado['entrada'] = piezas_procesadas
@@ -1871,18 +2210,31 @@ def optimizar_material(request):
                 except Exception:
                     pass
 
-                # Incrementar versión y asignar SIEMPRE un nuevo ID público (nuevo ID por cada optimización)
+                # Incrementar versión y asignar nuevo ID público SOLO si origen backend (recalculo real) y no proviene de layout frontend
+                origen_frontend = (resultado.get('origen') == 'frontend')
                 try:
-                    proyecto.version = (proyecto.version or 0) + 1
+                    logger.info(
+                        'OPTIMIZAR_MATERIAL llamada: origen=%s proyecto_id=%s version_pre=%s public_id_pre=%s tableros_frontend=%s will_recalc=%s',
+                        resultado.get('origen'),
+                        data.get('proyecto_id'),
+                        getattr(proyecto, 'version', None),
+                        getattr(proyecto, 'public_id', None),
+                        len(data.get('tableros') or []) if isinstance(data.get('tableros'), list) else 0,
+                        'YES' if not origen_frontend else 'NO'
+                    )
                 except Exception:
-                    proyecto.version = 1
-                # Calcular el siguiente public_id global (mínimo 100)
-                try:
-                    ultimo_pub = Proyecto.objects.exclude(public_id__isnull=True).order_by('-public_id').first()
-                    next_public_id = (ultimo_pub.public_id + 1) if ultimo_pub and ultimo_pub.public_id and ultimo_pub.public_id >= 100 else 100
-                except Exception:
-                    next_public_id = 100
-                proyecto.public_id = next_public_id
+                    pass
+                if not origen_frontend:
+                    try:
+                        proyecto.version = (proyecto.version or 0) + 1
+                    except Exception:
+                        proyecto.version = 1
+                    try:
+                        ultimo_pub = Proyecto.objects.exclude(public_id__isnull=True).order_by('-public_id').first()
+                        next_public_id = (ultimo_pub.public_id + 1) if ultimo_pub and ultimo_pub.public_id and ultimo_pub.public_id >= 100 else 100
+                    except Exception:
+                        next_public_id = 100
+                    proyecto.public_id = next_public_id
                 existente['folio_proyecto'] = str(proyecto.public_id)
                 # Agregar snapshot al historial con el nuevo ID
                 try:
@@ -1931,30 +2283,28 @@ def optimizar_material(request):
                 except Exception:
                     pass
 
-                # Generar y persistir un PDF del layout inmediatamente después de optimizar
-                try:
-                    from django.conf import settings
-                    import os
-                    pdf_data = _pdf_from_result(proyecto, existente)
-
-                    # Nombrar por ID del proyecto y nombre del cliente para fácil recuperación
-                    folio_actual = str(proyecto.public_id) if proyecto.public_id else f"{proyecto.correlativo}-{proyecto.version}"
+                # Generar y persistir PDF sólo si la optimización fue realizada en backend (evitar duplicado en origen frontend)
+                if resultado.get('origen') != 'frontend':
                     try:
-                        cliente_slug = slugify(proyecto.cliente.nombre) if proyecto.cliente_id else 'cliente'
+                        from django.conf import settings
+                        import os
+                        pdf_data = _pdf_from_result(proyecto, existente)
+                        folio_actual = str(proyecto.public_id) if proyecto.public_id else f"{proyecto.correlativo}-{proyecto.version}"
+                        try:
+                            cliente_slug = slugify(proyecto.cliente.nombre) if proyecto.cliente_id else 'cliente'
+                        except Exception:
+                            cliente_slug = 'cliente'
+                        rel_dir = f"proyectos/{proyecto.id}"
+                        rel_path = f"{rel_dir}/optimizacion_{folio_actual}_{cliente_slug}.pdf"
+                        abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)
+                        os.makedirs(abs_dir, exist_ok=True)
+                        abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
+                        with open(abs_path, 'wb') as fh:
+                            fh.write(pdf_data)
+                        proyecto.archivo_pdf = rel_path
+                        proyecto.save(update_fields=['archivo_pdf'])
                     except Exception:
-                        cliente_slug = 'cliente'
-                    rel_dir = f"proyectos/{proyecto.id}"
-                    rel_path = f"{rel_dir}/optimizacion_{folio_actual}_{cliente_slug}.pdf"
-                    abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)
-                    os.makedirs(abs_dir, exist_ok=True)
-                    abs_path = os.path.join(settings.MEDIA_ROOT, rel_path)
-                    with open(abs_path, 'wb') as fh:
-                        fh.write(pdf_data)
-                    proyecto.archivo_pdf = rel_path
-                    proyecto.save(update_fields=['archivo_pdf'])
-                except Exception:
-                    # Si falla la generación del PDF, no romper el flujo de optimización
-                    pass
+                        pass
             
             resp = {
                 'success': True,
@@ -2059,7 +2409,12 @@ def exportar_json_salida(request, proyecto_id):
 
 @login_required
 def exportar_pdf(request, proyecto_id):
-    """Devuelve el PDF guardado; si falta, lo regenera desde resultado_optimizacion y lo guarda."""
+    """[LEGACY] Generación/regeneración de PDF con layout pesado.
+    Marcado como legado: preferir exportar_pdf_snapshot / exportar_pdf_snapshot_cached.
+    Puede deshabilitarse estableciendo DISABLE_LEGACY_PDF=1 en variables de entorno.
+    """
+    if os.getenv('DISABLE_LEGACY_PDF', '').lower() in ('1','true','yes','y','on'):
+        return JsonResponse({'success': False, 'message': 'Ruta legacy PDF deshabilitada. Use snapshot.'}, status=410)
     proyecto = get_object_or_404(Proyecto, id=proyecto_id)
     from django.conf import settings
     import os
@@ -2161,6 +2516,151 @@ def exportar_pdf(request, proyecto_id):
     resp['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
     resp['Pragma'] = 'no-cache'
     return resp
+
+@login_required
+@csrf_exempt
+def exportar_pdf_snapshot(request, proyecto_id: int):
+    """Genera PDF rápido desde snapshot HTML enviado por el frontend (sin recalcular optimización).
+    Espera POST con JSON: { materiales: [ { titulo, eficiencia, layout_html, piezas: [...] } ] }
+    Guarda caché en MEDIA_ROOT/proyectos/<id>/materiales_snapshot.json y snapshot.html.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Método no permitido'}, status=405)
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    try:
+        payload = json.loads(request.body.decode('utf-8') or '{}')
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'JSON inválido'}, status=400)
+    materiales = payload.get('materiales') or payload.get('materiales_json') or []
+    if not isinstance(materiales, list) or not materiales:
+        return JsonResponse({'success': False, 'message': 'Faltan materiales para generar PDF'}, status=400)
+    import re, os
+    # Compactar HTML de cada material
+    for m in materiales:
+        html = m.get('layout_html', '') or ''
+        html = re.sub(r'>\s+<', '><', html)
+        html = re.sub(r'\s{2,}', ' ', html)
+        m['layout_html'] = html
+        # Normalizar eficiencia numérica
+        try:
+            m['eficiencia'] = float(m.get('eficiencia') or 0)
+        except Exception:
+            m['eficiencia'] = 0.0
+        # Asegurar piezas lista
+        piezas = m.get('piezas') or []
+        if not isinstance(piezas, list):
+            m['piezas'] = []
+    # Eficiencia global ligera (promedio simple)
+    if materiales:
+        eficiencia_global = sum(m.get('eficiencia', 0) for m in materiales) / len(materiales)
+    else:
+        eficiencia_global = 0
+    from django.conf import settings
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    context = {
+        'proyecto': proyecto,
+        'materiales': materiales,
+        'eficiencia_global': eficiencia_global,
+        'timestamp': timestamp,
+    }
+    if WEASY_HTML is None:
+        return JsonResponse({'success': False, 'message': 'WeasyPrint no disponible en el servidor'}, status=500)
+    from django.template.loader import render_to_string
+    html_out = render_to_string('pdf/materiales_snapshot.html', context)
+    t0 = time.time()
+    pdf_bytes = WEASY_HTML(string=html_out).write_pdf()
+    t1 = time.time()
+    logger.info('Snapshot PDF generado en %.2fs (materiales=%d)', t1 - t0, len(materiales))
+    # Guardar caché
+    rel_dir = f"proyectos/{proyecto.id}"
+    abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)
+    os.makedirs(abs_dir, exist_ok=True)
+    import uuid as _uuid
+    # Persistir JSON y HTML para posteriores descargas rápidas
+    json_path = os.path.join(abs_dir, 'materiales_snapshot.json')
+    html_path = os.path.join(abs_dir, 'snapshot.html')
+    try:
+        with open(json_path, 'w', encoding='utf-8') as fjson:
+            json.dump({'materiales': materiales, 'eficiencia_global': eficiencia_global, 'timestamp': timestamp}, fjson, ensure_ascii=False)
+        with open(html_path, 'w', encoding='utf-8') as fhtml:
+            fhtml.write(html_out)
+    except Exception:
+        pass  # Caché opcional
+    resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+    resp['Content-Disposition'] = 'inline; filename="snapshot_optimizacion.pdf"'
+    resp['Cache-Control'] = 'no-store'
+    return resp
+
+@login_required
+def exportar_pdf_snapshot_cached(request, proyecto_id: int):
+    """Segunda descarga rápida: reutiliza archivos de caché si existen."""
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    from django.conf import settings
+    import os, json
+    rel_dir = f"proyectos/{proyecto.id}"
+    abs_dir = os.path.join(settings.MEDIA_ROOT, rel_dir)
+    json_path = os.path.join(abs_dir, 'materiales_snapshot.json')
+    if not os.path.exists(json_path):
+        return JsonResponse({'success': False, 'message': 'No hay snapshot en caché'}, status=404)
+    try:
+        with open(json_path, 'r', encoding='utf-8') as fjson:
+            data = json.load(fjson)
+    except Exception:
+        return JsonResponse({'success': False, 'message': 'Snapshot corrupto'}, status=500)
+    materiales = data.get('materiales') or []
+    eficiencia_global = data.get('eficiencia_global', 0)
+    timestamp = data.get('timestamp') or datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    if WEASY_HTML is None:
+        return JsonResponse({'success': False, 'message': 'WeasyPrint no disponible'}, status=500)
+    from django.template.loader import render_to_string
+    context = {
+        'proyecto': proyecto,
+        'materiales': materiales,
+        'eficiencia_global': eficiencia_global,
+        'timestamp': timestamp,
+    }
+    html_out = render_to_string('pdf/materiales_snapshot.html', context)
+    t0 = time.time()
+    pdf_bytes = WEASY_HTML(string=html_out).write_pdf()
+    t1 = time.time()
+    logger.info('Snapshot PDF (cached) generado en %.2fs (materiales=%d)', t1 - t0, len(materiales))
+    resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+    resp['Content-Disposition'] = 'inline; filename="snapshot_optimizacion_cached.pdf"'
+    resp['Cache-Control'] = 'no-store'
+    return resp
+
+@login_required
+def exportar_pdf_json(request, proyecto_id: int):
+    """Genera PDF usando el estilo legacy (ReportLab) pero sin recalcular:
+    toma el `Proyecto.resultado_optimizacion` actual y lo dibuja.
+    """
+    proyecto = get_object_or_404(Proyecto, id=proyecto_id)
+    try:
+        if not proyecto.resultado_optimizacion:
+            return JsonResponse({'success': False, 'message': 'El proyecto no tiene resultado guardado'}, status=400)
+        try:
+            resultado = json.loads(proyecto.resultado_optimizacion)
+        except Exception:
+            # Si ya es dict (guardado sin dumps)
+            resultado = proyecto.resultado_optimizacion if isinstance(proyecto.resultado_optimizacion, dict) else None
+        if not isinstance(resultado, dict):
+            return JsonResponse({'success': False, 'message': 'Resultado inválido o corrupto'}, status=500)
+
+        pdf_bytes = _pdf_from_result(
+            proyecto,
+            resultado,
+            opts={'fast': True, 'draw_kerf': False, 'draw_kerf_invisible': False, 'piece_grid': False}
+        )
+        resp = HttpResponse(pdf_bytes, content_type='application/pdf')
+        try:
+            folio_txt = str(getattr(proyecto, 'public_id', '') or proyecto.codigo)
+        except Exception:
+            folio_txt = str(proyecto.id)
+        resp['Content-Disposition'] = f'inline; filename="optimizacion_{folio_txt}.pdf"'
+        resp['Cache-Control'] = 'no-store'
+        return resp
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': f'Error generando PDF desde JSON: {str(e)}'}, status=500)
 
  
 

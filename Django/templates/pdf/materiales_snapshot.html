@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<title>Proyecto {{ proyecto.public_id|default:proyecto.nombre }} – Snapshot PDF</title>
+<style>
+  body { font-family: sans-serif; font-size: 12px; margin: 0; padding: 16px; }
+  h1 { font-size: 18px; margin: 0 0 4px; }
+  h2 { font-size: 15px; margin: 24px 0 6px; page-break-before: always; }
+  header { border-bottom: 1px solid #999; margin-bottom: 12px; padding-bottom: 6px; }
+  .material-block { page-break-after: always; }
+  .material-block:last-child { page-break-after: auto; }
+  .meta { font-size: 11px; color: #444; margin: 0 0 8px; }
+  .layout { margin: 8px 0 12px; }
+  table.piezas { width: 100%; border-collapse: collapse; margin-top: 4px; font-size: 11px; }
+  table.piezas th, table.piezas td { border: 1px solid #ccc; padding: 3px 4px; text-align: left; }
+  table.piezas th { background: #f0f0f0; }
+  footer { position: fixed; bottom: 0; left:0; right:0; text-align: center; font-size:10px; color:#666; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Proyecto: {{ proyecto.nombre }}{% if proyecto.public_id %} (ID {{ proyecto.public_id }}){% endif %}</h1>
+  <p class="meta">Cliente: {{ proyecto.cliente.nombre|default:"—" }} | Fecha: {{ timestamp }} | Eficiencia global: {{ eficiencia_global|floatformat:1 }}%</p>
+</header>
+{% for m in materiales %}
+<div class="material-block">
+  <h2>Material {{ forloop.counter }} – {{ m.titulo|default:"Material" }} (Eficiencia {{ m.eficiencia|floatformat:1 }}%)</h2>
+  <div class="layout">{{ m.layout_html|safe }}</div>
+  {% if m.piezas %}
+  <table class="piezas">
+    <thead>
+      <tr>
+        <th>#</th><th>Nombre</th><th>Tablero</th><th>X</th><th>Y</th><th>Ancho</th><th>Alto</th><th>Rotada</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in m.piezas %}
+      <tr>
+        <td>{{ forloop.counter }}</td>
+        <td>{{ p.nombre }}</td>
+        <td>{{ p.tablero }}</td>
+        <td>{{ p.x }}</td>
+        <td>{{ p.y }}</td>
+        <td>{{ p.ancho }}</td>
+        <td>{{ p.alto }}</td>
+        <td>{% if p.rotada %}Sí{% else %}No{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% endif %}
+</div>
+{% endfor %}
+<footer>Generado rápido (snapshot HTML) - Sin recalcular optimización</footer>
+</body>
+</html>

@@ -24,9 +24,19 @@
         color: #9aa0a6;
         opacity: .75;
     }
+    /* Dropdown personalizado para clientes */
+    .dropdown-clientes { position:absolute; top:100%; left:0; right:0; background:#fff; border:1px solid #dee2e6; border-radius:6px; box-shadow:0 6px 18px rgba(0,0,0,.08); z-index:1050; padding:6px 0; max-height:260px; overflow-y:auto; font-size:14px; }
+    .dropdown-clientes .estado { padding:6px 12px; color:#6c757d; font-style:italic; }
+    .dropdown-clientes button.item { all:unset; display:block; width:100%; padding:6px 14px; cursor:pointer; }
+    .dropdown-clientes button.item:hover { background:#f1f5f9; }
+    .dropdown-clientes .nuevo { color:#0d6efd; font-weight:600; }
 </style>
+<!-- Overlay animación optimización central -->
+<link rel="stylesheet" href="/static/css/optimizer_anim.css">
+<div id="optimizerAnimOverlay"><canvas></canvas><div class="oa-label">Optimizando…</div></div>
+<script src="/static/js/optimizer_anim.js"></script>
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-24">
-    <h6 class="fw-semibold mb-0">Optimizador de Materiales</h6>
+    <h6 class="fw-semibold mb-0">Optimizador de Materiales{% if autoservicio %} (Autoservicio){% endif %}</h6>
     <button class="btn btn-sm btn-primary d-inline-flex align-items-center gap-1" onclick="nuevoProyecto()" title="Iniciar un proyecto en blanco">
         <i class="ri-add-line"></i>
         <span>Nuevo Proyecto</span>
@@ -59,23 +69,22 @@
     <div class="card-body">
         <div class="row g-3">
             <div class="col-md-4">
-                <label class="form-label">Cliente</label>
+                <label class="form-label">Cliente{% if autoservicio %} (AUTOSERVICIO){% endif %}</label>
                 <div class="position-relative">
-                    <input type="text" class="form-control" 
-                           id="clienteInput" list="clientesDatalist" 
-                           placeholder="Escribe al menos 3 letras para buscar cliente..."
-                           onkeyup="manejarSeleccionCliente(); generarNombreProyecto();" 
-                           oninput="buscarClientesDB(this.value)"
-                           autocomplete="off">
-                    <!-- Datalist dinámico con clientes desde BD -->
-                    <datalist id="clientesDatalist"></datalist>
+                          <input type="text" class="form-control" 
+                              id="clienteInput"
+                              placeholder="Escribe al menos 2 letras..."
+                              autocomplete="off"
+                              {% if autoservicio and cliente_autoservicio %}value="{{ cliente_autoservicio.nombre }}" disabled{% endif %}>
+                    <div id="clientesDropdown" class="dropdown-clientes" style="display:none;" aria-live="polite"></div>
                 </div>
             </div>
             <div class="col-md-2">
-                <label class="form-label">RUT</label>
-                <input type="text" class="form-control" 
-                       id="rutCliente" placeholder="12.345.678-9" maxlength="12" 
-                       oninput="formatearRUT(this)" disabled>
+                  <label class="form-label">RUT</label>
+                  <input type="text" class="form-control" 
+                      id="rutCliente" placeholder="12.345.678-9" maxlength="12" 
+                      oninput="formatearRUT(this)"
+                      {% if autoservicio and cliente_autoservicio %}value="{{ cliente_autoservicio.rut }}" disabled{% endif %}>
             </div>
             <div class="col-md-2">
                 <label class="form-label">ID del proyecto</label>
@@ -87,6 +96,17 @@
                        id="nombreProyecto" placeholder="Se generará automáticamente">
             </div>
         </div>
+        {% if autoservicio %}
+        <div id="autoservicioResumen" style="display:none" class="mt-3"></div>
+        <div class="mt-3 d-flex gap-2">
+            <button type="button" class="btn btn-success btn-sm" onclick="abrirModalResumenAutoservicio()">Finalizar y Descargar Portada PDF</button>
+            <a href="/autoservicio/hub/" class="btn btn-outline-secondary btn-sm">Volver al Hub</a>
+        </div>
+        <div id="autoservicioPagoPlaceholder" class="mt-2" style="display:none;">
+            <button type="button" class="btn btn-warning btn-sm" disabled title="Disponible próximamente">Pagar (Próximamente)</button>
+            <small class="text-muted ms-2">La opción de pago se habilitará tras la integración.</small>
+        </div>
+        {% endif %}
     </div>
 </div>
 
@@ -330,12 +350,14 @@
 
 <!-- Botón Optimizar abajo del segmento de piezas -->
 <div class="my-3 text-end">
-    <button id="btnOptimizar" class="btn btn-primary" onclick="optimizarPiezas()" disabled>
+    <button id="btnOptimizar" class="btn btn-primary" onclick="(function(){ window._manualOptimizeRequested=true; optimizarPiezas(); })()" disabled>
         <i class="fas fa-magic"></i> Optimizar
     </button>
+    {% if not autoservicio %}
     <button id="btnDescargarPDF" class="btn btn-outline-secondary ms-2" onclick="descargarPDF()">
         <i class="ri-file-download-line"></i> PDF
     </button>
+    {% endif %}
     <span id="alertaGating" class="ms-3 text-danger small" style="display:none;"></span>
 </div>
 
@@ -367,6 +389,34 @@
 </div>
 
 <!-- Área de resultados de optimización -->
+    {% if autoservicio %}
+    <div class="modal fade" id="modalResumenAutoservicio" tabindex="-1" aria-hidden="true" style="display:none;">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Resumen del Proyecto</h5>
+                    <button type="button" class="btn-close" aria-label="Cerrar" onclick="cerrarModalResumenAutoservicio()"></button>
+                </div>
+                <div class="modal-body small">
+                    <p class="mb-2">Verifica la información antes de generar la Portada PDF.</p>
+                    <ul class="list-unstyled mb-0">
+                        <li><strong>Nombre:</strong> <span data-field="nombre"></span></li>
+                        <li><strong>Folio:</strong> <span data-field="folio"></span></li>
+                        <li><strong>Cliente:</strong> <span data-field="cliente"></span></li>
+                        <li><strong>RUT:</strong> <span data-field="rut"></span></li>
+                        <li><strong>Material:</strong> <span data-field="material"></span></li>
+                        <li><strong>Tableros usados:</strong> <span data-field="tableros"></span></li>
+                        <li><strong>Aprovechamiento:</strong> <span data-field="aprovechamiento"></span></li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="cerrarModalResumenAutoservicio()">Cancelar</button>
+                    <button type="button" class="btn btn-success btn-sm" onclick="confirmarModalResumenAutoservicio()">Generar Portada PDF</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 <div id="resultadosOptimizacion" class="mt-3" style="display: none;">
     <!-- Barra de estadísticas compacta -->
     <div class="bg-light p-3 rounded mb-3 border">
@@ -717,22 +767,27 @@
                 renderPiezasToDOM(state && state.piezas ? state.piezas : []);
                 // Aplicar configuración a la pestaña activa
                 applyConfigToTab(activeMaterialIndex);
-                // Si hay resultado guardado para este material, re-renderizarlo
-                try{
+                // Reutilizar snapshot almacenado si existe, evitando recomputar SVG
+                try {
                     const cont = document.getElementById('visualizacionTableros');
-                    if (state && state.resultado && Array.isArray(state.resultado.tableros)){
+                    window._materialVisualizations = window._materialVisualizations || {};
+                    const snap = window._materialVisualizations[activeMaterialIndex];
+                    if (snap){
+                        if (cont){ cont.innerHTML = snap; cont.dataset.locked = '1'; }
+                    } else if (state && state.resultado && Array.isArray(state.resultado.tableros)) {
+                        // Fallback: construir desde resultado sólo una vez y guardar snapshot
                         const tb = construirVisualizacionDesdeBackend(state.resultado);
                         if (tb && tb.length){
                             if (cont && cont.dataset){ delete cont.dataset.locked; }
                             window.__allowReRender = true;
                             generarVisualizacion(tb);
                             window.__allowReRender = false;
-                            if (cont && cont.dataset){ cont.dataset.locked = '1'; }
+                            if (cont){ cont.dataset.locked = '1'; window._materialVisualizations[activeMaterialIndex] = cont.innerHTML; }
                         }
-                    } else {
-                        if (cont){ cont.innerHTML=''; cont.removeAttribute('data-locked'); }
+                    } else if (cont){
+                        cont.innerHTML=''; cont.removeAttribute('data-locked');
                     }
-                }catch(_e){
+                } catch(_e){
                     const cont = document.getElementById('visualizacionTableros');
                     if (cont){ cont.innerHTML=''; cont.removeAttribute('data-locked'); }
                 }
@@ -777,136 +832,86 @@
     // Asegurar actualización del botón PDF en carga
     document.addEventListener('DOMContentLoaded', ()=>{ try{ updatePdfButton(); }catch(_e){} });
 
-    // Manejar selección de cliente desde datalist
-    function manejarSeleccionCliente() {
-        const clienteInput = document.getElementById('clienteInput');
-        const rutInput = document.getElementById('rutCliente');
-        const clienteValue = clienteInput.value.trim();
-        
-        // Solo procesar si tiene al menos 3 caracteres o es una selección exacta
-        if (clienteValue.length < 3 && clienteValue !== '[NUEVO CLIENTE]') {
-            // Resetear estado para búsquedas muy cortas
-            rutInput.disabled = false;
-            rutInput.value = '';
-            clienteSeleccionado = null;
-            generarNombreProyecto();
-            return;
-        }
-        
-    // Buscar si el valor coincide con alguna opción del datalist
-        const datalist = document.getElementById('clientesDatalist');
-        const options = datalist.querySelectorAll('option');
-        
-        let clienteEncontrado = false;
-        
-        options.forEach(option => {
-            if (option.value === clienteValue) {
-                clienteEncontrado = true;
-                
-                if (option.dataset.id) {
-                    // Cliente existente seleccionado desde BD
-                    const rut = option.dataset.rut;
-                    const id = option.dataset.id;
-                    const organizacion = option.dataset.organizacion;
-                    const email = option.dataset.email;
-                    const telefono = option.dataset.telefono;
-                    
-                    rutInput.value = rut;
-                    rutInput.disabled = true;
-                    clienteSeleccionado = {
-                        id: id,
-                        nombre: clienteValue,
-                        rut: rut,
-                        organizacion: organizacion,
-                        email: email,
-                        telefono: telefono
-                    };
-                    
-                    console.log('Cliente seleccionado desde BD:', clienteSeleccionado);
-                } else {
-                    // No es un cliente existente (opción de sugerencia), permitir crear
-                    rutInput.disabled = false;
-                    clienteSeleccionado = null;
-                }
-            }
-        });
-        
-        // Si no se encontró coincidencia exacta, es texto libre (nuevo cliente)
-        if (!clienteEncontrado && clienteValue.length >= 3) {
-            rutInput.disabled = false;
-            if (rutInput.value && rutInput.disabled) {
-                rutInput.value = ''; // Limpiar RUT si era un cliente anterior
-            }
-            clienteSeleccionado = null;
-        }
-    }
+    // (Legacy manejarSeleccionCliente eliminado - reemplazado por dropdown personalizado)
 
-    // Buscar clientes en la base de datos (solo a partir de 2 caracteres) y mostrar [NUEVO CLIENTE] solo si no hay coincidencias
+    // Nuevo dropdown de clientes con estado de carga
     let timeoutId = null;
     function buscarClientesDB(query) {
         const queryTrimmed = query.trim();
-        
-        // Cancelar búsqueda anterior si existe
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-        }
-        
-        // Solo buscar si tiene al menos 2 caracteres (más ágil)
+        const dd = document.getElementById('clientesDropdown');
+        if (!dd) return;
+        if (timeoutId) clearTimeout(timeoutId);
         if (queryTrimmed.length < 2) {
-            // Limpiar datalist completamente
-            const datalist = document.getElementById('clientesDatalist');
-            datalist.innerHTML = '';
-            // También limpiamos estado seleccionado
+            dd.innerHTML = '<div class="estado">Ingresa al menos 2 letras</div>';
+            dd.style.display = 'block';
             clienteSeleccionado = null;
             return;
         }
-        
-        // Implementar debounce para evitar muchas requests
-        timeoutId = setTimeout(() => {
-            // Usamos el endpoint general (core) para evitar conflictos de nombre
+        timeoutId = setTimeout(()=>{
+            dd.innerHTML = '<div class="estado">Consultando clientes…</div>';
+            dd.style.display = 'block';
             fetch(`{% url 'buscar_clientes_ajax' %}?q=${encodeURIComponent(queryTrimmed)}`)
-                .then(response => response.json())
-                .then(data => {
+                .then(r=>r.json())
+                .then(data=>{
                     const lista = Array.isArray(data.clientes) ? data.clientes : [];
-                    actualizarDatalistClientes(lista);
+                    renderDropdownClientes(lista);
                 })
-                .catch(error => {
-                    console.error('Error al buscar clientes:', error);
+                .catch(err=>{
+                    console.error('Error al buscar clientes:', err);
+                    dd.innerHTML = '<div class="estado">Error consultando clientes</div>';
                 });
-        }, 200); // Debounce más rápido
+        },250);
     }
-    
-    function actualizarDatalistClientes(clientes) {
-        const datalist = document.getElementById('clientesDatalist');
-        // Limpiar
-        datalist.innerHTML = '';
-        // Agregar clientes encontrados
-        clientes.forEach(cliente => {
-            const option = document.createElement('option');
-            option.value = cliente.nombre;
-            option.setAttribute('data-rut', cliente.rut);
-            option.setAttribute('data-id', cliente.id);
-            option.setAttribute('data-organizacion', cliente.organizacion);
-            option.setAttribute('data-email', cliente.email);
-            option.setAttribute('data-telefono', cliente.telefono);
-            
-            // Texto descriptivo
-            let texto = `${cliente.nombre} - ${cliente.rut}`;
-            if (cliente.organizacion) {
-                texto += ` (${cliente.organizacion})`;
-            }
-            option.textContent = texto;
-            
-            datalist.appendChild(option);
-        });
-        // Si no hay coincidencias, ofrecer crear nuevo explícitamente
-        if (!clientes || clientes.length === 0) {
-            const option = document.createElement('option');
-            option.value = '[NUEVO CLIENTE]';
-            option.textContent = 'Agregar nuevo cliente';
-            datalist.appendChild(option);
+    function renderDropdownClientes(lista){
+        const dd = document.getElementById('clientesDropdown');
+        if (!dd) return;
+        if (!lista.length){
+            dd.innerHTML = '<div class="estado">Sin coincidencias. <span class="nuevo">[Nuevo cliente]</span></div>';
+            dd.style.display = 'block';
+            return;
         }
+        dd.innerHTML = lista.map(c=>`<button type="button" class="item" data-id="${c.id}" data-rut="${c.rut||''}" data-nombre="${c.nombre||''}" data-organizacion="${c.organizacion||''}" data-email="${c.email||''}" data-telefono="${c.telefono||''}">${c.nombre || 'Cliente'} <span class='text-muted'>${c.rut||''}</span></button>`).join('');
+        dd.style.display = 'block';
     }
+    (function initClienteDropdown(){
+        document.addEventListener('DOMContentLoaded', ()=>{
+            const inp = document.getElementById('clienteInput');
+            if(!inp) return;
+            const dd = document.getElementById('clientesDropdown');
+            inp.addEventListener('focus', ()=>{
+                dd.innerHTML = '<div class="estado">Ingresa al menos 2 letras</div>';
+                dd.style.display = 'block';
+            });
+            inp.addEventListener('input', e=>{ 
+                buscarClientesDB(e.target.value); 
+                generarNombreProyecto(); 
+                // Si se está modificando texto luego de seleccionar cliente, re-habilitar RUT
+                const rutIn = document.getElementById('rutCliente');
+                if (rutIn && (!clienteSeleccionado || clienteSeleccionado.nombre !== e.target.value.trim())) {
+                    rutIn.disabled = false;
+                }
+                if (!clienteSeleccionado) {
+                    const rutIn2 = document.getElementById('rutCliente');
+                    if (rutIn2) rutIn2.disabled = false;
+                }
+            });
+            document.addEventListener('click', e=>{
+                if(e.target.closest('#clientesDropdown button.item')){
+                    const btn = e.target.closest('button.item');
+                    inp.value = btn.dataset.nombre || btn.textContent.trim();
+                    const rutIn = document.getElementById('rutCliente');
+                    if (rutIn){ rutIn.value = btn.dataset.rut || ''; rutIn.disabled = true; }
+                    clienteSeleccionado = { id: btn.dataset.id, nombre: inp.value, rut: btn.dataset.rut||'', organizacion: btn.dataset.organizacion||'', email: btn.dataset.email||'', telefono: btn.dataset.telefono||'' };
+                    dd.style.display = 'none';
+                    generarNombreProyecto();
+                    return;
+                }
+                if(!e.target.closest('#clienteInput') && !e.target.closest('#clientesDropdown')){
+                    dd.style.display = 'none';
+                }
+            });
+        });
+    })();
 
     // Generar nombre del proyecto automáticamente (pero mantener editable)
     function generarNombreProyecto() {
@@ -1472,7 +1477,7 @@
                                         telefono: found.telefono
                                     };
                                     // Refrescar datalist con este cliente para coherencia
-                                    actualizarDatalistClientes(lista);
+                                    renderDropdownClientes(lista);
                                 }
                             } else {
                                 // No encontrado: dejar RUT editable con valor de ejemplo
@@ -2296,6 +2301,23 @@
     // Función principal de optimización  
     function optimizarPiezas() {
         console.log('=== INICIANDO OPTIMIZACIÓN ===');
+        // Animación global minimalista antes de cualquier cálculo pesado
+        if(!window.__globalOptAnim && window.OptimizerAnim){
+            window.__globalOptAnim = OptimizerAnim.start('#optimizerAnimOverlay','opt');
+        }
+        // Guardia anti doble ejecución oculta
+        const now = Date.now();
+        if (!window._manualOptimizeRequested) {
+            // Si no fue disparada por el botón y ya hubo una optimización reciente (<2s), abortar
+            if (window._lastOptimizeTs && (now - window._lastOptimizeTs) < 2000) {
+                console.log('[opt] Abortado: intento automático dentro de ventana de protección.');
+                return;
+            }
+        }
+        window._lastOptimizeTs = now;
+        window._manualOptimizeRequested = false; // se reseteará al usar el botón
+        // Reset congelación de métricas para capturar nuevo primer resultado
+        try { delete window._metricsFrozen; } catch(_e) {}
         // Desbloquear visualización para permitir nuevo render con los cambios
         try{
             const contVis = document.getElementById('visualizacionTableros');
@@ -2310,13 +2332,28 @@
                 const nombreProyecto = document.getElementById('nombreProyecto')?.value?.trim() || 'Proyecto sin nombre';
                 const clienteRut = document.getElementById('rutCliente')?.value?.trim();
                 const clienteNombre = document.getElementById('clienteInput')?.value?.trim();
-                // Intentar obtener cliente_id del datalist
-                let clienteId = null;
-                const datalist = document.getElementById('clientesDatalist');
-                if (datalist && clienteNombre) {
-                    const opt = Array.from(datalist.querySelectorAll('option')).find(o => o.value === clienteNombre);
-                    if (opt && opt.dataset.id) clienteId = opt.dataset.id;
+                // Obtener clienteId desde dropdown o fallback datalist
+                let clienteId = clienteSeleccionado?.id || null;
+                if (!clienteId) {
+                    const datalist = document.getElementById('clientesDatalist');
+                    if (datalist && clienteNombre) {
+                        const opt = Array.from(datalist.querySelectorAll('option')).find(o => o.value === clienteNombre);
+                        if (opt && opt.dataset.id) clienteId = opt.dataset.id;
+                    }
                 }
+                {% if autoservicio and cliente_autoservicio %}
+                // Forzar clienteId en flujo autoservicio (inputs están bloqueados, no hay selección dinámica)
+                clienteId = {{ cliente_autoservicio.id }};
+                {% endif %}
+                {% if autoservicio %}
+                // Autoservicio: autoseleccionar primer tablero y tapacanto si están vacíos
+                try {
+                    const selTab = document.getElementById('tableroSelect1');
+                    if (selTab && selTab.options.length > 0 && selTab.value === '') { selTab.selectedIndex = 0; }
+                    const selTap = document.getElementById('tapacantoSelect1');
+                    if (selTap && selTap.options.length > 0 && selTap.value === '') { selTap.selectedIndex = 0; }
+                } catch(_e) { console.warn('Auto-select material/tapacanto autoservicio falló', _e); }
+                {% endif %}
 
                 // Si no hay clienteId pero hay nombre+RUT, crear cliente automáticamente
                 const ensureProyecto = (cid) => {
@@ -2365,7 +2402,10 @@
                             containerResultados.setAttribute('data-proyecto-id', res.proyecto_id);
                             try{ const resDiv = document.getElementById('resumenProyecto'); if (resDiv) resDiv.setAttribute('data-proyecto-id', String(res.proyecto_id)); }catch(_e){}
                             try{ const f = document.getElementById('folioProyecto'); if (f && res.folio){ f.value = res.folio; document.getElementById('resFolio').textContent = res.folio; } }catch(_e){}
-                            setTimeout(()=> optimizarPiezas(), 50);
+                            // Optimización automática inmediata tras crear proyecto (eliminar segundo clic)
+                            console.log('[opt] Proyecto creado. Disparando optimización automática inicial…');
+                            window._manualOptimizeRequested = true; // forzar ejecución completa siguiente llamada
+                            setTimeout(()=>{ try{ optimizarPiezas(); }catch(e){ console.warn('Falló optimización automática inicial', e); } }, 60);
                         } else {
                             alert(res.message||'No se pudo crear el proyecto');
                         }
@@ -2375,6 +2415,7 @@
                     });
                 };
 
+                {% if not autoservicio %}
                 if (!clienteId && clienteNombre && clienteRut) {
                     fetch('{% url "crear_cliente_ajax" %}', {
                         method: 'POST',
@@ -2392,9 +2433,10 @@
                     });
                     return;
                 }
+                {% endif %}
 
                 if (!clienteId) {
-                    alert('Selecciona un cliente o ingresa Nombre y RUT válidos para crearlo automáticamente.');
+                    alert('Selecciona un cliente válido antes de optimizar.');
                     return;
                 }
 
@@ -2443,8 +2485,10 @@
                         containerResultados.setAttribute('data-proyecto-id', res.proyecto_id);
                         try{ const resDiv = document.getElementById('resumenProyecto'); if (resDiv) resDiv.setAttribute('data-proyecto-id', String(res.proyecto_id)); }catch(_e){}
                         try{ const f = document.getElementById('folioProyecto'); if (f && res.folio){ f.value = res.folio; document.getElementById('resFolio').textContent = res.folio; } }catch(_e){}
-                        // Continuar optimización tras crear el proyecto
-                        setTimeout(()=> optimizarPiezas(), 50);
+                        // Optimización automática inmediata (cliente ya existente)
+                        console.log('[opt] Proyecto creado (cliente existente). Disparando optimización automática inicial…');
+                        window._manualOptimizeRequested = true;
+                        setTimeout(()=>{ try{ optimizarPiezas(); }catch(e){ console.warn('Falló optimización automática inicial', e); } }, 60);
                     } else {
                         alert(res.message||'No se pudo crear el proyecto');
                     }
@@ -2556,6 +2600,90 @@
             console.log(`Optimización completada. Tableros generados: ${tableros.length}`);
             // Mostrar resultados
             mostrarResultados(tableros);
+            if (window.IS_AUTOSERVICIO && !window._autoservicioResumenMostrado){
+                window._autoservicioResumenMostrado = true;
+                try { prepararResumenAutoservicio(); } catch(_e) { console.warn('Resumen autoservicio error', _e); }
+            }
+                // Autoservicio: preparar datos cliente iniciales
+                (function initAutoservicio(){
+                    {% if autoservicio and cliente_autoservicio %}
+                    window.IS_AUTOSERVICIO = true;
+                    try{
+                        const inCli = document.getElementById('clienteInput');
+                        const inRut = document.getElementById('rutCliente');
+                        if (inCli) { inCli.value = '{{ cliente_autoservicio.nombre|escapejs }}'; inCli.disabled = true; }
+                        if (inRut) { inRut.value = '{{ cliente_autoservicio.rut|escapejs }}'; inRut.disabled = true; }
+                    }catch(_e){}
+                    {% else %}
+                    window.IS_AUTOSERVICIO = false;
+                    {% endif %}
+                })();
+
+                function prepararResumenAutoservicio(){
+                    const cont = document.getElementById('autoservicioResumen');
+                    if (!cont) return;
+                    cont.innerHTML = '<div class="p-3 border rounded">Resumen listo tras primera optimización. Puede finalizar y generar portada PDF.</div>';
+                    cont.style.display='block';
+                }
+
+                function generarPortadaAutoservicio(){
+                    if (!window.IS_AUTOSERVICIO){ return; }
+                    const pid = document.getElementById('resultadosOptimizacion')?.getAttribute('data-proyecto-id');
+                    if (!pid){ alert('Proyecto aún no persistido. Optimice primero.'); return; }
+                    window.open(`/autoservicio/portada-pdf/${encodeURIComponent(pid)}/`, '_blank');
+                }
+                function abrirModalResumenAutoservicio(){
+                    if(!window.IS_AUTOSERVICIO){ return; }
+                    const modal = document.getElementById('modalResumenAutoservicio');
+                    if(!modal){ generarPortadaAutoservicio(); return; }
+                    const nombre = document.getElementById('resNombre')?.textContent || '';
+                    const folio = document.getElementById('resFolio')?.textContent || '';
+                    const cliente = document.getElementById('resCliente')?.textContent || '';
+                    const rut = document.getElementById('resClienteRut')?.textContent || '';
+                    const material = document.getElementById('resMaterial')?.textContent || '';
+                    const tableros = document.getElementById('tablerosUsados')?.textContent || '';
+                    const aprovechamiento = document.getElementById('aprovechamiento')?.textContent || '';
+                    modal.querySelector('[data-field="nombre"]').textContent = nombre;
+                    modal.querySelector('[data-field="folio"]').textContent = folio || '—';
+                    modal.querySelector('[data-field="cliente"]').textContent = cliente;
+                    modal.querySelector('[data-field="rut"]').textContent = rut;
+                    modal.querySelector('[data-field="material"]').textContent = material;
+                    modal.querySelector('[data-field="tableros"]').textContent = tableros || '—';
+                    modal.querySelector('[data-field="aprovechamiento"]').textContent = aprovechamiento || '—';
+                    modal.style.display='block';
+                    modal.classList.add('show');
+                    document.body.classList.add('modal-open');
+                    const backdrop = document.createElement('div');
+                    backdrop.className='modal-backdrop fade show';
+                    backdrop.id='modalResumenAutoservicioBackdrop';
+                    document.body.appendChild(backdrop);
+                }
+                function cerrarModalResumenAutoservicio(){
+                    const modal = document.getElementById('modalResumenAutoservicio');
+                    if(modal){ modal.classList.remove('show'); modal.style.display='none'; }
+                    document.body.classList.remove('modal-open');
+                    const backdrop = document.getElementById('modalResumenAutoservicioBackdrop');
+                    if(backdrop){ backdrop.remove(); }
+                }
+                function confirmarModalResumenAutoservicio(){
+                    cerrarModalResumenAutoservicio();
+                    generarPortadaAutoservicio();
+                    const pay = document.getElementById('autoservicioPagoPlaceholder');
+                    if (pay) pay.style.display='block';
+                }
+            // Bloquear edición de cliente y RUT tras primera optimización
+            try {
+                const inCli = document.getElementById('clienteInput');
+                const inRut = document.getElementById('rutCliente');
+                if (inCli && !inCli.disabled) inCli.disabled = true;
+                if (inRut && !inRut.disabled) inRut.disabled = true;
+                // Marcar bandera para evitar re-bloqueos innecesarios
+                window._clienteRutLocked = true;
+            } catch(_e) {}
+            // Finalizar animación inmediatamente al aparecer la visualización
+            try {
+                if (window.__globalOptAnim){ window.__globalOptAnim.finish(); window.__globalOptAnim = null; }
+            } catch(_e) {}
 
             // Enviar resultado al backend para guardar en el proyecto (material actual = pestaña activa)
             try {
@@ -2565,15 +2693,11 @@
                     const m = activeTab.id.match(/material(\d+)-tab/);
                     if (m) materialIndex = parseInt(m[1],10);
                 }
-                // Bloquear PDF hasta que se actualice el folio/archivo en backend
+                // Bloquear PDF hasta que backend persista cambios (sin mostrar toast PDF; solo se usa en descarga inicial)
                 window._bloquearPDF = true;
                 setPdfButton(false);
-                // Mostrar aviso de "Generando PDF…" durante el bloqueo
-                try {
-                    const toast = document.getElementById('toastGenerandoPdf');
-                    if (toast) toast.style.display = 'block';
-                } catch(_e) {}
 
+                // Incluir tableros ya optimizados para evitar recomputación backend
                 const payload = {
                     proyecto_id: document.getElementById('resultadosOptimizacion').getAttribute('data-proyecto-id'),
                     configuracion_material: {
@@ -2600,9 +2724,31 @@
                         veta_libre: !!p.veta_libre,
                         tapacantos: p.tapacantos
                     })),
+                    tableros: (function(){
+                        try {
+                            return tableros.map(t=>({
+                                numero: t.numero,
+                                ancho: t.ancho,
+                                largo: t.alto || t.largo,
+                                piezas: t.piezas.map(p=>({
+                                    nombre: p.nombre,
+                                    ancho: p.ancho,
+                                    largo: p.alto,
+                                    x: p.x,
+                                    y: p.y,
+                                    rotada: !!p.rotada,
+                                    indiceUnidad: p.indiceUnidad,
+                                    totalUnidades: p.totalUnidades,
+                                    tapacantos: p.tapacantos || {arriba:false,derecha:false,abajo:false,izquierda:false}
+                                }))
+                            }));
+                        } catch(e){ console.warn('No se pudieron serializar tableros para evitar recomputación backend', e); return []; }
+                    })(),
                     material_index: materialIndex,
                     resetear_resultado: !!window._resetResultado
                 };
+                // Iniciar animación visual secundaria al enviar (si la global terminó por algún motivo)
+                let __animCtrl = (!window.__globalOptAnim && window.OptimizerAnim ? OptimizerAnim.start('#optimizerAnimOverlay','opt') : null);
                 fetch('{% url "optimizar_material" %}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
@@ -2618,6 +2764,8 @@
                             const toast = document.getElementById('toastGenerandoPdf');
                             if (toast) toast.style.display = 'none';
                         } catch(_e) {}
+                        if(__animCtrl){ __animCtrl.finish(); __animCtrl=null; }
+                        if(window.__globalOptAnim){ window.__globalOptAnim.finish(); window.__globalOptAnim=null; }
                         return;
                     }
                     try {
@@ -2628,6 +2776,9 @@
                             if (rf){ rf.textContent = res.folio; }
                         }
                     } catch(_e) {}
+                    // Finalizar animación al recibir respuesta exitosa (visualización ya generada arriba)
+                    if(__animCtrl){ __animCtrl.finish(); __animCtrl=null; }
+                    if(window.__globalOptAnim){ window.__globalOptAnim.finish(); window.__globalOptAnim=null; }
                     // Desbloquear PDF tras breve espera para asegurar escritura del archivo
                     setTimeout(()=>{
                         window._bloquearPDF = false;
@@ -2657,63 +2808,94 @@
                         const mY = (mRes.margenes && typeof mRes.margenes.margen_y === 'number') ? mRes.margenes.margen_y : 0;
                         const margen = Math.max(mX, mY);
                         const tablerosBackend = Array.isArray(mRes.tableros) ? mRes.tableros : [];
-                        // Numeración global por tipo (nombre + dimensiones normalizadas) para i/j
-                        const _typeTotals = new Map();
-                        tablerosBackend.forEach(t=>{
-                            (t.piezas||[]).forEach(p=>{
-                                const a = parseInt(p.ancho||p.width||0,10); const l = parseInt((p.largo!=null?p.largo:p.alto)||p.height||0,10);
-                                const k = `${(p.nombre||'').trim()}|${Math.min(a,l)}x${Math.max(a,l)}`;
-                                _typeTotals.set(k, (_typeTotals.get(k)||0) + 1);
-                            });
-                        });
-                        const _typeRunning = new Map();
-                        const tb = tablerosBackend.map((t, idx)=>({
-                            numero: (idx+1),
-                            ancho: (t.ancho || mRes.tablero_ancho_original || 0),
-                            alto: (t.largo || mRes.tablero_largo_original || 0),
-                            margenOriginal: margen,
-                            anchoUtil: Math.max(0, (t.ancho || mRes.tablero_ancho_original || 0) - 2*mX),
-                            altoUtil: Math.max(0, (t.largo || mRes.tablero_largo_original || 0) - 2*mY),
-                            kerf: (typeof mRes.desperdicio_sierra === 'number' ? mRes.desperdicio_sierra : (mRes.config && typeof mRes.config.kerf === 'number' ? mRes.config.kerf : 0)),
-                            piezas: (Array.isArray(t.piezas)? t.piezas.map(p=>{
-                                const aN = parseInt(p.ancho||p.width||0,10); const lN = parseInt((p.largo!=null?p.largo:p.alto)||p.height||0,10);
-                                const k = `${(p.nombre||'').trim()}|${Math.min(aN,lN)}x${Math.max(aN,lN)}`;
-                                const run = (_typeRunning.get(k)||0) + 1; _typeRunning.set(k, run);
-                                const tot = _typeTotals.get(k)||run;
-                                  // Normalización de coordenadas: decidir si vienen relativas (candA) o absolutas (candB)
-                                  const effW = Math.max(0, (t.ancho || mRes.tablero_ancho_original || 0) - 2*mX);
-                                  const effH = Math.max(0, (t.largo || mRes.tablero_largo_original || 0) - 2*mY);
-                                  const px = (p.x!=null? parseFloat(p.x) : 0); const py = (p.y!=null? parseFloat(p.y) : 0);
-                                  const candA = {x:px, y:py};
-                                  const candB = {x:px - mX, y:py - mY};
-                                  const fits = (c)=> c.x >= -2 && c.y >= -2 && c.x + aN <= effW + 2 && c.y + lN <= effH + 2;
-                                  const use = fits(candB) ? candB : (fits(candA) ? candA : candB);
-                                return {
+                        const origen = mRes.origen || 'backend';
+                        let tb;
+                        if (origen === 'frontend') {
+                            // Usar EXACTAMENTE las coordenadas y orden recibidos, sin renormalizar ni restar márgenes.
+                            tb = tablerosBackend.map((t, idx)=>({
+                                numero: t.numero || (idx+1),
+                                ancho: t.ancho || mRes.tablero_ancho_original || 0,
+                                alto: (t.alto!=null?t.alto:t.largo) || mRes.tablero_largo_original || 0,
+                                margenOriginal: margen,
+                                anchoUtil: Math.max(0, (t.ancho || mRes.tablero_ancho_original || 0) - 2*mX),
+                                altoUtil: Math.max(0, ((t.alto!=null?t.alto:t.largo) || mRes.tablero_largo_original || 0) - 2*mY),
+                                kerf: (typeof mRes.desperdicio_sierra === 'number' ? mRes.desperdicio_sierra : (mRes.config && typeof mRes.config.kerf === 'number' ? mRes.config.kerf : 0)),
+                                piezas: (Array.isArray(t.piezas)? t.piezas.map(p=>({
                                     nombre: p.nombre,
-                                      x: use.x,
-                                      y: use.y,
-                                    ancho: aN,
-                                    alto: lN,
+                                    x: (typeof p.x === 'number'? p.x : 0),
+                                    y: (typeof p.y === 'number'? p.y : 0),
+                                    ancho: parseInt(p.ancho||p.width||0,10),
+                                    alto: parseInt((p.alto!=null?p.alto:p.largo!=null?p.largo:p.height)||0,10),
                                     rotada: !!p.rotada,
-                                    indiceUnidad: (p.indiceUnidad!=null? p.indiceUnidad : run),
-                                    totalUnidades: (p.totalUnidades!=null? p.totalUnidades : tot),
+                                    indiceUnidad: p.indiceUnidad,
+                                    totalUnidades: p.totalUnidades,
                                     tapacantos: (typeof p.tapacantos==='object' && !Array.isArray(p.tapacantos)) ? p.tapacantos : {arriba:false,derecha:false,abajo:false,izquierda:false}
-                                };
-                            }) : []),
-                            getAprovechamiento(){ return (t.eficiencia_tablero!=null) ? t.eficiencia_tablero : (mRes.eficiencia||0); }
-                        }));
-                        // Renderizar usando el layout optimizado del backend SOLO si no está bloqueada la visualización
-                        (function(){
-                            try{
-                                // Forzar que la UI refleje SIEMPRE el layout del backend (mismo que el PDF)
-                                const contVis = document.getElementById('visualizacionTableros');
-                                if (contVis && contVis.dataset){ delete contVis.dataset.locked; }
-                                window.__allowReRender = true;
-                                generarVisualizacion(tb);
-                                window.__allowReRender = false;
-                                if (contVis && contVis.dataset){ contVis.dataset.locked = '1'; }
-                            }catch(_e){ try{ generarVisualizacion(tb); }catch(__e){} }
-                        })();
+                                })) : []),
+                                getAprovechamiento(){ return (t.eficiencia_tablero!=null) ? t.eficiencia_tablero : (mRes.eficiencia||0); }
+                            }));
+                            // Solo re-render si aún no está bloqueado (primer render). Si ya hay lock, conservar snapshot.
+                            (function(){
+                                try {
+                                    const contVis = document.getElementById('visualizacionTableros');
+                                    if (contVis && contVis.dataset.locked === '1') {
+                                        console.log('Salta re-render (origen=frontend, layout ya bloqueado).');
+                                    } else {
+                                        generarVisualizacion(tb);
+                                        window._lastRenderTableros = tb;
+                                        if (contVis) contVis.dataset.locked = '1';
+                                    }
+                                } catch(e){ console.warn('Fallo render frontend directo', e); }
+                            })();
+                        } else {
+                            // Backend: mantener lógica pero simplificar coordenadas sin heurística candA/candB.
+                            const _typeTotals = new Map();
+                            tablerosBackend.forEach(t=>{
+                                (t.piezas||[]).forEach(p=>{
+                                    const a = parseInt(p.ancho||p.width||0,10); const l = parseInt((p.largo!=null?p.largo:p.alto)||p.height||0,10);
+                                    const k = `${(p.nombre||'').trim()}|${Math.min(a,l)}x${Math.max(a,l)}`;
+                                    _typeTotals.set(k, (_typeTotals.get(k)||0) + 1);
+                                });
+                            });
+                            const _typeRunning = new Map();
+                            tb = tablerosBackend.map((t, idx)=>({
+                                numero: (idx+1),
+                                ancho: (t.ancho || mRes.tablero_ancho_original || 0),
+                                alto: (t.largo || mRes.tablero_largo_original || 0),
+                                margenOriginal: margen,
+                                anchoUtil: Math.max(0, (t.ancho || mRes.tablero_ancho_original || 0) - 2*mX),
+                                altoUtil: Math.max(0, (t.largo || mRes.tablero_largo_original || 0) - 2*mY),
+                                kerf: (typeof mRes.desperdicio_sierra === 'number' ? mRes.desperdicio_sierra : (mRes.config && typeof mRes.config.kerf === 'number' ? mRes.config.kerf : 0)),
+                                piezas: (Array.isArray(t.piezas)? t.piezas.map(p=>{
+                                    const aN = parseInt(p.ancho||p.width||0,10); const lN = parseInt((p.largo!=null?p.largo:p.alto)||p.height||0,10);
+                                    const k = `${(p.nombre||'').trim()}|${Math.min(aN,lN)}x${Math.max(aN,lN)}`;
+                                    const run = (_typeRunning.get(k)||0) + 1; _typeRunning.set(k, run);
+                                    const tot = _typeTotals.get(k)||run;
+                                    return {
+                                        nombre: p.nombre,
+                                        x: (typeof p.x === 'number'? p.x : 0),
+                                        y: (typeof p.y === 'number'? p.y : 0),
+                                        ancho: aN,
+                                        alto: lN,
+                                        rotada: !!p.rotada,
+                                        indiceUnidad: (p.indiceUnidad!=null? p.indiceUnidad : run),
+                                        totalUnidades: (p.totalUnidades!=null? p.totalUnidades : tot),
+                                        tapacantos: (typeof p.tapacantos==='object' && !Array.isArray(p.tapacantos)) ? p.tapacantos : {arriba:false,derecha:false,abajo:false,izquierda:false}
+                                    };
+                                }) : []),
+                                getAprovechamiento(){ return (t.eficiencia_tablero!=null) ? t.eficiencia_tablero : (mRes.eficiencia||0); }
+                            }));
+                            (function(){
+                                try{
+                                    const contVis = document.getElementById('visualizacionTableros');
+                                    if (contVis && contVis.dataset){ delete contVis.dataset.locked; }
+                                    window.__allowReRender = true;
+                                    generarVisualizacion(tb);
+                                    window._lastRenderTableros = tb;
+                                    window.__allowReRender = false;
+                                    if (contVis && contVis.dataset){ contVis.dataset.locked = '1'; }
+                                }catch(_e){ try{ generarVisualizacion(tb); }catch(__e){} }
+                            })();
+                        }
                         const cont = document.getElementById('resultadosOptimizacion');
                         if (cont) cont.style.display = 'block';
                         // Sincronizar proyecto activo en resumen y resultados
@@ -2724,15 +2906,45 @@
                                 if (cont) cont.setAttribute('data-proyecto-id', String(res.proyecto_id));
                             }
                         }catch(_e){}
-                        // Actualizar resumen desde backend
+                        // Actualizar resumen desde backend (freeze estricto: solo primer cálculo)
                         (function actualizarResumenDesdeBackend(){
-                            try{
-                                const totalTableros = (mRes.tableros||[]).length;
-                                const aprovech = (typeof mRes.eficiencia === 'number') ? mRes.eficiencia : 0;
-                                const areaTotalM2 = (typeof mRes.area_total === 'number') ? mRes.area_total : 0;
-                                const areaUsadaM2 = (typeof mRes.area_utilizada === 'number') ? mRes.area_utilizada : 0;
-                                const desperdicioM2 = Math.max(areaTotalM2 - areaUsadaM2, 0);
-                                // Recalcular tapacanto total a partir de piezas
+                            try {
+                                // Si ya congelado: usar métricas y salir
+                                if (window._metricsFrozen) {
+                                    const mf = window._metricsFrozen;
+                                    document.getElementById('tablerosUsados').textContent = mf.totalTableros;
+                                    document.getElementById('aprovechamiento').textContent = `${mf.aprovech.toFixed(1)}%`;
+                                    try {
+                                        let badge = document.getElementById('badgeOrigenOpt');
+                                        if (!badge) {
+                                            badge = document.createElement('span');
+                                            badge.id = 'badgeOrigenOpt';
+                                            badge.style.marginLeft = '8px';
+                                            badge.style.padding = '2px 6px';
+                                            badge.style.borderRadius = '4px';
+                                            badge.style.fontSize = '11px';
+                                            const apEl = document.getElementById('aprovechamiento');
+                                            if (apEl && apEl.parentElement) apEl.parentElement.appendChild(badge);
+                                        }
+                                        const origenB = mf.origen === 'frontend' ? 'frontend' : 'backend';
+                                        badge.textContent = origenB === 'frontend' ? 'origen:frontend' : 'origen:backend';
+                                        badge.style.background = origenB === 'frontend' ? '#d4edda' : '#ffeeba';
+                                        badge.style.color = '#333';
+                                    } catch(_eBadge2) {}
+                                    document.getElementById('desperdicio').textContent = `${mf.desperdicioM2.toFixed(3)} m²`;
+                                    document.getElementById('tapacantos').textContent = `${(mf.tapMM/1000).toFixed(1)} m`;
+                                    return; // evitar cualquier recomputación posterior
+                                }
+
+                                let totalTableros = (mRes.tableros||[]).length;
+                                let aprovech = (typeof mRes.eficiencia === 'number') ? mRes.eficiencia : 0;
+                                if (mRes.origen === 'frontend') {
+                                    if (window._aprovechamientoInicial == null) window._aprovechamientoInicial = aprovech;
+                                    aprovech = window._aprovechamientoInicial;
+                                }
+                                let areaTotalM2 = (typeof mRes.area_total === 'number') ? mRes.area_total : 0;
+                                let areaUsadaM2 = (typeof mRes.area_utilizada === 'number') ? mRes.area_utilizada : 0;
+                                let desperdicioM2 = Math.max(areaTotalM2 - areaUsadaM2, 0);
                                 let tapMM = 0;
                                 (mRes.tableros||[]).forEach(t=>{ (t.piezas||[]).forEach(p=>{
                                     const tc = (typeof p.tapacantos==='object' && !Array.isArray(p.tapacantos)) ? p.tapacantos : {};
@@ -2741,11 +2953,47 @@
                                     if (tc.abajo) tapMM += p.ancho;
                                     if (tc.izquierda) tapMM += (p.largo!=null? p.largo : p.alto);
                                 }); });
+                                if (window._lastRenderTableros && Array.isArray(window._lastRenderTableros)) {
+                                    const tbsSrc = window._lastRenderTableros;
+                                    let areaTotalLock = 0, areaUsadaLock = 0, tapMMlock = 0;
+                                    tbsSrc.forEach(tb=>{
+                                        areaTotalLock += tb.anchoUtil * tb.altoUtil;
+                                        (tb.piezas||[]).forEach(p=>{
+                                            areaUsadaLock += p.ancho * p.alto;
+                                            const tc = p.tapacantos || {}; if (tc.arriba) tapMMlock += p.ancho; if (tc.derecha) tapMMlock += p.alto; if (tc.abajo) tapMMlock += p.ancho; if (tc.izquierda) tapMMlock += p.alto;
+                                        });
+                                    });
+                                    if (areaTotalLock > 0) aprovech = (areaUsadaLock / areaTotalLock) * 100;
+                                    tapMM = tapMMlock;
+                                }
+                                // Forzar a usar el valor visual mostrado si existe para evitar cambios
+                                if (typeof window._aprovechamientoDisplay === 'number') {
+                                    aprovech = window._aprovechamientoDisplay;
+                                }
+                                window._metricsFrozen = {
+                                    totalTableros, aprovech, desperdicioM2, tapMM, areaTotalM2, areaUsadaM2, origen: (mRes.origen||'backend'), timestamp: Date.now()
+                                };
                                 document.getElementById('tablerosUsados').textContent = totalTableros;
                                 document.getElementById('aprovechamiento').textContent = `${aprovech.toFixed(1)}%`;
+                                try {
+                                    let badge = document.getElementById('badgeOrigenOpt');
+                                    if (!badge) {
+                                        badge = document.createElement('span');
+                                        badge.id = 'badgeOrigenOpt';
+                                        badge.style.marginLeft = '8px';
+                                        badge.style.padding = '2px 6px';
+                                        badge.style.borderRadius = '4px';
+                                        badge.style.fontSize = '11px';
+                                        const apEl = document.getElementById('aprovechamiento');
+                                        if (apEl && apEl.parentElement) apEl.parentElement.appendChild(badge);
+                                    }
+                                    badge.textContent = mRes.origen === 'frontend' ? 'origen:frontend' : 'origen:backend';
+                                    badge.style.background = mRes.origen === 'frontend' ? '#d4edda' : '#ffeeba';
+                                    badge.style.color = '#333';
+                                } catch(_eBadge3) {}
                                 document.getElementById('desperdicio').textContent = `${desperdicioM2.toFixed(3)} m²`;
                                 document.getElementById('tapacantos').textContent = `${(tapMM/1000).toFixed(1)} m`;
-                            }catch(e){ console.warn('No se pudo actualizar resumen con backend', e); }
+                            } catch(e) { console.warn('No se pudo actualizar resumen con backend (freeze)', e); }
                         })();
                     } catch(e){
                         console.warn('Error al aplicar resultado del backend', e);
@@ -3728,15 +3976,38 @@
 
     // Mostrar resultados de optimización
     function mostrarResultados(tableros) {
-        // Calcular estadísticas generales
-        const totalTableros = tableros.length;
-        const aprovechamientoPromedio = tableros.reduce((sum, t) => sum + t.getAprovechamiento(), 0) / totalTableros;
-        const desperdicioTotal = tableros.reduce((sum, t) => sum + t.getDesperdicio(), 0);
-    const tapacantoTotal = calcularTapacantoTotal(tableros); // en mm
+        // Forzar uso del snapshot visual si existe, para garantizar sincronía
+        if (window._lastRenderTableros && Array.isArray(window._lastRenderTableros)) {
+            tableros = window._lastRenderTableros;
+        }
+        // Calcular estadísticas generales (fórmula GLOBAL consistente)
+        let totalTableros = tableros.length;
+        let areaTotalUtil = tableros.reduce((sum, t) => sum + (t.anchoUtil * t.altoUtil), 0);
+        let areaUsada = tableros.reduce((sum, t) => sum + t.piezas.reduce((s, p) => s + (p.ancho * p.alto), 0), 0);
+        let aprovechamientoGlobal = areaTotalUtil > 0 ? (areaUsada / areaTotalUtil) * 100 : 0;
+        let desperdicioTotal = areaTotalUtil - areaUsada; // mm^2 restante util
+        let tapacantoTotal = calcularTapacantoTotal(tableros); // en mm
+        // Guardar aprovechamiento mostrado para evitar salto posterior en freeze
+        window._aprovechamientoDisplay = aprovechamientoGlobal;
+
+        // Si ya hay métricas congeladas, mostrar exactamente esas (coherencia absoluta)
+        if (window._metricsFrozen) {
+            totalTableros = window._metricsFrozen.totalTableros;
+            aprovechamientoGlobal = window._metricsFrozen.aprovech;
+            // desperdicioTotal y tapacantoTotal se recalculan a partir del snapshot si se quiere consistencia visual;
+            // sin embargo mantenemos las congeladas convirtiendo a formato previo si existen.
+            if (typeof window._metricsFrozen.desperdicioM2 === 'number') {
+                // desperdicioTotal está en mm^2, convertir desde m^2 congelado
+                desperdicioTotal = window._metricsFrozen.desperdicioM2 * 1_000_000;
+            }
+            if (typeof window._metricsFrozen.tapMM === 'number') {
+                tapacantoTotal = window._metricsFrozen.tapMM; // ya mm
+            }
+        }
 
         // Actualizar estadísticas en la interfaz
         document.getElementById('tablerosUsados').textContent = totalTableros;
-        document.getElementById('aprovechamiento').textContent = aprovechamientoPromedio.toFixed(1) + '%';
+        document.getElementById('aprovechamiento').textContent = aprovechamientoGlobal.toFixed(1) + '%';
         document.getElementById('desperdicio').textContent = (desperdicioTotal / 1000000).toFixed(3) + ' m²';
         document.getElementById('tapacantos').textContent = (tapacantoTotal / 1000).toFixed(1) + ' m';
 
@@ -3778,9 +4049,9 @@
             document.getElementById('resKerf').textContent = `${kerf} mm`;
             document.getElementById('resMargenes').textContent = `Margen: ${margenX} mm`;
             document.getElementById('resArea').textContent = `${(areaTableroM2*totalTableros).toFixed(2)} m² (${totalTableros} tableros)`;
-            document.getElementById('resAprovech').textContent = `${aprovechamientoPromedio.toFixed(1)}%`;
+            document.getElementById('resAprovech').textContent = `${aprovechamientoGlobal.toFixed(1)}%`;
             const areaUtilM2 = ((ancho - 2*margenX) * (alto - 2*margenX))/1_000_000;
-            const sobrantesM2 = Math.max((areaTableroM2*totalTableros) - (aprovechamientoPromedio/100 * areaUtilM2 * totalTableros), 0);
+            const sobrantesM2 = Math.max((areaTableroM2*totalTableros) - (aprovechamientoGlobal/100 * areaUtilM2 * totalTableros), 0);
             const resSob = document.getElementById('resSobrantes');
             if (resSob) resSob.textContent = `${sobrantesM2.toFixed(3)} m²`;
             // Mostrar en resumen: Nombre (Código)
@@ -3815,7 +4086,7 @@
             document.getElementById('resumenProyecto').style.display = 'block';
         } catch(e){ console.warn('No se pudo poblar el resumen:', e.message); }
 
-    // Generar visualización solo una vez; bloquear re-render inmediato
+    // Generar visualización solo una vez; bloquear re-render inmediato y guardar snapshot
     try{ 
         const contVis = document.getElementById('visualizacionTableros');
         if (contVis){
@@ -3825,6 +4096,14 @@
                 generarVisualizacion(tableros);
                 contVis.dataset.locked = '1';
             }
+            // Guardar snapshot para material activo
+            try {
+                const activeTab = document.querySelector('#materialTabs button.nav-link.active');
+                let matIdx = 1;
+                if (activeTab && activeTab.id){ const m = activeTab.id.match(/material(\d+)-tab/); if (m) matIdx = parseInt(m[1],10); }
+                window._materialVisualizations = window._materialVisualizations || {};
+                window._materialVisualizations[matIdx] = contVis.innerHTML;
+            } catch(eSnap){ console.warn('No se pudo guardar snapshot visualización', eSnap); }
         } else {
             generarVisualizacion(tableros);
         }
@@ -3840,31 +4119,109 @@
     }
 
     // Descargar PDF del proyecto; si no hay resultado, intentar forzar optimización primero
+    // Nuevo flujo rápido de PDF (snapshot HTML + caché)
     async function descargarPDF() {
+        // Bloqueo explícito en modo autoservicio: sólo se permite portada resumida
+        if (window.IS_AUTOSERVICIO) { alert('En modo autoservicio sólo se permite descargar la Portada PDF resumida.'); return; }
         if (window._bloquearPDF) { alert('Actualizando ID/archivo. Intenta nuevamente en unos segundos.'); return; }
         const btn = document.getElementById('btnDescargarPDF');
         if (btn) { btn.disabled = true; btn.classList.add('disabled'); btn.style.cursor = 'progress'; }
-        // Prioridad: el proyecto que figura en el resumen del proyecto
         const resumenEl = document.getElementById('resumenProyecto');
         let proyectoId = resumenEl ? resumenEl.getAttribute('data-proyecto-id') : null;
         if (!proyectoId) {
             const proyectoIdEl = document.getElementById('resultadosOptimizacion');
             proyectoId = proyectoIdEl ? proyectoIdEl.getAttribute('data-proyecto-id') : null;
         }
-        if (!proyectoId) { alert('Primero crea y guarda un proyecto para poder exportar PDF.'); return; }
-        const url = `/optimizador/exportar-pdf/${encodeURIComponent(proyectoId)}/`;
-        // Mostrar toast no intrusivo
-        const toast = document.getElementById('toastGenerandoPdf');
-        if (toast) toast.style.display = 'block';
-        // Abrir en nueva pestaña sin bloquear UI
-        setTimeout(()=>{
-            try {
-                window.open(url, '_blank', 'noopener');
-            } finally {
-                setTimeout(()=>{ if (toast) toast.style.display = 'none'; }, 1500);
-                setTimeout(()=>{ if (btn) { btn.disabled = false; btn.classList.remove('disabled'); btn.style.cursor = ''; } }, 1200);
+        if (!proyectoId) { alert('Primero crea y guarda un proyecto para poder exportar PDF.'); if(btn){btn.disabled=false;btn.classList.remove('disabled');btn.style.cursor='';} return; }
+        // Mostrar toast solo en primera generación (POST); caché no lo necesita
+        const toast = (!window._snapshotPdfEnviado) ? document.getElementById('toastGenerandoPdf') : null;
+        if (toast && !window._snapshotPdfEnviado) {
+            // Evitar parpadeo: esperar breve para confirmar que no se completó instantáneo
+            window._snapshotPdfCompleted = false;
+            setTimeout(()=>{ if (!window._snapshotPdfCompleted) { toast.style.display='block'; } }, 250);
+        }
+        // Si ya se generó una vez, usar caché GET instantáneo
+        if (window._snapshotPdfEnviado) {
+            const urlCached = `/optimizador/exportar-pdf-snapshot-cached/${encodeURIComponent(proyectoId)}/`;
+            setTimeout(()=>{
+                try { window.open(urlCached, '_blank', 'noopener'); } finally {
+                    setTimeout(()=>{ if (toast) toast.style.display='none'; }, 800);
+                    setTimeout(()=>{ if (btn){ btn.disabled=false; btn.classList.remove('disabled'); btn.style.cursor=''; } }, 600);
+                }
+            }, 40);
+            return;
+        }
+        // Construir materiales desde estado
+        try {
+            const materiales = [];
+            Object.keys(materialState).sort((a,b)=>parseInt(a)-parseInt(b)).forEach(idxStr => {
+                const idx = parseInt(idxStr,10);
+                const st = materialState[idx];
+                if (!st || !st.resultado) return;
+                const layoutHTML = (window._materialVisualizations && window._materialVisualizations[idx]) ? window._materialVisualizations[idx] : (document.getElementById('visualizacionTableros')?.innerHTML||'');
+                // Extraer piezas de resultado tableros
+                // Usar lista cacheada de piezas finalizadas si existe; generar si falta
+                let piezas = st.piezasFinalizadas || [];
+                if (!piezas.length){
+                    piezas = [];
+                    try {
+                        (st.resultado.tableros||[]).forEach((t,ti)=>{
+                            (t.piezas||[]).forEach(p=>{
+                                piezas.push({
+                                    nombre: p.nombre || p.id_unico || 'Pieza',
+                                    tablero: ti+1,
+                                    x: typeof p.x === 'number'? p.x: (p.posicion && p.posicion.x)||0,
+                                    y: typeof p.y === 'number'? p.y: (p.posicion && p.posicion.y)||0,
+                                    ancho: p.ancho || p.w || 0,
+                                    alto: p.largo || p.h || p.alto || 0,
+                                    rotada: !!p.rotada
+                                });
+                            });
+                        });
+                        st.piezasFinalizadas = piezas; // cachear para siguientes usos
+                    } catch(eP){ console.warn('No se pudieron preparar piezas para PDF snapshot', eP); }
+                }
+                // Calcular eficiencia material si existe en resultado
+                let eficiencia = 0;
+                try { if (typeof st.resultado.aprovechamiento === 'number') eficiencia = st.resultado.aprovechamiento; } catch(_e){}
+                materiales.push({
+                    titulo: `Material ${idx}`,
+                    eficiencia: eficiencia,
+                    layout_html: layoutHTML,
+                    piezas: piezas
+                });
+            });
+            if (!materiales.length){ alert('No hay resultados optimizados para generar PDF.'); if(btn){btn.disabled=false;btn.classList.remove('disabled');btn.style.cursor='';} if(toast) toast.style.display='none'; return; }
+            const urlPost = `/optimizador/exportar-pdf-snapshot/${encodeURIComponent(proyectoId)}/`;
+            const resp = await fetch(urlPost, { method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':getCsrfToken()}, body: JSON.stringify({ materiales }) });
+            if (!resp.ok){
+                // Fallback: generar PDF directo desde JSON del proyecto (estilo legacy rápido)
+                console.warn('Fallo snapshot; intentando fallback JSON → PDF…');
+                const urlJson = `/optimizador/exportar-pdf-json/${encodeURIComponent(proyectoId)}/`;
+                const resp2 = await fetch(urlJson, { method:'GET' });
+                if (!resp2.ok){
+                    const txt = await resp.text().catch(()=>''), txt2 = await resp2.text().catch(()=>'');
+                    console.warn('Snapshot error:', txt); console.warn('JSON-PDF error:', txt2);
+                    alert('Error al generar PDF.');
+                    if(toast) toast.style.display='none'; if(btn){btn.disabled=false;btn.classList.remove('disabled');btn.style.cursor='';}
+                    return;
+                }
+                const blob2 = await resp2.blob();
+                const pdfUrl2 = URL.createObjectURL(blob2);
+                window.open(pdfUrl2, '_blank','noopener');
+                window._snapshotPdfCompleted = true;
+                if (toast) setTimeout(()=>{ toast.style.display='none'; }, 800);
+                setTimeout(()=>{ if (btn){ btn.disabled=false; btn.classList.remove('disabled'); btn.style.cursor=''; } }, 600);
+                return;
             }
-        }, 50);
+            const blob = await resp.blob();
+            const pdfUrl = URL.createObjectURL(blob);
+            window.open(pdfUrl, '_blank','noopener');
+            window._snapshotPdfEnviado = true;
+            window._snapshotPdfCompleted = true;
+            if (toast) setTimeout(()=>{ toast.style.display='none'; }, 1000);
+            setTimeout(()=>{ if (btn){ btn.disabled=false; btn.classList.remove('disabled'); btn.style.cursor=''; } }, 900);
+        } catch(e){ console.error(e); alert('Error inesperado generando PDF.'); if(toast){ toast.style.display='none'; } if(btn){btn.disabled=false;btn.classList.remove('disabled');btn.style.cursor='';} }
     }
 
     // Imprimir el mismo PDF generado (no la pantalla), intentando forzar optimización antes
